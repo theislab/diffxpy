@@ -1,0 +1,13 @@
+cache
+data
+config.ini
+.metadata
+.idea
+.Rhistory
+playground/*
+venv/*
+resources/*
+**/__pycache__
+
+!**/.gitignore
+
