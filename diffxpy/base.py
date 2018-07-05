@@ -1,3 +1,4 @@
+import abc
 import logging
 
 import numpy as np
@@ -16,21 +17,58 @@ import data as data_utils
 from . import stattest
 
 
-class DifferentialExpressionTest:
+class _Estimation(metaclass=abc.ABCMeta):
+    """
+    Dummy class specifying all needed methods / parameters necessary for DifferentialExpressionTest.
+    Useful for type hinting.
+    """
 
-    def __init__(self, X, full_model, reduced_model):
-        self.X = X
-        self.full_model = full_model
-        self.reduced_model = reduced_model
+    @property
+    @abc.abstractmethod
+    def design(self) -> np.ndarray:
+        pass
+
+    @abc.abstractmethod
+    def probs(self) -> np.ndarray:
+        pass
+
+    @abc.abstractmethod
+    def log_probs(self) -> np.ndarray:
+        pass
+
+    @property
+    @abc.abstractmethod
+    def loss(self, **kwargs) -> np.ndarray:
+        pass
+
+    @property
+    @abc.abstractmethod
+    def gradient(self, **kwargs) -> np.ndarray:
+        pass
+
+
+class DifferentialExpressionTest:
+    full_estim: _Estimation
+    reduced_estim: _Estimation
+
+    def __init__(self, full_estim: _Estimation, reduced_estim: _Estimation):
+        self.full_estim = full_estim
+        self.reduced_estim = reduced_estim
+
+    def reduced_model_gradient(self):
+        return self.reduced_estim.gradient
+
+    def full_model_gradient(self):
+        return self.full_estim.gradient
 
     def likelihood_ratio_test(self):
-        full = np.sum(self.full_model.log_probs(self.X), axis=0)
-        reduced = np.sum(self.reduced_model.log_probs(self.X), axis=0)
+        full = np.sum(self.full_estim.log_probs(), axis=0)
+        reduced = np.sum(self.reduced_estim.log_probs(), axis=0)
 
         pval = stattest.likelihood_ratio_test(
             ll_full=full,
             ll_reduced=reduced,
-            df=self.full_model.design.shape[-1] - self.reduced_model.design.shape[-1]
+            df=self.full_estim.design.shape[-1] - self.reduced_estim.design.shape[-1]
         )
 
         return pval
@@ -50,8 +88,8 @@ def test(data, full_formula, reduced_formula, sample_description=None, model="nb
                 formula=full_design.design_info.subset(reduced_formula)
             )
 
-        X = data.X
-    elif anndata is not None and isinstance(data, xr.Dataset):
+        # X = data.X
+    elif xr is not None and isinstance(data, xr.Dataset):
         if sample_description is None:
             full_design = data_utils.design_matrix_from_xarray(
                 dataset=data,
@@ -64,7 +102,7 @@ def test(data, full_formula, reduced_formula, sample_description=None, model="nb
                 formula=full_design.design_info.subset(reduced_formula)
             )
 
-        X = data["X"]
+        # X = data["X"]
     else:
         if sample_description is None:
             raise ValueError(
@@ -72,7 +110,7 @@ def test(data, full_formula, reduced_formula, sample_description=None, model="nb
                 "with corresponding sample annotations"
             )
 
-        X = data
+        # X = data
 
     # in each case: if `sample_description` is specified, overwrite previous designs
     if sample_description is not None:
@@ -91,13 +129,13 @@ def test(data, full_formula, reduced_formula, sample_description=None, model="nb
         import api.models.nb_glm as test_model
 
         logger.info("Estimating reduced model...")
-        estim = test_model.Estimator(X, design_matrix=reduced_design)
+        reduced_input_data = test_model.InputData(data=data, design=reduced_design)
+        estim = test_model.Estimator(input_data=reduced_input_data)
         estim.initialize()
         estim.train(learning_rate=0.5, loss_history_size=200, stop_at_loss_change=0.05)
         estim.train(learning_rate=0.05, loss_history_size=200, stop_at_loss_change=0.05)
         if close_sessions:
-            reduced_model = test_model.model_from_params(estim.export_params())
-            estim.close_session()
+            reduced_model = estim.finalize()
         else:
             reduced_model = estim
         logger.info("Estimation of reduced model ready")
@@ -128,9 +166,9 @@ def test(data, full_formula, reduced_formula, sample_description=None, model="nb
         b_slopes = b[1:]
 
         logger.info("Estimating full model...")
+        full_input_data = test_model.InputData(data=data, design=reduced_design)
         estim = test_model.Estimator(
-            X,
-            design_matrix=full_design,
+            input_data=full_input_data,
             init_a_intercept=a_intercept,
             init_a_slopes=a_slopes,
             init_b_intercept=b_intercept,
@@ -140,11 +178,10 @@ def test(data, full_formula, reduced_formula, sample_description=None, model="nb
         estim.train(learning_rate=0.5, loss_history_size=200, stop_at_loss_change=0.05)
         estim.train(learning_rate=0.05, loss_history_size=200, stop_at_loss_change=0.05)
         if close_sessions:
-            full_model = test_model.model_from_params(estim.export_params())
-            estim.close_session()
+            full_model = estim.finalize()
         else:
             full_model = estim
         logger.info("Estimation of full model ready")
 
-        de_test = DifferentialExpressionTest(X, full_model, reduced_model)
+        de_test = DifferentialExpressionTest(full_model, reduced_model)
         return de_test
