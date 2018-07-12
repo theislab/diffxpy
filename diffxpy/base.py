@@ -14,7 +14,7 @@ except ImportError:
     anndata = None
 
 import data as data_utils
-from . import stattest
+from . import stats
 
 
 class _Estimation(metaclass=abc.ABCMeta):
@@ -46,6 +46,11 @@ class _Estimation(metaclass=abc.ABCMeta):
     def gradient(self, **kwargs) -> np.ndarray:
         pass
 
+    @property
+    @abc.abstractmethod
+    def hessian_diagonal(self, **kwargs) -> np.ndarray:
+        pass
+
 
 class DifferentialExpressionTest:
     full_estim: _Estimation
@@ -65,7 +70,7 @@ class DifferentialExpressionTest:
         full = np.sum(self.full_estim.log_probs(), axis=0)
         reduced = np.sum(self.reduced_estim.log_probs(), axis=0)
 
-        pval = stattest.likelihood_ratio_test(
+        pval = stats.likelihood_ratio_test(
             ll_full=full,
             ll_reduced=reduced,
             df=self.full_estim.design.shape[-1] - self.reduced_estim.design.shape[-1]
@@ -74,7 +79,7 @@ class DifferentialExpressionTest:
         return pval
 
 
-def test(data, full_formula, reduced_formula, sample_description=None, model="nb_glm", close_sessions=True):
+def test(data, full_formula, reduced_formula, sample_description=None, noise_model="nb", close_sessions=True):
     full_design = None
     reduced_design = None
     if anndata is not None and isinstance(data, anndata.AnnData):
@@ -125,7 +130,7 @@ def test(data, full_formula, reduced_formula, sample_description=None, model="nb
 
     logger = logging.getLogger(__name__)
 
-    if model == "nb_glm":
+    if noise_model == "nb" or noise_model == "negative_binomial":
         import api.models.nb_glm as test_model
 
         logger.info("Estimating reduced model...")
@@ -185,3 +190,10 @@ def test(data, full_formula, reduced_formula, sample_description=None, model="nb
 
         de_test = DifferentialExpressionTest(full_model, reduced_model)
         return de_test
+
+
+def two_sample(cond: str):  # wrapper for test with '~ 1 + cond'
+    pass
+
+def many2many():
+    pass
