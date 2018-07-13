@@ -100,7 +100,10 @@ class DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
     @property
     @abc.abstractmethod
-    def summarize(self, **kwargs) -> np.ndarray:
+    def results(self, **kwargs) -> pandas.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+        """
         assert self.gene_ids is not None
         assert self.pval is not None
         assert self.qval is not None
@@ -115,6 +118,14 @@ class DifferentialExpressionTest(metaclass=abc.ABCMeta):
             })
 
         return res
+
+    @property
+    @abc.abstractmethod
+    def plot(self, **kwargs):
+        """
+        Create visual summary of top differentially expressed genes.
+        """
+        pass
 
 
 class DifferentialExpressionTestWald(DifferentialExpressionTest):
