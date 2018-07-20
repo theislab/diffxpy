@@ -115,7 +115,7 @@ def wald_test(theta_mle, theta_sd, theta0=0):
     """
     Perform single coefficient Wald test.
 
-    The Wald test tests whether a given coefficient deviates significantly
+    The Wald test unit_test whether a given coefficient deviates significantly
     from the supplied reference value, based on the standard deviation
     of the posterior of the parameter estimate. In the context of
     generalized linear nodels, this standard deviation
@@ -144,7 +144,7 @@ def two_coef_z_test(theta_mle0, theta_mle1, theta_sd0, theta_sd1):
     """
     Perform z-test to compare two coefficients.
 
-    The Wald test tests whether a given coefficient deviates significantly
+    The Wald test unit_test whether a given coefficient deviates significantly
     from the other ceofficient, based on their standard deviations
     of the posterior of the parameter estimates. In the context of
     generalized linear nodels, this standard deviation
