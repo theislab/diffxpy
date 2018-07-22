@@ -1,7 +1,8 @@
-from scipy import stats
+import numpy as np
+import scipy.stats
 
 
-def likelihood_ratio_test(ll_full, ll_reduced, df_full: int, df_red: int):
+def likelihood_ratio_test(ll_full, ll_reduced, df_full: int, df_reduced: int):
     """
     Perform log-likihood ratio test based on already fitted models.
 
@@ -15,19 +16,20 @@ def likelihood_ratio_test(ll_full, ll_reduced, df_full: int, df_red: int):
     	Likelihood of reduced model for each gene.
     :param df_full: int
     	Degrees of freedom (number of parameters) of full model for each gene.
-    :param df_red:  int
+    :param df_reduced:  int
     	Degrees of freedom (number of parameters) of reduced model for each gene.
     """
     if ll_full.shape[0] != ll_full.shape[0]:
-    	raise ValueError('stats.likelihood_ratio_test(): ll_full and ll_red have to contain the same number of genes')
+        raise ValueError('stats.likelihood_ratio_test(): ll_full and ll_red have to contain the same number of genes')
     # Compute the difference in degrees of freedom.
-    delta_df = df_full - df_red
+    delta_df = df_full - df_reduced
     # Compute the deviance test statistic.
     delta_dev = 2 * (ll_full - ll_reduced)
     # Compute the p-values based on the deviance and
     # its expection based on the chi-square distribution.
-    pvals = 1 - np.asarray([stats.chi2(delta_df[i]).cdf(delta_dev[i]) for i in range(delta_df.shape[0])])
+    pvals = 1 - np.asarray([scipy.stats.chi2(delta_df[i]).cdf(delta_dev[i]) for i in range(delta_df.shape[0])])
     return pvals
+
 
 def wilcoxon(x0, x1):
     """
@@ -42,11 +44,13 @@ def wilcoxon(x0, x1):
     	Observations in second group by gene.
     """
     if x0.shape[0] != x1.shape[0]:
-    	raise ValueError('stats.wilcoxon(): x0 and x1 have to contain the same number of genes')
-    pvals = np.asarray([stats.mannwhitneyu(x=x0[:,i].flatten(), y=x1[:,i].flatten()).pvalues for i in range(x0.shape[0])])
+        raise ValueError('stats.wilcoxon(): x0 and x1 have to contain the same number of genes')
+    pvals = np.asarray(
+        [scipy.stats.mannwhitneyu(x=x0[:, i].flatten(), y=x1[:, i].flatten()).pvalues for i in range(x0.shape[0])])
     return pvals
 
-def t_test_raw(x0, x1): 
+
+def t_test_raw(x0, x1):
     """
     Perform two-sided t-test allowing for unequal group variances (Welch's t-test) on raw data.
 
@@ -59,7 +63,7 @@ def t_test_raw(x0, x1):
     	Observations in second group by gene.
     """
     if x0.shape[0] != x1.shape[0]:
-    	raise ValueError('stats.t_test_raw(): x0 and x1 have to contain the same number of genes')
+        raise ValueError('stats.t_test_raw(): x0 and x1 have to contain the same number of genes')
     
     mu0 = np.mean(x0, axis=0).flatten()
     var0 = np.var(x0, axis=0).flatten()
@@ -67,11 +71,12 @@ def t_test_raw(x0, x1):
     var1 = np.var(x1, axis=0).flatten()
     n0 = x0.shape[0]
     n1 = x1.shape[0]
-
+    
     pval = t_test_moments(mu0=mu0, mu1=mu1, var0=var0, var1=var1, n0=n0, n1=n1)
     return pval
 
-def t_test_moments(mu0, mu1, var0, var1, n0:int, n1:int): 
+
+def t_test_moments(mu0, mu1, var0, var1, n0: int, n1: int):
     """
     Perform two-sided t-test allowing for unequal group variances (Welch's t-test)
     moments of distribution of data.
@@ -92,13 +97,13 @@ def t_test_moments(mu0, mu1, var0, var1, n0:int, n1:int):
     	Number of observations in second group.
     """
     if len(mu0) != len(mu1):
-    	raise ValueError('stats.t_test_moments(): mu and mu1 have to contain the same number of entries')
+        raise ValueError('stats.t_test_moments(): mu and mu1 have to contain the same number of entries')
     if len(var0) != len(var1):
-    	raise ValueError('stats.t_test_moments(): mu and mu1 have to contain the same number of entries')
+        raise ValueError('stats.t_test_moments(): mu and mu1 have to contain the same number of entries')
     
     s_delta = np.sqrt((var0 / n0) + (var1 / n1))
     t = (mu0 - mu1) / s_delta
-
+    
     df = (
             np.square((var0 / n0) + (var1 / n1)) /
             (
@@ -106,7 +111,7 @@ def t_test_moments(mu0, mu1, var0, var1, n0:int, n1:int):
                     (np.square(var1 / n1) / (n1 - 1))
             )
     )
-
+    
     pval = np.asarray([scipy.stats.t(df[i]).cdf(t[i]) for i in range(t.shape[0])])
     return pval
 
@@ -133,10 +138,10 @@ def wald_test(theta_mle, theta_sd, theta0=0):
     	Reference parameter values against which coefficient is tested.
     """
     if theta_mle.shape[0] != theta_sd.shape[0]:
-    	raise ValueError('stats.wald_test(): theta_mle and theta_sd have to contain the same number of entries')
+        raise ValueError('stats.wald_test(): theta_mle and theta_sd have to contain the same number of entries')
     
-    wald_statistic = (theta_mle-theta0)/theta_sd
-    pvals = 1 - stats.norm(loc=0, scale=1).cdf(wald_statistic)# check whether this is two-sided
+    wald_statistic = (theta_mle - theta0) / theta_sd
+    pvals = 1 - scipy.stats.norm(loc=0, scale=1).cdf(wald_statistic)  # check whether this is two-sided
     return pvals
 
 
@@ -164,12 +169,13 @@ def two_coef_z_test(theta_mle0, theta_mle1, theta_sd0, theta_sd1):
     	Standard deviation of maximum likelihood estimator of second parameter by gene.
     """
     if theta_mle0.shape[0] != theta_mle1.shape[0]:
-    	raise ValueError('stats.two_coef_z_test(): theta_mle0 and theta_mle1 have to contain the same number of entries')
+        raise ValueError(
+            'stats.two_coef_z_test(): theta_mle0 and theta_mle1 have to contain the same number of entries')
     if theta_sd0.shape[0] != theta_sd1.shape[0]:
-    	raise ValueError('stats.two_coef_z_test(): theta_sd0 and theta_sd1 have to contain the same number of entries')
+        raise ValueError('stats.two_coef_z_test(): theta_sd0 and theta_sd1 have to contain the same number of entries')
     if theta_mle0.shape[0] != theta_sd0.shape[0]:
-    	raise ValueError('stats.two_coef_z_test(): theta_mle0 and theta_sd0 have to contain the same number of entries')
+        raise ValueError('stats.two_coef_z_test(): theta_mle0 and theta_sd0 have to contain the same number of entries')
     
-    z_statistic = (theta_mle0-theta_mle1)/np.sqrt(np.square(theta_sd0)+np.square(theta_sd1))
-    pvals = 1 - stats.norm(loc=0, scale=1).cdf(z_statistic)# check whether this is two-sided
+    z_statistic = (theta_mle0 - theta_mle1) / np.sqrt(np.square(theta_sd0) + np.square(theta_sd1))
+    pvals = 1 - scipy.stats.norm(loc=0, scale=1).cdf(z_statistic)  # check whether this is two-sided
     return pvals

@@ -80,8 +80,8 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     Dummy class specifying all needed methods / parameters necessary for DifferentialExpressionTest.
     Useful for type hinting. Structure:
     Methods which are called by constructor and which compute (corrected) p-values:
-        __test()
-        __correction()
+        _test()
+        _correction()
     Accessor methods for important metrics which have to be extracted from estimated models:
         log_fold_change()
         reduced_model_gradient()
@@ -92,8 +92,8 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     """
     
     def __init__(self):
-        self.__pval = None
-        self.__qval = None
+        self._pval = None
+        self._qval = None
     
     @property
     @abc.abstractmethod
@@ -126,14 +126,14 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     @property
     def pval(self):
         if self.pval is None:
-            self.__pval = self._test()
-        return self.__pval
+            self._pval = self._test()
+        return self._pval
     
     @property
     def qval(self):
         if self.qval is None:
-            self.__qval = self._correction()
-        return self.__qval
+            self._qval = self._correction()
+        return self._qval
     
     @property
     @abc.abstractmethod
@@ -174,7 +174,7 @@ class _DiscreteDifferentialExpressionTest(_DifferentialExpressionTest, metaclass
     
     @property
     def gene_ids(self) -> np.ndarray:
-        return self.full_estim.features
+        return np.asarray(self.full_estim.features)
     
     @property
     def reduced_model_gradient(self):
@@ -203,20 +203,27 @@ class _DiscreteDifferentialExpressionTest(_DifferentialExpressionTest, metaclass
         sample_description = self.sample_description[[f.name() for f in di.subset(factors).factor_infos]]
         dmat = self.full_estim.design_loc
         
+        # make rows unique
         dmat, idx = np.unique(dmat, axis=0, return_index=True)
         sample_description = sample_description.iloc[idx].reset_index(drop=True)
         
         # factors = factors.intersection(di.term_names)
         
+        # select the columns of the factors
         cols = np.arange(len(di.column_names))
         sel = np.concatenate([cols[di.slice(f)] for f in factors], axis=0)
-        neg_sel = np.zeros_like(cols).astype(bool)
-        neg_sel[sel] = True
+        neg_sel = np.ones_like(cols).astype(bool)
+        neg_sel[sel] = False
         
+        # overwrite all columns which are not specified by the factors with 0
         dmat[:, neg_sel] = 0
         
+        # make the design matrix + sample description unique again
+        dmat, idx = np.unique(dmat, axis=0, return_index=True)
+        sample_description = sample_description.iloc[idx].reset_index(drop=True)
+        
         locations = self.full_estim.inverse_link_loc(dmat @ self.full_estim.par_link_loc)
-        locations = np.log(locations, base=base)
+        locations = np.log(locations) / np.log(base)
         
         dist = np.expand_dims(locations, axis=0)
         dist = np.transpose(dist, [1, 0, 2]) - dist
@@ -254,6 +261,8 @@ class _DiscreteDifferentialExpressionTest(_DifferentialExpressionTest, metaclass
         if return_type == "dataframe":
             df = dists.to_dataframe("logFC")
             df = df.reset_index().drop(["minuend", "subtrahend"], axis=1)
+            
+            return df
         else:
             return dists
     
@@ -334,7 +343,7 @@ class _DiscreteDifferentialExpressionTest(_DifferentialExpressionTest, metaclass
         return retval
 
 
-class DifferentialExpressionTestSingle(_DiscreteDifferentialExpressionTest):
+class DifferentialExpressionTestSingle(_DiscreteDifferentialExpressionTest, metaclass=abc.ABCMeta):
     """
     _DifferentialExpressionTest for unit_test with a single test per gene.
     The individual test object inherit directly from this class.
@@ -343,18 +352,11 @@ class DifferentialExpressionTestSingle(_DiscreteDifferentialExpressionTest):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     
-    def _test(self):
-        pass
-    
-    def _correction(self):
-        # code BH FDR correction here
-        # self.qval = BH corrected PVAL
-        pass
-    
     def log_fold_change(self, base=np.e, return_type="dataframe"):
         """
         Calculates the log fold change between the two sample groups in this test.
-        Returns some distance matrix representation of size `num_genes`.
+        Returns for each gene the difference between 'factor == 1' and 'factor == 0'.
+        
 
         :param base: the log base to use; default is the natural logarithm
         :param return_type: Choose the return type.
@@ -367,6 +369,21 @@ class DifferentialExpressionTestSingle(_DiscreteDifferentialExpressionTest):
 
         :return: either pandas.DataFrame or xarray.DataArray
         """
+        factors = set(self.full_design_info.term_names).difference(self.reduced_design_info.term_names)
+        dists = self._log_fold_change(factors=factors, base=base)
+        
+        # this is a two-sample test; therefore, dists has to contain 2x2 distances
+        assert dists.shape[0:2] == (2, 2), "Number of pairwise comparisons does not equal to two!"
+        
+        # use only comparison of 'factor == 1' to 'factor == 0'
+        dists = dists[1, 0]
+        if return_type == "dataframe":
+            df = dists.to_dataframe("logFC")
+            df = df.reset_index()
+            
+            return df
+        else:
+            return dists
     
     def summary(self, **kwargs) -> pd.DataFrame:
         """
@@ -380,21 +397,15 @@ class DifferentialExpressionTestSingle(_DiscreteDifferentialExpressionTest):
             "gene": self.gene_ids,
             "pval": self.pval,
             "qval": self.qval,
-            "log2fc": self.log2_fold_change(),
+            "log2fc": self.log2_fold_change(return_type="xarray").values,
             "grad": self.full_model_gradient,
             "grad_red": self.reduced_model_gradient,
         })
         
         return res
-    
-    def plot(self, **kwargs):
-        """
-        Create visual summary of top differentially expressed genes.
-        """
-        pass
 
 
-class DifferentialExpressionTestMulti(_DiscreteDifferentialExpressionTest):
+class DifferentialExpressionTestMulti(_DiscreteDifferentialExpressionTest, metaclass=abc.ABCMeta):
     """
     _DifferentialExpressionTest for unit_test with a multiple unit_test per gene.
     The individual test object inherit directly from this class.
@@ -402,17 +413,6 @@ class DifferentialExpressionTestMulti(_DiscreteDifferentialExpressionTest):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-    
-    def log_fold_change(self):
-        pass
-    
-    def _test(self):
-        pass
-    
-    def _correction(self):
-        # code BH FDR correction here
-        # self.qval = BH corrected PVAL
-        pass
     
     def summary(self, **kwargs) -> pd.DataFrame:
         """
@@ -425,22 +425,19 @@ class DifferentialExpressionTestMulti(_DiscreteDifferentialExpressionTest):
         # TODO have to modify so that min max works on 3D arrays for pairwise
         res = pd.DataFrame({
             "gene": self.gene_ids,
-            "pval": np.min(self.pval, axis=1),  # return minimal pval by gene
-            "qval": np.min(self.qval, axis=1),  # return minimal qval by gene
-            "lfc": np.max(self.log2FC(), axis=1),  # return maximal lfc by gene
-            "grad": np.max(self.full_model_gradient(),
-                           axis=1),  # return maximal gradient by gene
-            "grad_red": np.max(self.reduced_model_gradient(),
-                               axis=1),  # return maximal gradient by gene
+            # return minimal pval by gene:
+            "pval": np.min(self.pval, axis=1),
+            # return minimal qval by gene:
+            "qval": np.min(self.qval, axis=1),
+            # return maximal logFC by gene:
+            "log2fc": self.log2_fold_change(return_type="xarray").max(dim="minuend").max(dim="subtrahend"),
+            # return maximal gradient by gene:
+            "grad": np.max(self.full_model_gradient, axis=1),
+            # return maximal gradient by gene:
+            "grad_red": np.max(self.reduced_model_gradient, axis=1),
         })
         
         return res
-    
-    def plot(self, **kwargs):
-        """
-        Create visual summary of top differentially expressed genes.
-        """
-        pass
 
 
 class DifferentialExpressionTestWald(DifferentialExpressionTestSingle):
@@ -452,57 +449,40 @@ class DifferentialExpressionTestWald(DifferentialExpressionTestSingle):
     def __init__(self, model_estim: _Estimation):
         super().__init__()
         self.model_estim = model_estim
-        self.test()
-        self.bh_correction()
+        # self.test()
+        # self.bh_correction()
     
-    def reduced_model_gradient(self):
-        pass
-    
-    def full_model_gradient(self):
-        return self.model_estim.gradient
-    
-    def log_fold_change(self):
-        pass
+    # def reduced_model_gradient(self):
+    #     pass
+    #
+    # def full_model_gradient(self):
+    #     return self.model_estim.gradient
+    #
+    # def log_fold_change(self):
+    #     pass
     
     def _test(self, coef_loc_totest):
         full = np.sum(self.full_estim.log_probs(), axis=0)
         reduced = np.sum(self.reduced_estim.log_probs(), axis=0)
         
         # TODO extract MLE and std of model here.
-        self.pval = stats.wald_test(theta_mle=self.model_estim., theta_sd=self.model_estim., theta0=0)
+        self.pval = stats.wald_test(theta_mle=self.model_estim.location, theta_sd=self.model_estim.scale, theta0=0)
 
 
 class DifferentialExpressionTestLRT(DifferentialExpressionTestSingle):
     """
     Single log-likelihood ratio test per gene.
     """
-    full_estim: _Estimation
-    reduced_estim: _Estimation
-    
-    def __init__(self, full_estim: _Estimation, reduced_estim: _Estimation):
-        super().__init__()
-        self.full_estim = full_estim
-        self.reduced_estim = reduced_estim
-        self._test()
-        self._correction()
-    
-    def reduced_model_gradient(self):
-        return self.reduced_estim.gradient
-    
-    def full_model_gradient(self):
-        return self.full_estim.gradient
-    
-    def log_fold_change(self):
-        pass
     
     def _test(self):
         full = np.sum(self.full_estim.log_probs(), axis=0)
         reduced = np.sum(self.reduced_estim.log_probs(), axis=0)
         
-        self.pval = stats.likelihood_ratio_test(
+        return stats.likelihood_ratio_test(
             ll_full=full,
             ll_reduced=reduced,
-            df=self.full_estim.design.shape[-1] - self.reduced_estim.design.shape[-1]
+            df_full=self.full_estim.design_loc.shape[-1],
+            df_reduced=self.reduced_estim.design_loc.shape[-1]
         )
 
 
@@ -513,8 +493,7 @@ class DifferentialExpressionTestTT(DifferentialExpressionTestSingle):
     
     def __init__(self, pval):
         super().__init__()
-        self.pval = pval
-        self._correction()
+        self._pval = pval
 
 
 class DifferentialExpressionTestWilcoxon(DifferentialExpressionTestSingle):
@@ -524,8 +503,7 @@ class DifferentialExpressionTestWilcoxon(DifferentialExpressionTestSingle):
     
     def __init__(self, pval):
         super().__init__()
-        self.pval = pval
-        self._correction()
+        self._pval = pval
 
 
 class DifferentialExpressionTestPairwise(DifferentialExpressionTestMulti):
@@ -535,17 +513,16 @@ class DifferentialExpressionTestPairwise(DifferentialExpressionTestMulti):
     
     def __init__(self, pval):
         super().__init__()
-        self.pval = pval
-        self._correction()
+        self._pval = pval
     
-    def reduced_model_gradient(self):
-        return self.grad_red
-    
-    def full_model_gradient(self):
-        return self.grad_full
-    
-    def log_fold_change(self):
-        return self.lfc
+    # def reduced_model_gradient(self):
+    #     return self.grad_red
+    #
+    # def full_model_gradient(self):
+    #     return self.grad_full
+    #
+    # def log_fold_change(self):
+    #     return self.lfc
 
 
 class DifferentialExpressionTestVsRest(DifferentialExpressionTestMulti):
@@ -555,7 +532,7 @@ class DifferentialExpressionTestVsRest(DifferentialExpressionTestMulti):
     
     def __init__(self, pval, grad_full, grad_red, lfc):
         super().__init__()
-        self.pval = pval
+        self._pval = pval
         self.grad_full = grad_full
         self.grad_red = grad_red
         self._correction()
@@ -572,11 +549,13 @@ class DifferentialExpressionTestVsRest(DifferentialExpressionTestMulti):
 
 def test_lrt(
         data,
-        full_formula_loc,
-        reduced_formula_loc,
-        full_formula_scale=None,
-        reduced_formula_scale=None,
-        sample_description=None,
+        full_formula: str = None,
+        reduced_formula: str = None,
+        full_formula_loc: str = None,
+        reduced_formula_loc: str = None,
+        full_formula_scale: str = None,
+        reduced_formula_scale: str = None,
+        sample_description: pd.DataFrame = None,
         noise_model="nb",
         close_sessions=True
 ):
@@ -589,16 +568,22 @@ def test_lrt(
     test for the difference of the mean parameter of both samples.
         
     :param data
-    :param full_formula_loc: formula
-        Full model formula for location paramter model.
+    :param full_formula: formula
+        Full model formula for location and scale parameter models.
     :param reduced_formula_loc: formula
-        Reduced model formula for location paramter model.
+        Reduced model formula for location and scale parameter models.
+    :param full_formula_loc: formula
+        Full model formula for location parameter model.
+        If not specified, `full_formula` will be used instead.
+    :param reduced_formula_loc: formula
+        Reduced model formula for location parameter model.
+        If not specified, `reduced_formula` will be used instead.
     :param full_formula_scale: formula
-        Full model formula for scale paramter model.
-        Will use same formula as for location parameter if not specified.
+        Full model formula for scale parameter model.
+        If not specified, `full_formula` will be used instead.
     :param reduced_formula_scale: formula
-        Reduced model formula for scale paramter model.
-        Will use same formula as for location parameter if not specified.
+        Reduced model formula for scale parameter model.
+        If not specified, `reduced_formula` will be used instead.
     :param method: str
         {'wald':default, 'lrt' 't-test', 'wilcoxon'} Statistical test to use.
     :param sample_description: 
@@ -607,9 +592,13 @@ def test_lrt(
     :param close_sessions: 
     """
     if full_formula_scale is None:
-        full_formula_scale = full_formula_loc
+        full_formula_scale = full_formula
     if reduced_formula_scale is None:
-        reduced_formula_scale = reduced_formula_loc
+        reduced_formula_scale = reduced_formula
+    if full_formula_scale is None:
+        full_formula_scale = full_formula
+    if reduced_formula_scale is None:
+        reduced_formula_scale = reduced_formula
     
     full_design_loc = None
     reduced_design_loc = None
@@ -731,31 +720,6 @@ def test_lrt(
             reduced_model = estim
         logger.info("Estimation of reduced model ready")
         
-        # find columns of `full_model` which are identical to `reduced_model`
-        indices_loc = np.arange(len(full_design_loc.design_info.column_name_indexes))
-        indices_loc = np.unique(np.concatenate([
-            indices_loc[v] for i, v in full_design_loc.design_info.term_name_slices.items() if
-            i in reduced_design_loc.design_info.term_names
-        ]))
-        
-        # initialize `a` and `b` of the full model with estimated values from the reduced model
-        shape_loc = list(reduced_model.a.shape)
-        shape_loc[-2] = full_design_loc.shape[-1]
-        
-        location = np.tile(
-            np.sqrt(np.nextafter(0, 1, dtype=reduced_model.a.dtype)),
-            reps=shape_loc
-        )
-        scale = location.copy()
-        
-        location[indices_loc] = reduced_model.location
-        location_intercept = location[[0]]
-        location_slopes = location[1:]
-        
-        scale[indices_loc] = reduced_model.b
-        scale_intercept = scale[[0]]
-        scale_slopes = scale[1:]
-        
         logger.info("Estimating full model...")
         full_input_data = test_model.InputData.new(
             data=data, design_loc=full_design_loc, design_scale=full_design_scale
@@ -829,7 +793,7 @@ def test_wald(data, formula_loc, coef_loc_totest, formula_scale=None,
             design_loc = data_utils.design_matrix_from_xarray(
                 dataset=data,
                 dim="observations",
-                formula=full_formula_loc
+                formula=formula_loc
             )
             # Define scale parameter model.
             if formula_scale is None:
@@ -900,10 +864,10 @@ def test_t_test(data, grouping):
         of observations into the two groups.
     """
     groups = np.unique(data.obs[grouping])  # TODO: make sure this is anndata
-    pval = t_test_raw(
+    pval = stats.t_test_raw(
         x0=data[data.obs[grouping] == groups[0], :],
         x1=data[data.obs[grouping] == groups[1], :])
-    de_test = DifferentialExpressionTestTT(model, pval)
+    de_test = DifferentialExpressionTestTT(pval)
     return de_test
 
 
@@ -918,10 +882,10 @@ def test_wilcoxon(data, grouping):
         of observations into the two groups.
     """
     groups = np.unique(data.obs[grouping])  # TODO: make sure this is anndata
-    pval = wilcoxon(
+    pval = stats.wilcoxon(
         x0=data[data.obs[grouping] == groups[0], :],
         x1=data[data.obs[grouping] == groups[1], :])
-    de_test = DifferentialExpressionTestTT(model, pval)
+    de_test = DifferentialExpressionTestTT(pval)
     return de_test
 
 
@@ -982,10 +946,10 @@ def two_sample(data, grouping: str, test=None, sample_description=None, noise_mo
                             close_sessions=close_sessions)
     elif test == 'lrt':
         # TODO handle formula syntax
-        full_formula_loc = '~1+' + grouping
-        red_formula_loc = '~1'
-        full_formula_scale = '~1+' + grouping
-        red_formula_scale = '~1+' + grouping
+        full_formula_loc = '~ 1 + ' + grouping
+        red_formula_loc = '~ 1'
+        full_formula_scale = '~ 1 + ' + grouping
+        red_formula_scale = '~ 1 + ' + grouping
         de_test = stats.test_lrt(data=data, full_formula_loc=full_formula_loc, red_formula_loc=red_formula_loc,
                                  full_formula_scale=full_formula_scale, red_formula_scale=red_formula_scale,
                                  sample_description=sample_description, noise_model=noise_model,
@@ -1078,7 +1042,7 @@ def test_pairwise(data, grouping: str, test='z-test', sample_description=None, n
                 design_loc = data_utils.design_matrix_from_xarray(
                     dataset=data,
                     dim="observations",
-                    formula=full_formula_loc
+                    formula=formula_loc
                 )
                 # Define scale parameter model.
                 if formula_scale is None:
@@ -1120,7 +1084,7 @@ def test_pairwise(data, grouping: str, test='z-test', sample_description=None, n
             import api.models.nb_glm as test_model
             
             logger.info("Estimating model...")
-            input_data = test_model.InputData(data=data, design_loc=design_loc, design_scale=design_scale)
+            input_data = test_model.InputData.new(data=data, design_loc=design_loc, design_scale=design_scale)
             estim = test_model.Estimator(input_data=input_data)
             estim.initialize()
             estim.train(learning_rate=0.5, loss_history_size=200, stop_at_loss_change=0.05)
@@ -1134,12 +1098,12 @@ def test_pairwise(data, grouping: str, test='z-test', sample_description=None, n
             raise ValueError('base.test(): `noise_model` not recognized.')
         
         ##TODO extract coefficients and standard deviation from model fit which are then used by ztest
-        theta_mle = NA  # values of parameter estiamtes: genes x coefficient array with one coefficient per group
-        theta_sd = NA  # standard deviation of estimates: genes x coefficient array with one coefficient per group
+        theta_mle = None  # values of parameter estiamtes: genes x coefficient array with one coefficient per group
+        theta_sd = None  # standard deviation of estimates: genes x coefficient array with one coefficient per group
         for i, g1 in enumerate(groups):
             for j, g2 in enumerate(groups[(i + 1):]):
                 pvals[:, i, j] = stats.two_coef_z_test(theta_mle0=theta_mle[:, i], theta_mle1=theta_mle[:, j],
-                                                       theta_sd0=theta_sd[:, i], theta_sd1 == theta_sd[:, j])
+                                                       theta_sd0=theta_sd[:, i], theta_sd1=theta_sd[:, j])
     else:
         for i, g1 in enumerate(groups):
             for j, g2 in enumerate(groups[(i + 1):]):
@@ -1149,7 +1113,7 @@ def test_pairwise(data, grouping: str, test='z-test', sample_description=None, n
                 pvals[:, i, j] = de_test_temp.pval
     
     # TODO extracrt lfc and gradients (if available)
-    de_test = DifferentialExpressionTestPairwise(pval=pval, grad_full=None, grad_red=None, lfc=None)
+    de_test = DifferentialExpressionTestPairwise(pval=pvals, grad_full=None, grad_red=None, lfc=None)
     return de_test
 
 
@@ -1237,7 +1201,7 @@ def test_vsrest(data, grouping: str, test='fast-wald', sample_description=None, 
                 design_loc = data_utils.design_matrix_from_xarray(
                     dataset=data,
                     dim="observations",
-                    formula=full_formula_loc
+                    formula=formula_loc
                 )
                 # Define scale parameter model.
                 if formula_scale is None:
@@ -1279,7 +1243,7 @@ def test_vsrest(data, grouping: str, test='fast-wald', sample_description=None, 
             import api.models.nb_glm as test_model
             
             logger.info("Estimating model...")
-            input_data = test_model.InputData(data=data, design_loc=design_loc, design_scale=design_scale)
+            input_data = test_model.InputData.new(data=data, design_loc=design_loc, design_scale=design_scale)
             estim = test_model.Estimator(input_data=input_data)
             estim.initialize()
             estim.train(learning_rate=0.5, loss_history_size=200, stop_at_loss_change=0.05)
@@ -1293,11 +1257,11 @@ def test_vsrest(data, grouping: str, test='fast-wald', sample_description=None, 
             raise ValueError('base.test(): `noise_model` not recognized.')
         
         ##TODO extract coefficients and standard deviation from model fit which are then used by ztest
-        theta_mle = NA  # values of parameter estiamtes: genes x coefficient array with one coefficient per group
-        theta_sd = NA  # standard deviation of estimates: genes x coefficient array with one coefficient per group
+        theta_mle = None  # values of parameter estiamtes: genes x coefficient array with one coefficient per group
+        theta_sd = None  # standard deviation of estimates: genes x coefficient array with one coefficient per group
         ave_expr = np.mean(data.X, axis=0).flatten()
         for i, g1 in enumerate(groups):
-            pvals[:, i] = stats.wald_test(theta_mle=theta_mle[:, i], theta_sd[:, i], theta0=ave_expr)
+            pvals[:, i] = stats.wald_test(theta_mle=theta_mle[:, i], theta_sd=theta_sd[:, i], theta0=ave_expr)
     else:
         for i, g1 in enumerate(groups):
             # TODO adjust group allocation that group g1 is tested versus union of all other groups.
@@ -1307,5 +1271,5 @@ def test_vsrest(data, grouping: str, test='fast-wald', sample_description=None, 
             pvals[:, i] = de_test_temp.pval
     
     # TODO extracrt lfc and gradients (if available)
-    de_test = DifferentialExpressionTestVsRest(pval=pval, grad_full=None, grad_red=None, lfc=None)
+    de_test = DifferentialExpressionTestVsRest(pval=pvals, grad_full=None, grad_red=None, lfc=None)
     return de_test
