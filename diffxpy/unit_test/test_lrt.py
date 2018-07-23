@@ -35,7 +35,7 @@ class TestLRT(unittest.TestCase):
         wd = os.path.join(self.working_dir.name, "lrt")
         os.makedirs(wd, exist_ok=True)
         
-        test = de.test_lrt(sim.input_data, full_formula="~ 1 + condition", reduced_formula="~ 1")
+        test = de.test_lrt(sim.input_data, full_formula="~ 1 + batch + condition", reduced_formula="~ 1 + batch")
         
         print(test.summary())
 
