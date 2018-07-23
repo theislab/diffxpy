@@ -691,12 +691,9 @@ def test_wald_loc(data,
     :param factor_loc_totest: str
         Factor of formula to test with Wald test.
         E.g. "condition" if formula_loc would be "~ 1 + batch + condition"
-    :param method: str
-        {'wald':default, 'lrt' 't-test', 'wilcoxon'} Statistical test to use.
-    :param sample_description: 
+    :param sample_description:
     :param noise_model: str
         {'nb':default} Noise model to use in model-based unit_test.
-    :param close_sessions: 
     """
     sample_description = _parse_sample_description(data, sample_description)
     design_loc = data_utils.design_matrix(
@@ -766,7 +763,11 @@ def test_wilcoxon(data: anndata.AnnData, grouping):
     logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0))
 
     pval = stats.wilcoxon(x0=x0, x1=x1)
-    de_test = DifferentialExpressionTestWilcoxon(pval, logfc)
+    de_test = DifferentialExpressionTestWilcoxon(
+        gene_ids=data.var_names,
+        pval=pval,
+        logfc=logfc,
+    )
 
     return de_test
 
@@ -776,7 +777,7 @@ def two_sample(
         grouping: str,
         test=None,
         sample_description=None,
-        noise_model: str=None,
+        noise_model: str = None,
 ) -> _DifferentialExpressionTestSingle:
     """
     Perform differential expression test between two groups on adata object
@@ -830,6 +831,8 @@ def two_sample(
         formula_scale = '~1+' + grouping
         de_test = test_wald_loc(
             data=data,
+            factor_loc_totest=factor_loc_totest,
+            coef_to_test=coef_to_test,
             formula_loc=formula_loc,
             formula_scale=formula_scale,
             sample_description=sample_description,
@@ -942,9 +945,13 @@ def test_pairwise(data, grouping: str, test='z-test', sample_description=None, n
             for j, g2 in enumerate(groups[(i + 1):]):
                 X = ...
                 X.sel(group="A")
-                de_test_temp = two_sample(data=data, grouping=grouping, test=test,
-                                          sample_description=sample_description,
-                                          noise_model=noise_model, close_sessions=close_sessions)
+                de_test_temp = two_sample(
+                    data=data,
+                    grouping=grouping,
+                    test=test,
+                    sample_description=sample_description,
+                    noise_model=noise_model
+                )
                 pvals[:, i, j] = de_test_temp.pval
                 logfc[:, i, j] = de_test_temp.log_fold_change
                 tests[:, i, j] = de_test_temp
