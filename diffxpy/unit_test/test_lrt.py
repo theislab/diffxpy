@@ -2,11 +2,11 @@ import os
 import unittest
 import tempfile
 
-import numpy as np
-import xarray as xr
-import pandas as pd
+# import numpy as np
+# import xarray as xr
+# import pandas as pd
 
-from sgdglm.api.models.nb_glm import Simulator, Estimator, InputData
+from batchglm.api.models.nb_glm import Simulator, Estimator, InputData
 import diffxpy as de
 
 

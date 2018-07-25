@@ -11,7 +11,7 @@ setup(
         'numpy',
         'scipy',
         'patsy',
-        'sgdglm',
+        'batchglm',
     ],
     extras_require={
         'optional': [

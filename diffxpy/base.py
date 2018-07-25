@@ -12,14 +12,28 @@ import xarray as xr
 # except ImportError:
 #     xr = None
 
+from enum import Enum
+
+#
+# class TrainingStrategy(Enum):
+#     DEFAULT = lambda learning_rate, convergence_criteria:
+#         def train_fn(estim):
+#             estin.train()
+#         return train_fn
+#     PRE_INITIALIZED = 2
+#
+# def train(estim):
+#     estin.train(learning_rate=...)
+#     estin.train(learning_rate=...)
+
 try:
     import anndata
 except ImportError:
     anndata = None
 
 import patsy
-import sgdglm.data as data_utils
-from sgdglm.api.models.glm import Model as GeneralizedLinearModel
+import batchglm.data as data_utils
+from batchglm.api.models.glm import Model as GeneralizedLinearModel
 
 from . import stats
 
@@ -592,7 +606,7 @@ def _parse_sample_description(data, sample_description=None) -> pd.DataFrame:
 
 def _fit(noise_model, data, design_loc, design_scale, init_model=None, gene_names=None, close_session=True):
     if noise_model == "nb" or noise_model == "negative_binomial":
-        import api.models.nb_glm as test_model
+        import batchglm.api.models.nb_glm as test_model
 
         logger.info("Estimating model...")
         input_data = test_model.InputData.new(
@@ -1045,10 +1059,13 @@ def test_pairwise(
     gene_names = _parse_gene_names(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
     grouping = _parse_grouping(data, sample_description, grouping)
+    sample_description = pd.DataFrame({"grouping": grouping})
 
     groups = np.unique(grouping)
-    pvals = np.zeros([len(groups), len(groups), X.shape[1]])
-    logfc = np.zeros([len(groups), len(groups), X.shape[1]])
+    pvals = np.tile(np.NaN, [len(groups), len(groups), X.shape[1]])
+    pvals[np.eye(pvals.shape[0]).astype(bool)] = 0
+    logfc = np.tile(np.NaN, [len(groups), len(groups), X.shape[1]])
+    logfc[np.eye(logfc.shape[0]).astype(bool)] = 0
     tests = np.tile([None], [X.shape[1], len(groups), len(groups)])
 
     if test == 'z-test':
@@ -1072,44 +1089,18 @@ def test_pairwise(
 
         for i, g1 in enumerate(groups):
             for j, g2 in enumerate(groups[(i + 1):]):
+                j = j + i + 1
+
                 pvals[i, j] = stats.two_coef_z_test(theta_mle0=theta_mle[i], theta_mle1=theta_mle[j],
                                                     theta_sd0=theta_sd[i], theta_sd1=theta_sd[j])
                 pvals[j, i] = pvals[i, j]
                 logfc[i, j] = theta_mle[j] - theta_mle[i]
                 logfc[j, i] = logfc[i, j]
-    elif test == "lrt":
-        reduced_formula = "~ 1"
-        full_formula = "~ 1 + grouping"
-        de_test = test_lrt(
-            data=data,
-            reduced_formula=reduced_formula,
-            full_formula=full_formula,
-            gene_names=gene_names,
-            sample_description=sample_description,
-            noise_model=noise_model,
-        )
-        for i, g1 in enumerate(groups):
-            x1 = np.log(np.mean(X[grouping == g1], axis=0))
-            for j, g2 in enumerate(groups[(i + 1):]):
-                sel = (grouping == g1) | (grouping == g2)
-
-                red_probs = de_test.reduced_estim.log_probs()[sel]
-                full_probs = de_test.full_estim.log_probs()[sel]
-                ll_reduced = np.sum(red_probs, axis=0)
-                ll_full = np.sum(full_probs, axis=0)
-
-                pvals[i, j] = stats.likelihood_ratio_test(
-                    ll_full=ll_full,
-                    ll_reduced=ll_reduced,
-                    df_full=de_test.full_estim.design_loc.shape[-1],
-                    df_reduced=de_test.reduced_estim.design_loc.shape[-1]
-                )
-                pvals[j, i] = pvals[i, j]
-                logfc[i, j] = x1 - np.log(np.mean(X[grouping == g2], axis=0))
-                logfc[j, i] = - logfc[i, j]
     else:
         for i, g1 in enumerate(groups):
             for j, g2 in enumerate(groups[(i + 1):]):
+                j = j + i + 1
+
                 sel = (grouping == g1) | (grouping == g2)
                 de_test_temp = two_sample(
                     data=X[sel],
@@ -1228,30 +1219,6 @@ def test_vsrest(
         for i, g1 in enumerate(groups):
             pvals[i] = stats.wald_test(theta_mle=theta_mle[i], theta_sd=theta_sd[i], theta0=ave_expr)
             logfc[i] = theta_mle[i]
-    elif test == "lrt":
-        reduced_formula = "~ 1"
-        full_formula = "~ 1 + grouping"
-        de_test = test_lrt(
-            data=data,
-            reduced_formula=reduced_formula,
-            full_formula=full_formula,
-            gene_names=gene_names,
-            sample_description=sample_description,
-            noise_model=noise_model,
-        )
-        reduced = np.sum(de_test.reduced_estim.log_probs(), axis=0)
-        for i, g1 in enumerate(groups):
-            test_grouping = np.where(grouping == g1, "group", "rest")
-
-            full = np.sum(de_test.full_estim.log_probs()[test_grouping], axis=0)
-
-            pvals[i] = stats.likelihood_ratio_test(
-                ll_full=full,
-                ll_reduced=reduced,
-                df_full=de_test.full_estim.design_loc.shape[-1],
-                df_reduced=de_test.reduced_estim.design_loc.shape[-1]
-            )
-            logfc[i] = np.log(np.mean(X[grouping != g1], axis=0)) - np.log(np.mean(X[grouping == g1], axis=0))
     else:
         for i, g1 in enumerate(groups):
             test_grouping = np.where(grouping == g1, "group", "rest")
