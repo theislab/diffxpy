@@ -116,20 +116,12 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     def log2_fold_change(self, **kwargs):
         """
         Calculates the pairwise log_2 fold change(s) for this DifferentialExpressionTest.
-
-        See <self>.`log_fold_change` for futher details.
-
-        :return: either pandas.DataFrame or xarray.DataArray
         """
         return self.log_fold_change(base=2, **kwargs)
 
     def log10_fold_change(self, **kwargs):
         """
         Calculates the log_10 fold change(s) for this DifferentialExpressionTest.
-
-        See <self>.`log_fold_change` for futher details.
-
-        :return: either pandas.DataFrame or xarray.DataArray
         """
         return self.log_fold_change(base=10, **kwargs)
 
@@ -165,6 +157,8 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
     """
     _DifferentialExpressionTest for unit_test with a single test per gene.
     The individual test object inherit directly from this class.
+
+    All implementations of this class should return one p-value and one fold change per gene.
     """
 
     def summary(self, **kwargs) -> pd.DataFrame:
@@ -284,6 +278,10 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
             dist.coords["minuend_" + col] = (("minuend",), sample_description[col])
             dist.coords["subtrahend_" + col] = (("subtrahend",), sample_description[col])
 
+        # # If this is a pairwise comparison, return only one fold change per gene
+        # if dist.shape[:2] == (2, 2):
+        #     dist = dist[1, 0]
+
         return dist
 
     def log_fold_change(self, base=np.e, return_type="vector"):
@@ -309,10 +307,10 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
             dists = self._log_fold_change(factors=factors, base=base)
 
             df = dists.to_dataframe("logFC")
-            df = df.reset_index().drop(["minuend", "subtrahend"], axis=1)
+            df = df.reset_index().drop(["minuend", "subtrahend"], axis=1, errors="ignore")
             return df
         elif return_type == "vector":
-            if len(factors) > 1 or np.unique(np.asarray(self.sample_description[list(factors)]), axis=0) != 2:
+            if len(factors) > 1 or self.sample_description[list(factors)].drop_duplicates().shape[0] != 2:
                 return None
             else:
                 dists = self._log_fold_change(factors=factors, base=base)
@@ -390,7 +388,13 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
         assert self.pval is not None
         assert self.qval is not None
 
-        # TODO have to modify so that min max works on 3D arrays for pairwise
+        # calculate maximum logFC of lower triangular fold change matrix
+        raw_logfc = self.log2_fold_change(return_type="xarray")
+        argm = np.argmax(raw_logfc, axis=0)
+        args = np.argmax(raw_logfc[argm], axis=0)
+        argm = argm[args]
+        logfc = raw_logfc[argm, args] * np.where(argm > args, 1, -1)
+
         res = pd.DataFrame({
             "gene": self.gene_ids,
             # return minimal pval by gene:
@@ -398,7 +402,7 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
             # return minimal qval by gene:
             "qval": np.min(self.qval, axis=1),
             # return maximal logFC by gene:
-            "log2fc": self.log2_fold_change(return_type="xarray").max(dim="minuend").max(dim="subtrahend"),
+            "log2fc": logfc,
         })
 
         return res
@@ -424,6 +428,9 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         return np.asarray(self.model_estim.features)
 
     def log_fold_change(self, base=np.e, **kwargs):
+        """
+        Returns one fold change per gene
+        """
         design = np.unique(self.model_estim.design_loc, axis=0)
         dmat = np.zeros_like(design)
         dmat[:, self.coef_loc_totest] = design[:, self.coef_loc_totest]
@@ -453,6 +460,9 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         return self._gene_ids
 
     def log_fold_change(self, base=np.e, **kwargs):
+        """
+        Returns one fold change per gene
+        """
         if base == np.e:
             return self._logfc
         else:
@@ -475,6 +485,9 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
         return self._gene_ids
 
     def log_fold_change(self, base=np.e, **kwargs):
+        """
+        Returns one fold change per gene
+        """
         if base == np.e:
             return self._logfc
         else:
@@ -497,6 +510,9 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         return self._gene_ids
 
     def log_fold_change(self, base=np.e, **kwargs):
+        """
+        Returns matrix of fold changes per gene
+        """
         if base == np.e:
             return self._logfc
         else:
@@ -508,21 +524,13 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
     Tests between between each group and the rest for more than 2 groups per gene.
     """
 
-    def __init__(self, pval, logfc, grad_full, grad_red):
+    def __init__(self, gene_ids, pval, logfc):
         super().__init__()
+        self._gene_ids = np.asarray(gene_ids)
         self._pval = pval
         self._logfc = logfc
 
-        self.grad_full = grad_full
-        self.grad_red = grad_red
-
-        self.qval
-
-    def reduced_model_gradient(self):
-        return self.grad_red
-
-    def full_model_gradient(self):
-        return self.grad_full
+        q = self.qval
 
     @property
     def gene_ids(self) -> np.ndarray:
@@ -533,6 +541,34 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
             return self._logfc
         else:
             return self._logfc / np.log(base)
+
+
+def _parse_gene_names(data, gene_names):
+    if gene_names is None:
+        if anndata is not None and isinstance(data, anndata.AnnData):
+            gene_names = data.var_names
+        elif isinstance(data, xr.DataArray):
+            gene_names = data["features"]
+        elif isinstance(data, xr.Dataset):
+            gene_names = data["features"]
+        else:
+            raise ValueError("Missing gene names")
+
+    return np.asarray(gene_names)
+
+
+def _parse_data(data, gene_names):
+    if anndata is not None and isinstance(data, anndata.AnnData):
+        X = data.X
+    elif isinstance(data, xr.DataArray):
+        X = data
+    elif isinstance(data, xr.Dataset):
+        X = data["X"]
+    else:
+        X = xr.DataArray(data, dims=("observations", "features"))
+        X["features"] = gene_names
+
+    return X
 
 
 def _parse_sample_description(data, sample_description=None) -> pd.DataFrame:
@@ -554,12 +590,17 @@ def _parse_sample_description(data, sample_description=None) -> pd.DataFrame:
     return sample_description
 
 
-def _fit(noise_model, data, design_loc, design_scale, init_model=None, close_session=True):
+def _fit(noise_model, data, design_loc, design_scale, init_model=None, gene_names=None, close_session=True):
     if noise_model == "nb" or noise_model == "negative_binomial":
         import api.models.nb_glm as test_model
 
         logger.info("Estimating model...")
-        input_data = test_model.InputData.new(data=data, design_loc=design_loc, design_scale=design_scale)
+        input_data = test_model.InputData.new(
+            data=data,
+            design_loc=design_loc,
+            design_scale=design_scale,
+            feature_names=gene_names
+        )
         estim = test_model.Estimator(input_data=input_data, init_model=init_model)
         estim.initialize()
         estim.train(learning_rate=0.5, loss_history_size=200, stop_at_loss_change=0.05)
@@ -584,6 +625,7 @@ def test_lrt(
         full_formula_loc: str = None,
         reduced_formula_scale: str = None,
         full_formula_scale: str = None,
+        gene_names=None,
         sample_description: pd.DataFrame = None,
         noise_model="nb",
 ):
@@ -612,7 +654,8 @@ def test_lrt(
     :param full_formula_scale: formula
         Full model formula for scale parameter model.
         If not specified, `full_formula` will be used instead.
-    :param sample_description:
+    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str
         {'nb':default} Noise model to use in model-based unit_test.
     """
@@ -625,6 +668,7 @@ def test_lrt(
     if reduced_formula_scale is None:
         reduced_formula_scale = reduced_formula
 
+    X = _parse_data(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
 
     full_design_loc = data_utils.design_matrix(
@@ -638,15 +682,17 @@ def test_lrt(
 
     reduced_model = _fit(
         noise_model=noise_model,
-        data=data,
+        data=X,
         design_loc=reduced_design_loc,
         design_scale=reduced_design_scale,
+        gene_names=gene_names,
     )
     full_model = _fit(
         noise_model=noise_model,
-        data=data,
+        data=X,
         design_loc=full_design_loc,
         design_scale=full_design_scale,
+        gene_names=gene_names,
         init_model=reduced_model
     )
 
@@ -661,14 +707,17 @@ def test_lrt(
     return de_test
 
 
-def test_wald_loc(data,
-                  factor_loc_totest,
-                  coef_to_test=None,  # e.g. coef_to_test="B"
-                  formula=None,
-                  formula_loc=None,
-                  formula_scale=None,
-                  sample_description=None,
-                  noise_model="nb"):
+def test_wald_loc(
+        data,
+        factor_loc_totest,
+        coef_to_test=None,  # e.g. coef_to_test="B"
+        formula=None,
+        formula_loc=None,
+        formula_scale=None,
+        gene_names=None,
+        sample_description=None,
+        noise_model="nb"
+):
     """
     Perform log-likelihood ratio test for differential expression 
     between two groups on adata object for each gene.
@@ -687,60 +736,101 @@ def test_wald_loc(data,
     :param formula_scale: formula
         model formula for scale parameter model.
         If not specified, `formula` will be used instead.
-
     :param factor_loc_totest: str
         Factor of formula to test with Wald test.
         E.g. "condition" if formula_loc would be "~ 1 + batch + condition"
-    :param sample_description:
+    :param coef_to_test: If there are more than two groups specified by `factor_loc_totest`,
+        this parameter allows to specify the group which should be tested
+    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str
         {'nb':default} Noise model to use in model-based unit_test.
     """
+
+    if formula_loc is None:
+        formula_loc = formula
+    if formula_scale is None:
+        formula_scale = formula
+    assert formula_scale is not None and formula_loc is not None, "Missing formula!"
+
+    X = _parse_data(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
+
     design_loc = data_utils.design_matrix(
         sample_description=sample_description, formula=formula_loc)
     design_scale = data_utils.design_matrix(
         sample_description=sample_description, formula=formula_scale)
 
+    col_slice = np.arange(design_loc.shape[-1])[design_loc.design_info.slice(factor_loc_totest)]
+    assert col_slice.size > 0, "Could not find any matching columns!"
+
+    if col_slice.size == 1:
+        # only one column possible
+        col_index = col_slice[0]
+    else:
+        samples = sample_description[factor_loc_totest].astype(type(coef_to_test)) == coef_to_test
+        one_cols = np.where(design_loc[samples][:, col_slice][0] == 1)
+        if one_cols.size == 0:
+            # there is no such column; modify design matrix to create one
+            col_index = col_slice[0]
+            design_loc[:, col_index] = np.where(samples, 1, 0)
+        else:
+            # use the one_column as col_index
+            col_index = one_cols[0]
+
     model = _fit(
         noise_model=noise_model,
-        data=data,
+        data=X,
         design_loc=design_loc,
         design_scale=design_scale,
+        gene_names=gene_names,
     )
-
-    dmat, unique_sd = _dmat_unique(design_loc, sample_description)
 
     de_test = DifferentialExpressionTestWald(model, col_index=col_index)
 
     return de_test
 
 
+def _parse_grouping(data, sample_description, grouping):
+    if isinstance(grouping, str):
+        sample_description = _parse_sample_description(data, sample_description)
+        grouping = sample_description[grouping]
+    return np.squeeze(np.asarray(grouping))
+
+
 def _split_X(data, grouping):
-    # TODO: generalize this to np.ndarrays and other types
-    grouping = data.obs[grouping]
     groups = np.unique(grouping)
     x0 = data[grouping == groups[0], :]
     x1 = data[grouping == groups[1], :]
     return x0, x1
 
 
-def test_t_test(data: anndata.AnnData, grouping):
+def test_t_test(
+        data,
+        grouping,
+        gene_names=None,
+        sample_description=None
+):
     """
     Perform Welch's t-test for differential expression 
     between two groups on adata object for each gene.
 
     :param data
-    :param grouping: str
-        Column in adata.obs which contains the split
-        of observations into the two groups.
+    :param grouping: str, array
+        - column in data.obs/sample_description which contains the split of observations into the two groups.
+        - array of length `num_observations` containing group labels
+    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param sample_description: optional pandas.DataFrame containing sample annotations
     """
+    gene_names = _parse_gene_names(data, gene_names)
+    grouping = _parse_grouping(data, grouping, sample_description)
     x0, x1 = _split_X(data, grouping)
 
+    pval = stats.t_test_raw(x0=x0, x1=x1)
     logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0))
 
-    pval = stats.t_test_raw(x0=x0, x1=x1)
     de_test = DifferentialExpressionTestTT(
-        gene_ids=data.var_names,
+        gene_ids=gene_names,
         pval=pval,
         logfc=logfc,
     )
@@ -748,23 +838,32 @@ def test_t_test(data: anndata.AnnData, grouping):
     return de_test
 
 
-def test_wilcoxon(data: anndata.AnnData, grouping):
+def test_wilcoxon(
+        data,
+        grouping,
+        gene_names=None,
+        sample_description=None
+):
     """
     Perform Wilcoxon rank sum test for differential expression 
     between two groups on adata object for each gene.
 
     :param data
-    :param grouping: str
-        Column in adata.obs which contains the split
-        of observations into the two groups.
+    :param grouping: str, array
+        - column in data.obs/sample_description which contains the split of observations into the two groups.
+        - array of length `num_observations` containing group labels
+    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param sample_description: optional pandas.DataFrame containing sample annotations
     """
+    gene_names = _parse_gene_names(data, gene_names)
+    grouping = _parse_grouping(data, grouping, sample_description)
     x0, x1 = _split_X(data, grouping)
 
+    pval = stats.wilcoxon(x0=x0, x1=x1)
     logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0))
 
-    pval = stats.wilcoxon(x0=x0, x1=x1)
     de_test = DifferentialExpressionTestWilcoxon(
-        gene_ids=data.var_names,
+        gene_ids=gene_names,
         pval=pval,
         logfc=logfc,
     )
@@ -774,8 +873,9 @@ def test_wilcoxon(data: anndata.AnnData, grouping):
 
 def two_sample(
         data,
-        grouping: str,
+        grouping: Union[str, np.ndarray, list],
         test=None,
+        gene_names=None,
         sample_description=None,
         noise_model: str = None,
 ) -> _DifferentialExpressionTestSingle:
@@ -808,12 +908,13 @@ def two_sample(
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
         
     :param data
-    :param grouping: str
-        Column in adata.obs which contains the split
-        of observations into the two groups.
+    :param grouping: str, array
+        - column in data.obs/sample_description which contains the split of observations into the two groups.
+        - array of length `num_observations` containing group labels
     :param test: str
         {'wald':default, 'lrt' 't-test', 'wilcoxon'} Statistical test to use.
-    :param sample_description: 
+    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str
         {'nb':default} Noise model to use in model-based unit_test.
     """
@@ -821,49 +922,79 @@ def two_sample(
         raise ValueError('base.two_sample(): Do not specify `noise_model` if using test t-test or wilcoxon: ' +
                          'The t-test is based on a gaussian noise model and wilcoxon is model free.')
 
+    X = _parse_data(data, gene_names)
+    grouping = _parse_grouping(data, sample_description, grouping)
+    sample_description = pd.DataFrame({"grouping": grouping})
+
+    groups = np.unique(grouping)
+    if groups.size > 2:
+        raise ValueError("More than two groups detected:\n\t%s", groups)
+    if groups.size < 2:
+        raise ValueError("Less than two groups detected:\n\t%s", groups)
+
     # Set default test:
     if test is None:
         test = 'wald'
 
     if test == 'wald':
-        # TODO handle formula syntax
-        formula_loc = '~1+' + grouping
-        formula_scale = '~1+' + grouping
+        if noise_model is None:
+            raise ValueError("Please specify noise_model")
+        formula_loc = '~ 1 + grouping'
+        formula_scale = '~ 1 + grouping'
         de_test = test_wald_loc(
-            data=data,
-            factor_loc_totest=factor_loc_totest,
-            coef_to_test=coef_to_test,
+            data=X,
+            factor_loc_totest="grouping",
+            coef_to_test=None,
             formula_loc=formula_loc,
             formula_scale=formula_scale,
+            gene_names=gene_names,
             sample_description=sample_description,
             noise_model=noise_model,
         )
     elif test == 'lrt':
-        # TODO handle formula syntax
-        full_formula_loc = '~ 1 + ' + grouping
+        if noise_model is None:
+            raise ValueError("Please specify noise_model")
+        full_formula_loc = '~ 1 + grouping'
+        full_formula_scale = '~ 1 + grouping'
         reduced_formula_loc = '~ 1'
-        full_formula_scale = '~ 1 + ' + grouping
-        reduced_formula_scale = '~ 1 + ' + grouping
+        reduced_formula_scale = '~ 1'
         de_test = test_lrt(
-            data=data,
+            data=X,
             full_formula_loc=full_formula_loc,
             reduced_formula_loc=reduced_formula_loc,
             full_formula_scale=full_formula_scale,
             reduced_formula_scale=reduced_formula_scale,
+            gene_names=gene_names,
             sample_description=sample_description,
             noise_model=noise_model,
         )
     elif test == 't-test':
-        de_test = test_t_test(data=data)
+        de_test = test_t_test(
+            data=X,
+            gene_names=gene_names,
+            grouping=grouping,
+        )
     elif test == 'wilcoxon':
-        de_test = test_wilcoxon(data=data)
+        de_test = test_wilcoxon(
+            data=X,
+            gene_names=gene_names,
+            grouping=grouping,
+        )
     else:
         raise ValueError('base.two_sample(): Parameter `test` not recognized.')
 
     return de_test
 
 
-def test_pairwise(data, grouping: str, test='z-test', sample_description=None, noise_model=None, close_sessions=True):
+def test_pairwise(
+        data,
+        grouping: Union[str, np.ndarray, list],
+        test='z-test',
+        gene_names=None,
+        sample_description=None,
+        noise_model=None,
+        return_full_test_objs=False
+):
     """
     Perform pairwise differential expression test between two groups on adata object
     for each gene for all combinations of pairs of groups.
@@ -900,64 +1031,103 @@ def test_pairwise(data, grouping: str, test='z-test', sample_description=None, n
     :param grouping: str
         Column in adata.obs which contains the split
         of observations into the two groups.
-    :param method: str
+    :param test: str
         {'z-test':default,'wald', 'lrt' 't-test', 'wilcoxon'} Statistical test to use.
-    :param sample_description: 
+    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str
         {'nb':default} Noise model to use in model-based unit_test.
-    :param close_sessions: 
+    :param return_full_test_objs: [Debugging] return matrix of test objects; currently valid for test != "z-test"
     """
     # Do not store all models but only p-value and q-value matrix:
     # genes x groups x groups
-    groups = np.unique(data.obs[grouping])
-    pvals = np.zeros([data.X.shape[1], len(groups), len(groups)])
-    logfc = np.zeros([data.X.shape[1], len(groups), len(groups)])
-    tests = np.tile([None], [data.X.shape[1], len(groups), len(groups)])
+    X = _parse_data(data, gene_names)
+    gene_names = _parse_gene_names(data, gene_names)
+    sample_description = _parse_sample_description(data, sample_description)
+    grouping = _parse_grouping(data, sample_description, grouping)
+
+    groups = np.unique(grouping)
+    pvals = np.zeros([len(groups), len(groups), X.shape[1]])
+    logfc = np.zeros([len(groups), len(groups), X.shape[1]])
+    tests = np.tile([None], [X.shape[1], len(groups), len(groups)])
 
     if test == 'z-test':
-        # TODO handle formula syntax
-        formula_loc = '~1+' + grouping
-        formula_scale = '~1+' + grouping
+        # fit each group individually
+        group_models = []
+        for g in groups:
+            sel = grouping == g
+            model = _fit(
+                noise_model=noise_model,
+                data=X[sel],
+                design_loc=np.ones([np.sum(sel), 1]),
+                design_scale=np.ones([np.sum(sel), 1]),
+                gene_names=gene_names,
+            )
+            group_models.append(model)
 
-        sample_description = _parse_sample_description(data, sample_description)
-        design_loc = data_utils.design_matrix(
-            sample_description=sample_description, formula=formula_loc)
-        design_scale = data_utils.design_matrix(
-            sample_description=sample_description, formula=formula_scale)
+        # values of parameter estimates: genes x coefficient array with one coefficient per group
+        theta_mle = [np.squeeze(np.asarray(e.par_link_loc)) for e in group_models]
+        # standard deviation of estimates: genes x coefficient array with one coefficient per group
+        theta_sd = [np.asarray(e.hessian_diagonal.isel(variables=0)) for e in group_models]
 
-        model = _fit(
-            noise_model=noise_model,
-            data=data,
-            design_loc=design_loc,
-            design_scale=design_scale,
-        )
-
-        ##TODO extract coefficients and standard deviation from model fit which are then used by ztest
-        theta_mle = None  # values of parameter estiamtes: genes x coefficient array with one coefficient per group
-        theta_sd = None  # standard deviation of estimates: genes x coefficient array with one coefficient per group
         for i, g1 in enumerate(groups):
             for j, g2 in enumerate(groups[(i + 1):]):
-                pvals[:, i, j] = stats.two_coef_z_test(theta_mle0=theta_mle[:, i], theta_mle1=theta_mle[:, j],
-                                                       theta_sd0=theta_sd[:, i], theta_sd1=theta_sd[:, j])
-                logfc[:, i, j] = theta_mle[:, j] - theta_mle[:, i]
+                pvals[i, j] = stats.two_coef_z_test(theta_mle0=theta_mle[i], theta_mle1=theta_mle[j],
+                                                    theta_sd0=theta_sd[i], theta_sd1=theta_sd[j])
+                pvals[j, i] = pvals[i, j]
+                logfc[i, j] = theta_mle[j] - theta_mle[i]
+                logfc[j, i] = logfc[i, j]
+    elif test == "lrt":
+        reduced_formula = "~ 1"
+        full_formula = "~ 1 + grouping"
+        de_test = test_lrt(
+            data=data,
+            reduced_formula=reduced_formula,
+            full_formula=full_formula,
+            gene_names=gene_names,
+            sample_description=sample_description,
+            noise_model=noise_model,
+        )
+        for i, g1 in enumerate(groups):
+            x1 = np.log(np.mean(X[grouping == g1], axis=0))
+            for j, g2 in enumerate(groups[(i + 1):]):
+                sel = (grouping == g1) | (grouping == g2)
+
+                red_probs = de_test.reduced_estim.log_probs()[sel]
+                full_probs = de_test.full_estim.log_probs()[sel]
+                ll_reduced = np.sum(red_probs, axis=0)
+                ll_full = np.sum(full_probs, axis=0)
+
+                pvals[i, j] = stats.likelihood_ratio_test(
+                    ll_full=ll_full,
+                    ll_reduced=ll_reduced,
+                    df_full=de_test.full_estim.design_loc.shape[-1],
+                    df_reduced=de_test.reduced_estim.design_loc.shape[-1]
+                )
+                pvals[j, i] = pvals[i, j]
+                logfc[i, j] = x1 - np.log(np.mean(X[grouping == g2], axis=0))
+                logfc[j, i] = - logfc[i, j]
     else:
         for i, g1 in enumerate(groups):
             for j, g2 in enumerate(groups[(i + 1):]):
-                X = ...
-                X.sel(group="A")
+                sel = (grouping == g1) | (grouping == g2)
                 de_test_temp = two_sample(
-                    data=data,
-                    grouping=grouping,
+                    data=X[sel],
+                    grouping=grouping[sel],
                     test=test,
-                    sample_description=sample_description,
+                    gene_names=gene_names,
+                    sample_description=sample_description.iloc[sel],
                     noise_model=noise_model
                 )
-                pvals[:, i, j] = de_test_temp.pval
-                logfc[:, i, j] = de_test_temp.log_fold_change
-                tests[:, i, j] = de_test_temp
+                pvals[i, j] = de_test_temp.pval
+                pvals[j, i] = pvals[i, j]
+                logfc[i, j] = de_test_temp.log_fold_change()
+                logfc[j, i] = - logfc[i, j]
+                if return_full_test_objs:
+                    tests[i, j] = de_test_temp
+                    tests[j, i] = de_test_temp
 
-    # TODO extracrt lfc and gradients (if available)
-    de_test = DifferentialExpressionTestPairwise(pval=pvals, logfc=None)
+    de_test = DifferentialExpressionTestPairwise(gene_ids=gene_names, pval=pvals, logfc=logfc)
 
     if return_full_test_objs:
         return de_test, tests
@@ -965,7 +1135,14 @@ def test_pairwise(data, grouping: str, test='z-test', sample_description=None, n
         return de_test
 
 
-def test_vsrest(data, grouping: str, test='fast-wald', sample_description=None, noise_model=None, close_sessions=True):
+def test_vsrest(
+        data,
+        grouping: Union[str, np.ndarray, list],
+        test='fast-wald',
+        gene_names=None,
+        sample_description=None,
+        noise_model=None
+):
     """
     Perform pairwise differential expression test between two groups on adata object
     for each gene for each groups versus the rest of the data set.
@@ -1008,50 +1185,86 @@ def test_vsrest(data, grouping: str, test='fast-wald', sample_description=None, 
     :param grouping: str
         Column in adata.obs which contains the split
         of observations into the two groups.
-    :param method: str
+    :param test: str
         {'fast-wald':default,'wald', 'lrt' 't-test', 'wilcoxon'} Statistical test to use.
-    :param sample_description: 
+    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str
         {'nb':default} Noise model to use in model-based unit_test.
-    :param close_sessions: 
     """
     # Do not store all models but only p-value and q-value matrix:
     # genes x groups
-    groups = np.unique(data.obs[grouping])
-    pvals = np.zeros([data.X.shape[1], len(groups)])
+    X = _parse_data(data, gene_names)
+    gene_names = _parse_gene_names(data, gene_names)
+    sample_description = _parse_sample_description(data, sample_description)
+    grouping = _parse_grouping(data, sample_description, grouping)
+    sample_description = pd.DataFrame({"grouping": grouping})
+
+    groups = np.unique(grouping)
+    pvals = np.zeros([len(groups), X.shape[1]])
+    logfc = np.zeros([len(groups), X.shape[1]])
 
     if test == 'fast-wald':
-        # TODO handle formula syntax
-        formula_loc = '~1+' + grouping
-        formula_scale = '~1+' + grouping
+        # fit each group individually
+        group_models = []
+        for g in groups:
+            sel = grouping == g
+            model = _fit(
+                noise_model=noise_model,
+                data=X[sel],
+                design_loc=np.ones([np.sum(sel), 1]),
+                design_scale=np.ones([np.sum(sel), 1]),
+                gene_names=gene_names,
+            )
+            group_models.append(model)
 
-        sample_description = _parse_sample_description(data, sample_description)
-        design_loc = data_utils.design_matrix(
-            sample_description=sample_description, formula=formula_loc)
-        design_scale = data_utils.design_matrix(
-            sample_description=sample_description, formula=formula_scale)
+        # values of parameter estimates: genes x coefficient array with one coefficient per group
+        theta_mle = [np.squeeze(np.asarray(e.par_link_loc)) for e in group_models]
+        # standard deviation of estimates: genes x coefficient array with one coefficient per group
+        theta_sd = [np.asarray(e.hessian_diagonal.isel(variables=0)) for e in group_models]
+        # average expression
+        ave_expr = np.mean(X, axis=0)
 
-        model = _fit(
-            noise_model=noise_model,
-            data=data,
-            design_loc=design_loc,
-            design_scale=design_scale,
-        )
-
-        ##TODO extract coefficients and standard deviation from model fit which are then used by ztest
-        theta_mle = None  # values of parameter estiamtes: genes x coefficient array with one coefficient per group
-        theta_sd = None  # standard deviation of estimates: genes x coefficient array with one coefficient per group
-        ave_expr = np.mean(data.X, axis=0).flatten()
         for i, g1 in enumerate(groups):
-            pvals[:, i] = stats.wald_test(theta_mle=theta_mle[:, i], theta_sd=theta_sd[:, i], theta0=ave_expr)
+            pvals[i] = stats.wald_test(theta_mle=theta_mle[i], theta_sd=theta_sd[i], theta0=ave_expr)
+            logfc[i] = theta_mle[i]
+    elif test == "lrt":
+        reduced_formula = "~ 1"
+        full_formula = "~ 1 + grouping"
+        de_test = test_lrt(
+            data=data,
+            reduced_formula=reduced_formula,
+            full_formula=full_formula,
+            gene_names=gene_names,
+            sample_description=sample_description,
+            noise_model=noise_model,
+        )
+        reduced = np.sum(de_test.reduced_estim.log_probs(), axis=0)
+        for i, g1 in enumerate(groups):
+            test_grouping = np.where(grouping == g1, "group", "rest")
+
+            full = np.sum(de_test.full_estim.log_probs()[test_grouping], axis=0)
+
+            pvals[i] = stats.likelihood_ratio_test(
+                ll_full=full,
+                ll_reduced=reduced,
+                df_full=de_test.full_estim.design_loc.shape[-1],
+                df_reduced=de_test.reduced_estim.design_loc.shape[-1]
+            )
+            logfc[i] = np.log(np.mean(X[grouping != g1], axis=0)) - np.log(np.mean(X[grouping == g1], axis=0))
     else:
         for i, g1 in enumerate(groups):
-            # TODO adjust group allocation that group g1 is tested versus union of all other groups.
-            de_test_temp = two_sample(data=data, grouping=grouping, test=test,
-                                      sample_description=sample_description,
-                                      noise_model=noise_model, close_sessions=close_sessions)
-            pvals[:, i] = de_test_temp.pval
+            test_grouping = np.where(grouping == g1, "group", "rest")
+            de_test_temp = two_sample(
+                data=X,
+                grouping=test_grouping,
+                test=test,
+                gene_names=gene_names,
+                sample_description=sample_description,
+                noise_model=noise_model
+            )
+            pvals[i] = de_test_temp.pval
+            logfc[i] = de_test_temp.log_fold_change()
 
-    # TODO extracrt lfc and gradients (if available)
-    de_test = DifferentialExpressionTestVsRest(pval=pvals, grad_full=None, grad_red=None, lfc=None)
+    de_test = DifferentialExpressionTestVsRest(gene_ids=gene_names, pval=pvals, logfc=logfc)
     return de_test
