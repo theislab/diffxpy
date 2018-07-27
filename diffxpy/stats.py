@@ -123,7 +123,7 @@ def t_test_moments(mu0, mu1, var0, var1, n0: int, n1: int):
             )
     )
 
-    pval = np.asarray([scipy.stats.t(df[i]).cdf(t[i]) for i in range(t.shape[0])])
+    pval = 1 - scipy.stats.t(df).cdf(t)
     return pval
 
 
