@@ -9,3 +9,12 @@ diffxpy covers a wide range of differential expression analysis scenarios encoun
 2. Clone the GitHub repository of diffxpy.
 3. cd into the clone.
 4. pip install -e .
+
+# Building the documentation
+The documentation is maintained in the `docs/` directory.
+
+The built documentation will be saved in `build/docs`. 
+ 
+1. Make sure sphinx is installed (install via pip for example). 
+2. `cd docs/`
+3. `make html`
