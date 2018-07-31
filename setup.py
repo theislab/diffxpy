@@ -12,10 +12,10 @@ setup(
         'scipy',
         'patsy',
         'batchglm',
+        'xarray',
     ],
     extras_require={
         'optional': [
-            'xarray',
             'anndata',
         ],
         # 'scanpy_deps': [
