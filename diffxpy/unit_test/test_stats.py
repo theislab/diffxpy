@@ -115,8 +115,8 @@ class TestStats():
         locs = numpy.random.normal(loc=0, scale=1, size=n)
         scales = np.exp(numpy.random.normal(loc=0, scale=0.5, size=n))
         # Draw two sets of samples  estimates for each test:
-        x0 = np.hstack([numpy.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)])
-        x1 = np.hstack([numpy.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)])
+        x0 = np.vstack([numpy.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)]).T
+        x1 = np.vstack([numpy.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)]).T
         # Compute p-value distribution under null model.
         pvals = de.stats.wilcoxon(x0=x0, x1=x1)
         # Compare p-value distribution under null model against uniform distribution.
@@ -140,8 +140,8 @@ class TestStats():
         locs = numpy.random.normal(loc=0, scale=1, size=n)
         scales = np.exp(numpy.random.normal(loc=0, scale=0.5, size=n))
         # Draw two sets of samples  estimates for each test:
-        x0 = np.hstack([numpy.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)])
-        x1 = np.hstack([numpy.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)])
+        x0 = np.vstack([numpy.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)]).T
+        x1 = np.vstack([numpy.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)]).T
         # Compute p-value distribution under null model.
         pvals = de.stats.t_test_raw(x0=x0, x1=x1)
         # Compare p-value distribution under null model against uniform distribution.

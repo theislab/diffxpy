@@ -54,15 +54,15 @@ def wilcoxon(
     axis = 1
     if np.any(np.ndim(x0) != np.ndim(x1)):
         raise ValueError('stats.wilcoxon(): number of dimensions is not allowed to differ between x0 and x1!')
-    if np.any(x0.shape[axis] != x1.shape[axis]):
-        raise ValueError('stats.wilcoxon(): the first axis (number of tests) is not allowed to differ between x0 and x1!')
-
-    # Reshape into 2D array if only 1 t-test is performed.
+    # Reshape into 2D array if only one test is performed.
     if np.ndim(x0)==1:
         x0 = x0.reshape([x0.shape[0], 1])
         x1 = x1.reshape([x1.shape[0], 1])
-    
-    pvals = np.asarray([scipy.stats.mannwhitneyu(x=x0[:, i], y=x1[:, i]).pvalue for i in range(x0.shape[1])])
+    if np.any(x0.shape[axis] != x1.shape[axis]):
+        raise ValueError('stats.wilcoxon(): the first axis (number of tests) is not allowed to differ between x0 and x1!')
+
+    pvals = np.asarray([scipy.stats.mannwhitneyu(x=x0[:, i].flatten(), y=x1[:, i].flatten(), 
+        alternative='two-sided').pvalue for i in range(x0.shape[1])])
     return pvals
 
 
@@ -71,7 +71,8 @@ def t_test_raw(
     x1: np.ndarray,
     ):
     """
-    Perform two-sided t-test allowing for unequal group variances (Welch's t-test) on raw data.
+    Perform two-sided t-test allowing for unequal group variances (Welch's t-test) on raw data
+    along second axis (for each gene).
 
     The t-test assumes normally distributed data. This function computes
     the necessary statistics and calls t_test_moments().
@@ -81,8 +82,15 @@ def t_test_raw(
     :param x1:  np.array (observations x genes)
         Observations in second group by gene.
     """
-    if x0.shape[0] != x1.shape[0]:
+    axis = 1
+    if x0.shape[1] != x1.shape[1]:
         raise ValueError('stats.t_test_raw(): x0 and x1 have to contain the same number of genes')
+    # Reshape into 2D array if only one test is performed.
+    if np.ndim(x0)==1:
+        x0 = x0.reshape([x0.shape[0], 1])
+        x1 = x1.reshape([x1.shape[0], 1])
+    if np.any(x0.shape[axis] != x1.shape[axis]):
+        raise ValueError('stats.wilcoxon(): the first axis (number of tests) is not allowed to differ between x0 and x1!')
 
     mu0 = np.mean(x0, axis=0).flatten()
     var0 = np.var(x0, axis=0).flatten()
