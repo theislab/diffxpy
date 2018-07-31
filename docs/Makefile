@@ -5,8 +5,8 @@
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
 SPHINXPROJ    = diffxpy
-SOURCEDIR     = docs
-BUILDDIR      = build
+SOURCEDIR     = ./
+BUILDDIR      = ../build/docs
 
 # Put it first so that "make" without argument is like "make help".
 help:
