@@ -2,7 +2,12 @@ import numpy as np
 import scipy.stats
 
 
-def likelihood_ratio_test(ll_full, ll_reduced, df_full: int, df_reduced: int):
+def likelihood_ratio_test(
+    ll_full: np.ndarray, 
+    ll_reduced: np.ndarray, 
+    df_full: int, 
+    df_reduced: int
+    ):
     """
     Perform log-likihood ratio test based on already fitted models.
 
@@ -30,9 +35,13 @@ def likelihood_ratio_test(ll_full, ll_reduced, df_full: int, df_reduced: int):
     return pvals
 
 
-def wilcoxon(x0, x1):
+def wilcoxon(
+    x0: np.ndarray,
+    x1: np.ndarray,
+    ):
     """
-    Perform Wilcoxon rank sum test (Mann-Whiteney U test) along some axis.
+    Perform Wilcoxon rank sum test (Mann-Whiteney U test) along second axis
+    (for each gene).
 
     The Wilcoxon rank sum test is a non-parameteric test
     to compare two groups of observations.
@@ -42,26 +51,25 @@ def wilcoxon(x0, x1):
     :param x1:  np.array (observations x genes)
         Observations in second group by gene.
     """
-    axis = 0
-    other_axes = np.arange(np.ndim(x0))
-    other_axes = other_axes[other_axes != axis]
+    axis = 1
+    if np.any(np.ndim(x0) != np.ndim(x1)):
+        raise ValueError('stats.wilcoxon(): number of dimensions is not allowed to differ between x0 and x1!')
+    if np.any(x0.shape[axis] != x1.shape[axis]):
+        raise ValueError('stats.wilcoxon(): the first axis (number of tests) is not allowed to differ between x0 and x1!')
 
-    if np.any(np.asarray(x0.shape)[other_axes] != np.asarray(x1.shape)[other_axes]):
-        raise ValueError('stats.wilcoxon(): only the first axis is allowed to differ between x0 and x1!')
-
-    # flatten input data to (num_observations, num_tests)
-    wide_shape = np.asarray(x0.shape)[other_axes]
-    flat_shape = int(np.prod(wide_shape))
-    x0 = x0.reshape([x0.shape[0], flat_shape])
-    x1 = x1.reshape([x1.shape[0], flat_shape])
-
-    pvals = np.asarray([scipy.stats.mannwhitneyu(x=x0[:, i], y=x1[:, i]).pvalue for i in range(flat_shape)])
-    # unflatten results
-    pvals = pvals.reshape(wide_shape)
+    # Reshape into 2D array if only 1 t-test is performed.
+    if np.ndim(x0)==1:
+        x0 = x0.reshape([x0.shape[0], 1])
+        x1 = x1.reshape([x1.shape[0], 1])
+    
+    pvals = np.asarray([scipy.stats.mannwhitneyu(x=x0[:, i], y=x1[:, i]).pvalue for i in range(x0.shape[1])])
     return pvals
 
 
-def t_test_raw(x0, x1):
+def t_test_raw(
+    x0: np.ndarray,
+    x1: np.ndarray,
+    ):
     """
     Perform two-sided t-test allowing for unequal group variances (Welch's t-test) on raw data.
 
@@ -87,7 +95,14 @@ def t_test_raw(x0, x1):
     return pval
 
 
-def t_test_moments(mu0, mu1, var0, var1, n0: int, n1: int):
+def t_test_moments(
+    mu0: np.ndarray, 
+    mu1: np.ndarray, 
+    var0: np.ndarray, 
+    var1: np.ndarray, 
+    n0: int, 
+    n1: int
+    ):
     """
     Perform two-sided t-test allowing for unequal group variances (Welch's t-test)
     moments of distribution of data.
@@ -127,7 +142,10 @@ def t_test_moments(mu0, mu1, var0, var1, n0: int, n1: int):
     return pval
 
 
-def wald_test(theta_mle, theta_sd, theta0=0):
+def wald_test(
+    theta_mle: np.ndarray, 
+    theta_sd: np.ndarray, 
+    theta0: int = 0):
     """
     Perform single coefficient Wald test.
 
@@ -156,7 +174,12 @@ def wald_test(theta_mle, theta_sd, theta0=0):
     return pvals
 
 
-def two_coef_z_test(theta_mle0, theta_mle1, theta_sd0, theta_sd1):
+def two_coef_z_test(
+    theta_mle0: np.ndarray, 
+    theta_mle1: np.ndarray, 
+    theta_sd0: np.ndarray, 
+    theta_sd1: np.ndarray
+    ):
     """
     Perform z-test to compare two coefficients.
 
