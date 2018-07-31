@@ -1,5 +1,7 @@
+build
 cache
 data
+diffxpy.egg-info
 config.ini
 .metadata
 .idea
