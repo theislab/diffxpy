@@ -10,9 +10,6 @@ from batchglm.api.models.nb_glm import Simulator, Estimator, InputData
 import diffxpy as de
 
 
-# from utils.config import getConfig
-
-
 class TestLRT(unittest.TestCase):
     sim: Simulator
     working_dir: tempfile.TemporaryDirectory
@@ -24,18 +21,23 @@ class TestLRT(unittest.TestCase):
         
         print("working_dir: %s" % self.working_dir)
     
-    # def tearDown(self):
-    #     for e in self._estims:
-    #         e.close_session()
-    #
-    #     self.working_dir.cleanup()
+    def tearDown(self):
+        #     for e in self._estims:
+        #         e.close_session()
+        #
+        self.working_dir.cleanup()
     
     def test_lrt(self):
         sim = self.sim
         wd = os.path.join(self.working_dir.name, "lrt")
         os.makedirs(wd, exist_ok=True)
         
-        test = de.test_lrt(sim.input_data, full_formula="~ 1 + batch + condition", reduced_formula="~ 1 + batch")
+        test = de.test_lrt(
+            data=sim.X,
+            full_formula="~ 1 + batch + condition",
+            reduced_formula="~ 1 + batch",
+            sample_description=sim.sample_description
+        )
         
         print(test.summary())
 
