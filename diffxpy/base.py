@@ -593,6 +593,7 @@ def _fit(
         design_scale,
         init_model=None,
         gene_names=None,
+        batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         close_session=True
 ):
@@ -600,6 +601,7 @@ def _fit(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
         
         - 'nb': default
+    :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -630,7 +632,12 @@ def _fit(
             design_scale=design_scale,
             feature_names=gene_names
         )
-        estim = test_model.Estimator(input_data=input_data, init_model=init_model)
+        
+        constructor_args = {}
+        if batch_size is not None:
+            constructor_args["batch_size"] = batch_size
+        estim = test_model.Estimator(input_data=input_data, init_model=init_model, **constructor_args)
+        
         estim.initialize()
         
         # training:
@@ -644,7 +651,7 @@ def _fit(
             model = estim.finalize()
         else:
             model = estim
-        logger.info("Estimation model ready")
+        logger.info("Estimating model ready")
     
     else:
         raise ValueError('base.test(): `noise_model` not recognized.')
@@ -663,6 +670,7 @@ def test_lrt(
         gene_names=None,
         sample_description: pd.DataFrame = None,
         noise_model="nb",
+        batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
 ):
     """
@@ -695,6 +703,7 @@ def test_lrt(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
         
         - 'nb': default
+    :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -742,6 +751,7 @@ def test_lrt(
         design_loc=reduced_design_loc,
         design_scale=reduced_design_scale,
         gene_names=gene_names,
+        batch_size=batch_size,
         training_strategy=training_strategy,
     )
     full_model = _fit(
@@ -751,6 +761,7 @@ def test_lrt(
         design_scale=full_design_scale,
         gene_names=gene_names,
         init_model=reduced_model,
+        batch_size=batch_size,
         training_strategy=training_strategy,
     )
     
@@ -775,6 +786,7 @@ def test_wald_loc(
         gene_names: str = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = "nb",
+        batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
 ):
     """
@@ -804,6 +816,7 @@ def test_wald_loc(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
         
         - 'nb': default
+    :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -861,6 +874,7 @@ def test_wald_loc(
         design_loc=design_loc,
         design_scale=design_scale,
         gene_names=gene_names,
+        batch_size=batch_size,
         training_strategy=training_strategy,
     )
     
@@ -958,6 +972,7 @@ def two_sample(
         gene_names=None,
         sample_description=None,
         noise_model: str = None,
+        batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
 ) -> _DifferentialExpressionTestSingle:
     """
@@ -1005,6 +1020,7 @@ def two_sample(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
         
         - 'nb': default
+    :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1056,6 +1072,7 @@ def two_sample(
             gene_names=gene_names,
             sample_description=sample_description,
             noise_model=noise_model,
+            batch_size=batch_size,
             training_strategy=training_strategy,
         )
     elif test == 'lrt':
@@ -1074,6 +1091,7 @@ def two_sample(
             gene_names=gene_names,
             sample_description=sample_description,
             noise_model=noise_model,
+            batch_size=batch_size,
             training_strategy=training_strategy,
         )
     elif test == 't-test':
@@ -1101,6 +1119,7 @@ def test_pairwise(
         gene_names: str = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
+        batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         return_full_test_objs: bool = False,
 ):
@@ -1155,6 +1174,7 @@ def test_pairwise(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
         
         - 'nb': default
+    :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1201,6 +1221,7 @@ def test_pairwise(
                 design_loc=np.ones([np.sum(sel), 1]),
                 design_scale=np.ones([np.sum(sel), 1]),
                 gene_names=gene_names,
+                batch_size=batch_size,
                 training_strategy=training_strategy,
             )
             group_models.append(model)
@@ -1232,6 +1253,7 @@ def test_pairwise(
                     gene_names=gene_names,
                     sample_description=sample_description.iloc[sel],
                     noise_model=noise_model,
+                    batch_size=batch_size,
                     training_strategy=training_strategy,
                 )
                 pvals[i, j] = de_test_temp.pval
@@ -1257,6 +1279,7 @@ def test_vsrest(
         gene_names: str = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
+        batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
 ):
     """
@@ -1316,6 +1339,7 @@ def test_vsrest(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
         
         - 'nb': default
+    :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1359,6 +1383,7 @@ def test_vsrest(
                 design_loc=np.ones([np.sum(sel), 1]),
                 design_scale=np.ones([np.sum(sel), 1]),
                 gene_names=gene_names,
+                batch_size=batch_size,
                 training_strategy=training_strategy,
             )
             group_models.append(model)
@@ -1383,6 +1408,7 @@ def test_vsrest(
                 gene_names=gene_names,
                 sample_description=sample_description,
                 noise_model=noise_model,
+                batch_size=batch_size,
                 training_strategy=training_strategy,
             )
             pvals[i] = de_test_temp.pval
