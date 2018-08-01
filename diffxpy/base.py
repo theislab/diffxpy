@@ -697,7 +697,7 @@ def test_lrt(
         If not specified, `reduced_formula` will be used instead.
     :param full_formula_scale: formula
         Full model formula for scale parameter model.
-        If not specified, `full_formula` will be used instead.
+        If not specified, `reduced_formula_scale` will be used instead.
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
