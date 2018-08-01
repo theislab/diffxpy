@@ -1,7 +1,6 @@
 import unittest
 
 import numpy as np
-import numpy.random
 import scipy.stats as stats
 import diffxpy as de
 
@@ -43,7 +42,7 @@ class TestStats(unittest.TestCase):
         # Draw chi-square distributed deviance which is the statistic 
         # distributed under the null hypothesis:
         # dev = 2 * (ll_full - ll_reduced)
-        dev = numpy.random.chisquare(df=df, size=n)
+        dev = np.random.chisquare(df=df, size=n)
         
         # Set ll_full, ll_red and df_full and df_red so that the correct
         # deviance is computed within likelihood_ratio_test().
@@ -71,7 +70,7 @@ class TestStats(unittest.TestCase):
         
         # Draw standard normal distributed estimate which is sampled
         # from the parameter posterior under the null model:
-        mles = numpy.random.normal(loc=0, scale=1, size=n)
+        mles = np.random.normal(loc=0, scale=1, size=n)
         sd = np.zeros([n]) + 1
         
         # Compute p-value distribution under null model.
@@ -94,12 +93,12 @@ class TestStats(unittest.TestCase):
         """
         
         # Draw parameter posteriors for each test:
-        theta_mles = numpy.random.normal(loc=0, scale=1, size=n)
-        theta_sds = np.exp(numpy.random.normal(loc=0, scale=0.5, size=n))
+        theta_mles = np.random.normal(loc=0, scale=1, size=n)
+        theta_sds = np.exp(np.random.normal(loc=0, scale=0.5, size=n))
         
         # Draw two estimates from each posterior:
-        theta_mle0 = numpy.random.normal(loc=theta_mles, scale=theta_sds)
-        theta_mle1 = numpy.random.normal(loc=theta_mles, scale=theta_sds)
+        theta_mle0 = np.random.normal(loc=theta_mles, scale=theta_sds)
+        theta_mle1 = np.random.normal(loc=theta_mles, scale=theta_sds)
         
         # Compute p-value distribution under null model.
         pvals = de.stats.two_coef_z_test(theta_mle0=theta_mle0, theta_mle1=theta_mle1, theta_sd0=theta_sds,
@@ -123,12 +122,12 @@ class TestStats(unittest.TestCase):
         """
         
         # Draw sample distribution parameters for each test:
-        locs = numpy.random.normal(loc=0, scale=1, size=n)
-        scales = np.exp(numpy.random.normal(loc=0, scale=0.5, size=n))
+        locs = np.random.normal(loc=0, scale=1, size=n)
+        scales = np.exp(np.random.normal(loc=0, scale=0.5, size=n))
         
         # Draw two sets of samples  estimates for each test:
-        x0 = np.vstack([numpy.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)]).T
-        x1 = np.vstack([numpy.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)]).T
+        x0 = np.vstack([np.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)]).T
+        x1 = np.vstack([np.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)]).T
         
         # Compute p-value distribution under null model.
         pvals = de.stats.wilcoxon(x0=x0, x1=x1)
@@ -153,12 +152,12 @@ class TestStats(unittest.TestCase):
         """
         
         # Draw sample distribution parameters for each test:
-        locs = numpy.random.normal(loc=0, scale=1, size=n)
-        scales = np.exp(numpy.random.normal(loc=0, scale=0.5, size=n))
+        locs = np.random.normal(loc=0, scale=1, size=n)
+        scales = np.exp(np.random.normal(loc=0, scale=0.5, size=n))
         
         # Draw two sets of samples  estimates for each test:
-        x0 = np.vstack([numpy.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)]).T
-        x1 = np.vstack([numpy.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)]).T
+        x0 = np.vstack([np.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)]).T
+        x1 = np.vstack([np.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)]).T
         
         # Compute p-value distribution under null model.
         pvals = de.stats.t_test_raw(x0=x0, x1=x1)
