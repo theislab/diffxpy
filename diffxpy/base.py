@@ -80,7 +80,12 @@ class _Estimation(GeneralizedLinearModel, metaclass=abc.ABCMeta):
     
     @property
     @abc.abstractmethod
-    def hessian_diagonal(self, **kwargs) -> np.ndarray:
+    def fisher_loc(self, **kwargs) -> np.ndarray:
+        pass
+    
+    @property
+    @abc.abstractmethod
+    def fisher_scale(self, **kwargs) -> np.ndarray:
         pass
 
 
@@ -415,9 +420,13 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     
     def _test(self):
         theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
-        theta_sd = self.model_estim.hessian_diagonal[self.coef_loc_totest]
+        # standard deviation of estimates: genes x coefficient array with one coefficient per group
+        # $\text{SE}(\hat{\theta}_{ML}) = \frac{1}{Fisher(\hat{\theta}_{ML})}$
+        theta_sd = 1 / np.sqrt(
+            np.asarray(self.model_estim.fisher_loc[self.coef_loc_totest])
+        )
         return stats.wald_test(theta_mle=theta_mle, theta_sd=theta_sd, theta0=0)
-
+    
     def summary(self, **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
@@ -438,7 +447,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         self._gene_ids = np.asarray(gene_ids)
         self._logfc = logfc
         self._pval = pval
-
+        
         q = self.qval
     
     @property
@@ -524,7 +533,7 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         self._gene_ids = np.asarray(gene_ids)
         self._logfc = logfc
         self._pval = pval
-
+        
         q = self.qval
     
     @property
@@ -580,27 +589,9 @@ def _parse_gene_names(data, gene_names):
 
 
 def _parse_data(data, gene_names):
-    if anndata is not None and isinstance(data, anndata.AnnData) and isinstance(data.X, scipy.sparse.csr_matrix):
-        X = dask.array.from_array(data.X, data.X.shape)
-        X = xr.DataArray(dask.array.stack(X), dims=("observations", "features"), coords={
-            "observations": data.obs_names,
-            "features": data.var_names,
-        })
-    elif anndata is not None and isinstance(data, anndata.AnnData) and isinstance(data.X, scipy.sparse.csr_matrix)==False:
-        X = data.X
-    elif isinstance(data, scipy.sparse.csr_matrix):
-        X = dask.array.from_array(data, data.shape)
-        X = xr.DataArray(dask.array.stack(X), dims=("observations", "features"), coords={
-            "observations": data.obs_names,
-            "features": data.var_names,
-        })
-    elif isinstance(data, xr.DataArray):
-        X = data
-    elif isinstance(data, xr.Dataset):
-        X = data["X"]
-    else:
-        X = xr.DataArray(data, dims=("observations", "features"))
-        X["features"] = gene_names
+    X = data_utils.xarray_from_data(data, dims=("observations", "features"))
+    if gene_names is not None:
+        X.coords["features"] = gene_names
     
     return X
 
@@ -810,7 +801,7 @@ def test_lrt(
         design_scale=full_design_scale,
         gene_names=gene_names,
         init_model=reduced_model,
-        batch_size=X.shape[0], # workaround: batch_size=num_observations
+        batch_size=X.shape[0],  # workaround: batch_size=num_observations
         training_strategy=training_strategy,
     )
     
@@ -1280,7 +1271,7 @@ def test_pairwise(
         # values of parameter estimates: genes x coefficient array with one coefficient per group
         theta_mle = [np.squeeze(np.asarray(e.par_link_loc)) for e in group_models]
         # standard deviation of estimates: genes x coefficient array with one coefficient per group
-        theta_sd = [np.asarray(e.hessian_diagonal.isel(variables=0)) for e in group_models]
+        theta_sd = [np.asarray(e.fisher_loc) for e in group_models]
         
         for i, g1 in enumerate(groups):
             for j, g2 in enumerate(groups[(i + 1):]):
@@ -1442,7 +1433,8 @@ def test_vsrest(
         # values of parameter estimates: genes x coefficient array with one coefficient per group
         theta_mle = [np.squeeze(np.asarray(e.par_link_loc)) for e in group_models]
         # standard deviation of estimates: genes x coefficient array with one coefficient per group
-        theta_sd = [np.asarray(e.hessian_diagonal.isel(variables=0)) for e in group_models]
+        # $\text{SE}(\hat{\theta}_{ML}) = \frac{1}{Fisher(\hat{\theta}_{ML})}$
+        theta_sd = [1 / np.sqrt(np.asarray(e.fisher_loc)) for e in group_models]
         # average expression
         ave_expr = np.mean(X, axis=0)
         
