@@ -700,6 +700,7 @@ def test_lrt(
         noise_model="nb",
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        **kwargs
 ):
     """
     Perform log-likelihood ratio test for differential expression 
@@ -750,7 +751,10 @@ def test_lrt(
               ]
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
+    if len(kwargs) != 0:
+        logger.info("additional kwargs: %s", str(kwargs))
     
     if full_formula_loc is None:
         full_formula_loc = full_formula
@@ -782,6 +786,7 @@ def test_lrt(
         gene_names=gene_names,
         batch_size=batch_size,
         training_strategy=training_strategy,
+        **kwargs,
     )
     full_model = _fit(
         noise_model=noise_model,
@@ -792,6 +797,7 @@ def test_lrt(
         init_model=reduced_model,
         batch_size=X.shape[0],  # workaround: batch_size=num_observations
         training_strategy=training_strategy,
+        **kwargs,
     )
     
     de_test = DifferentialExpressionTestLRT(
@@ -817,6 +823,7 @@ def test_wald_loc(
         noise_model: str = "nb",
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        **kwargs
 ):
     """
     Perform log-likelihood ratio test for differential expression
@@ -864,7 +871,10 @@ def test_wald_loc(
               ]
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
+    if len(kwargs) != 0:
+        logger.info("additional kwargs: %s", str(kwargs))
     
     if formula_loc is None:
         formula_loc = formula
@@ -906,6 +916,7 @@ def test_wald_loc(
         gene_names=gene_names,
         batch_size=batch_size,
         training_strategy=training_strategy,
+        **kwargs,
     )
     
     de_test = DifferentialExpressionTestWald(model, col_index=col_index)
@@ -1004,6 +1015,7 @@ def two_sample(
         noise_model: str = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        **kwargs
 ) -> _DifferentialExpressionTestSingle:
     """
     Perform differential expression test between two groups on adata object
@@ -1069,6 +1081,7 @@ def two_sample(
               ]
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if test in ['t-test', 'wilcoxon'] and noise_model is not None:
         raise ValueError('base.two_sample(): Do not specify `noise_model` if using test t-test or wilcoxon: ' +
@@ -1105,6 +1118,7 @@ def two_sample(
             noise_model=noise_model,
             batch_size=batch_size,
             training_strategy=training_strategy,
+            **kwargs
         )
     elif test == 'lrt':
         if noise_model is None:
@@ -1124,6 +1138,7 @@ def two_sample(
             noise_model=noise_model,
             batch_size=batch_size,
             training_strategy=training_strategy,
+            **kwargs
         )
     elif test == 't-test':
         de_test = test_t_test(
@@ -1153,6 +1168,7 @@ def test_pairwise(
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         return_full_test_objs: bool = False,
+        **kwargs
 ):
     """
     Perform pairwise differential expression test between two groups on adata object
@@ -1225,7 +1241,11 @@ def test_pairwise(
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param return_full_test_objs: [Debugging] return matrix of test objects; currently valid for test != "z-test"
+    :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
+    if len(kwargs) != 0:
+        logger.info("additional kwargs: %s", str(kwargs))
+    
     # Do not store all models but only p-value and q-value matrix:
     # genes x groups x groups
     X = _parse_data(data, gene_names)
@@ -1254,6 +1274,7 @@ def test_pairwise(
                 gene_names=gene_names,
                 batch_size=batch_size,
                 training_strategy=training_strategy,
+                **kwargs
             )
             group_models.append(model)
         
@@ -1286,6 +1307,7 @@ def test_pairwise(
                     noise_model=noise_model,
                     batch_size=batch_size,
                     training_strategy=training_strategy,
+                    **kwargs
                 )
                 pvals[i, j] = de_test_temp.pval
                 pvals[j, i] = pvals[i, j]
@@ -1312,6 +1334,7 @@ def test_vsrest(
         noise_model: str = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        **kwargs
 ):
     """
     Perform pairwise differential expression test between two groups on adata object
@@ -1390,7 +1413,11 @@ def test_vsrest(
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param return_full_test_objs: [Debugging] return matrix of test objects; currently valid for test != "z-test"
+    :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
+    if len(kwargs) != 0:
+        logger.info("additional kwargs: %s", str(kwargs))
+    
     # Do not store all models but only p-value and q-value matrix:
     # genes x groups
     X = _parse_data(data, gene_names)
@@ -1416,6 +1443,7 @@ def test_vsrest(
                 gene_names=gene_names,
                 batch_size=batch_size,
                 training_strategy=training_strategy,
+                **kwargs
             )
             group_models.append(model)
         
@@ -1442,6 +1470,7 @@ def test_vsrest(
                 noise_model=noise_model,
                 batch_size=batch_size,
                 training_strategy=training_strategy,
+                **kwargs
             )
             pvals[i] = de_test_temp.pval
             logfc[i] = de_test_temp.log_fold_change()
