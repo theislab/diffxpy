@@ -558,7 +558,7 @@ def _parse_gene_names(data, gene_names):
 def _parse_data(data, gene_names):
     if anndata is not None and isinstance(data, anndata.AnnData) and isinstance(data.X, scipy.sparse.csr_matrix):
         X = dask.array.from_array(data.X, data.X.shape)
-        X = xr.DataArray(dask.array.stack(X), dims=INPUT_DATA_PARAMS["X"], coords={
+        X = xr.DataArray(dask.array.stack(X), dims=("observations", "features"), coords={
             "observations": data.obs_names,
             "features": data.var_names,
         })
@@ -566,7 +566,7 @@ def _parse_data(data, gene_names):
         X = data.X
     elif isinstance(data, scipy.sparse.csr_matrix):
         X = dask.array.from_array(data, data.shape)
-        X = xr.DataArray(dask.array.stack(X), dims=INPUT_DATA_PARAMS["X"], coords={
+        X = xr.DataArray(dask.array.stack(X), dims=("observations", "features"), coords={
             "observations": data.obs_names,
             "features": data.var_names,
         })
@@ -858,8 +858,6 @@ def test_wald_loc(
         formula_scale = formula
     assert formula_scale is not None and formula_loc is not None, "Missing formula!"
     
-    print(data.shape)
-    print(gene_names.shape)
     X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
@@ -1064,8 +1062,6 @@ def two_sample(
     
     X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
-    print(X.shape)
-    print(gene_names.shape)
     grouping = _parse_grouping(data, sample_description, grouping)
     sample_description = pd.DataFrame({"grouping": grouping})
     
