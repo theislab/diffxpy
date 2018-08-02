@@ -21,6 +21,7 @@ from batchglm.api.models.glm import Model as GeneralizedLinearModel
 
 from . import stats
 from . import correction
+from batch_bfgs import optim_bfgs
 
 logger = logging.getLogger(__name__)
 
@@ -659,39 +660,49 @@ def _fit(
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param close_session: If True, will finalize the estimator. Otherwise, return the estimator itself.
     """
-    if noise_model == "nb" or noise_model == "negative_binomial":
-        import batchglm.api.models.nb_glm as test_model
-        
-        logger.info("Estimating model...")
-        input_data = test_model.InputData.new(
-            data=data,
-            design_loc=design_loc,
-            design_scale=design_scale,
-            feature_names=gene_names
-        )
-        
-        constructor_args = {}
-        if batch_size is not None:
-            constructor_args["batch_size"] = batch_size
-        estim = test_model.Estimator(input_data=input_data, init_model=init_model, **constructor_args)
-        
-        estim.initialize()
-        
-        # training:
-        if callable(training_strategy):
-            # call training_strategy if it is a function
-            training_strategy(estim)
+    if training_strategy is 'BFGS':
+        lib_size = np.zeros(data.shape[0])+1
+        if noise_model == "nb" or noise_model == "negative_binomial":
+            estim = optim_bfgs.Estim_BFGS(X=data, X_mu=design_loc, X_disp=design_scale, 
+                lib_size=lib_size, batch_size=batch_size)
+            estim.run(nproc=3, maxiter=1000, debug=False)
+            model = estim.return_batchglm_formated_model()
         else:
-            estim.train_sequence(training_strategy)
-        
-        if close_session:
-            model = estim.finalize()
-        else:
-            model = estim
-        logger.info("Estimating model ready")
-    
+            raise ValueError('base.test(): `noise_model` not recognized.')
     else:
-        raise ValueError('base.test(): `noise_model` not recognized.')
+        if noise_model == "nb" or noise_model == "negative_binomial":
+            import batchglm.api.models.nb_glm as test_model
+            
+            logger.info("Estimating model...")
+            input_data = test_model.InputData.new(
+                data=data,
+                design_loc=design_loc,
+                design_scale=design_scale,
+                feature_names=gene_names
+            )
+            
+            constructor_args = {}
+            if batch_size is not None:
+                constructor_args["batch_size"] = batch_size
+            estim = test_model.Estimator(input_data=input_data, init_model=init_model, **constructor_args)
+            
+            estim.initialize()
+            
+            # training:
+            if callable(training_strategy):
+                # call training_strategy if it is a function
+                training_strategy(estim)
+            else:
+                estim.train_sequence(training_strategy)
+            
+            if close_session:
+                model = estim.finalize()
+            else:
+                model = estim
+            logger.info("Estimating model ready")
+        
+        else:
+            raise ValueError('base.test(): `noise_model` not recognized.')
     
     return model
 
