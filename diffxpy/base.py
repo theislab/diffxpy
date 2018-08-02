@@ -5,7 +5,9 @@ from typing import Union, Dict, Tuple, List, Set, Callable
 import pandas as pd
 
 import numpy as np
+import scipy.sparse
 
+import dask
 import xarray as xr
 
 try:
@@ -18,6 +20,7 @@ import batchglm.data as data_utils
 from batchglm.api.models.glm import Model as GeneralizedLinearModel
 
 from . import stats
+from . import correction
 
 logger = logging.getLogger(__name__)
 
@@ -124,8 +127,15 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     def _test(self, **kwargs) -> np.ndarray:
         pass
     
-    def _correction(self, **kwargs) -> np.ndarray:
-        pass
+    def _correction(self, method) -> np.ndarray:
+        """
+        Performs multiple testing corrections available in statsmodels.stats.multitest.multipletests()
+        on self.pval.
+
+        :param method: Multiple testing correction method.
+            Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
+        """
+        return correction.correct(pvals=self.pval, method=method)
     
     @property
     def pval(self):
@@ -134,9 +144,9 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         return self._pval
     
     @property
-    def qval(self):
+    def qval(self, method="fdr_bh"):
         if self._qval is None:
-            self._qval = self._correction()
+            self._qval = self._correction(method=method)
         return self._qval
     
     @property
@@ -162,14 +172,12 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
         Summarize differential expression results into an output table.
         """
         assert self.gene_ids is not None
-        assert self.pval is not None
-        assert self.qval is not None
         
         res = pd.DataFrame({
             "gene": self.gene_ids,
             "pval": self.pval,
             "qval": self.qval,
-            "log2fc": self.log2_fold_change(),
+            "log2fc": self.log2_fold_change()
         })
         
         return res
@@ -364,42 +372,8 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         Summarize differential expression results into an output table.
         """
         res = super().summary(**kwargs)
-        res["grad"] = self.full_model_gradient,
-        res["grad_red"] = self.reduced_model_gradient
-        
-        return res
-
-
-class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=abc.ABCMeta):
-    """
-    _DifferentialExpressionTest for unit_test with a multiple unit_test per gene.
-    The individual test object inherit directly from this class.
-    """
-    
-    def summary(self, **kwargs) -> pd.DataFrame:
-        """
-        Summarize differential expression results into an output table.
-        """
-        assert self.gene_ids is not None
-        assert self.pval is not None
-        assert self.qval is not None
-        
-        # calculate maximum logFC of lower triangular fold change matrix
-        raw_logfc = self.log2_fold_change(return_type="xarray")
-        argm = np.argmax(raw_logfc, axis=0)
-        args = np.argmax(raw_logfc[argm], axis=0)
-        argm = argm[args]
-        logfc = raw_logfc[argm, args] * np.where(argm > args, 1, -1)
-        
-        res = pd.DataFrame({
-            "gene": self.gene_ids,
-            # return minimal pval by gene:
-            "pval": np.min(self.pval, axis=1),
-            # return minimal qval by gene:
-            "qval": np.min(self.qval, axis=1),
-            # return maximal logFC by gene:
-            "log2fc": logfc,
-        })
+        res["grad"] = self.full_model_gradient.data
+        res["grad_red"] = self.reduced_model_gradient.data
         
         return res
 
@@ -423,6 +397,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     def gene_ids(self) -> np.ndarray:
         return np.asarray(self.model_estim.features)
     
+    @property
+    def model_gradient(self):
+        return self.model_estim.gradient
+    
     def log_fold_change(self, base=np.e, **kwargs):
         """
         Returns one fold change per gene
@@ -439,6 +417,15 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         theta_sd = self.model_estim.hessian_diagonal[self.coef_loc_totest]
         return stats.wald_test(theta_mle=theta_mle, theta_sd=theta_sd, theta0=0)
 
+    def summary(self, **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+        """
+        res = super().summary(**kwargs)
+        res["grad"] = self.model_gradient.data
+        
+        return res
+
 
 class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
     """
@@ -450,6 +437,8 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         self._gene_ids = np.asarray(gene_ids)
         self._logfc = logfc
         self._pval = pval
+
+        q = self.qval
     
     @property
     def gene_ids(self) -> np.ndarray:
@@ -475,6 +464,8 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
         self._gene_ids = np.asarray(gene_ids)
         self._logfc = logfc
         self._pval = pval
+        
+        q = self.qval
     
     @property
     def gene_ids(self) -> np.ndarray:
@@ -490,6 +481,38 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
             return self._logfc / np.log(base)
 
 
+class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=abc.ABCMeta):
+    """
+    _DifferentialExpressionTest for unit_test with a multiple unit_test per gene.
+    The individual test object inherit directly from this class.
+    """
+    
+    def summary(self, **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+        """
+        assert self.gene_ids is not None
+        
+        # calculate maximum logFC of lower triangular fold change matrix
+        raw_logfc = self.log2_fold_change(return_type="xarray")
+        argm = np.argmax(raw_logfc, axis=0)
+        args = np.argmax(raw_logfc[argm], axis=0)
+        argm = argm[args]
+        logfc = raw_logfc[argm, args] * np.where(argm > args, 1, -1)
+        
+        res = pd.DataFrame({
+            "gene": self.gene_ids,
+            # return minimal pval by gene:
+            "pval": np.min(self.pval, axis=1),
+            # return minimal qval by gene:
+            "qval": np.min(self.qval, axis=1),
+            # return maximal logFC by gene:
+            "log2fc": logfc
+        })
+        
+        return res
+
+
 class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
     """
     Pairwise unit_test between more than 2 groups per gene.
@@ -500,6 +523,8 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         self._gene_ids = np.asarray(gene_ids)
         self._logfc = logfc
         self._pval = pval
+
+        q = self.qval
     
     @property
     def gene_ids(self) -> np.ndarray:
@@ -554,8 +579,20 @@ def _parse_gene_names(data, gene_names):
 
 
 def _parse_data(data, gene_names):
-    if anndata is not None and isinstance(data, anndata.AnnData):
+    if anndata is not None and isinstance(data, anndata.AnnData) and isinstance(data.X, scipy.sparse.csr_matrix):
+        X = dask.array.from_array(data.X, data.X.shape)
+        X = xr.DataArray(dask.array.stack(X), dims=("observations", "features"), coords={
+            "observations": data.obs_names,
+            "features": data.var_names,
+        })
+    elif anndata is not None and isinstance(data, anndata.AnnData) and isinstance(data.X, scipy.sparse.csr_matrix)==False:
         X = data.X
+    elif isinstance(data, scipy.sparse.csr_matrix):
+        X = dask.array.from_array(data, data.shape)
+        X = xr.DataArray(dask.array.stack(X), dims=("observations", "features"), coords={
+            "observations": data.obs_names,
+            "features": data.var_names,
+        })
     elif isinstance(data, xr.DataArray):
         X = data
     elif isinstance(data, xr.Dataset):
@@ -734,6 +771,7 @@ def test_lrt(
         reduced_formula_scale = reduced_formula
     
     X = _parse_data(data, gene_names)
+    gene_names = _parse_gene_names(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
     
     full_design_loc = data_utils.design_matrix(
@@ -844,6 +882,7 @@ def test_wald_loc(
     assert formula_scale is not None and formula_loc is not None, "Missing formula!"
     
     X = _parse_data(data, gene_names)
+    gene_names = _parse_gene_names(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
     
     design_loc = data_utils.design_matrix(
@@ -919,8 +958,8 @@ def test_t_test(
     grouping = _parse_grouping(data, grouping, sample_description)
     x0, x1 = _split_X(data, grouping)
     
-    pval = stats.t_test_raw(x0=x0, x1=x1)
-    logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0))
+    pval = stats.t_test_raw(x0=x0.data, x1=x1.data)
+    logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
     
     de_test = DifferentialExpressionTestTT(
         gene_ids=gene_names,
@@ -953,8 +992,8 @@ def test_wilcoxon(
     grouping = _parse_grouping(data, grouping, sample_description)
     x0, x1 = _split_X(data, grouping)
     
-    pval = stats.wilcoxon(x0=x0, x1=x1)
-    logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0))
+    pval = stats.wilcoxon(x0=x0.data, x1=x1.data)
+    logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
     
     de_test = DifferentialExpressionTestWilcoxon(
         gene_ids=gene_names,
@@ -1045,6 +1084,7 @@ def two_sample(
                          'The t-test is based on a gaussian noise model and wilcoxon is model free.')
     
     X = _parse_data(data, gene_names)
+    gene_names = _parse_gene_names(data, gene_names)
     grouping = _parse_grouping(data, sample_description, grouping)
     sample_description = pd.DataFrame({"grouping": grouping})
     
@@ -1081,7 +1121,7 @@ def two_sample(
         full_formula_loc = '~ 1 + grouping'
         full_formula_scale = '~ 1 + grouping'
         reduced_formula_loc = '~ 1'
-        reduced_formula_scale = '~ 1'
+        reduced_formula_scale = '~ 1 + grouping'
         de_test = test_lrt(
             data=X,
             full_formula_loc=full_formula_loc,
