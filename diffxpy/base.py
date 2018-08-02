@@ -761,7 +761,7 @@ def test_lrt(
         design_scale=full_design_scale,
         gene_names=gene_names,
         init_model=reduced_model,
-        batch_size=X.shape[0], # workaround: batch_size=num_observations
+        batch_size=batch_size,
         training_strategy=training_strategy,
     )
     
