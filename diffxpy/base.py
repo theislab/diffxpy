@@ -588,27 +588,9 @@ def _parse_gene_names(data, gene_names):
 
 
 def _parse_data(data, gene_names):
-    if anndata is not None and isinstance(data, anndata.AnnData) and isinstance(data.X, scipy.sparse.csr_matrix):
-        X = dask.array.from_array(data.X, data.X.shape)
-        X = xr.DataArray(dask.array.stack(X), dims=("observations", "features"), coords={
-            "observations": data.obs_names,
-            "features": data.var_names,
-        })
-    elif anndata is not None and isinstance(data, anndata.AnnData) and not isinstance(data.X, scipy.sparse.csr_matrix):
-        X = data.X
-    elif isinstance(data, scipy.sparse.csr_matrix):
-        X = dask.array.from_array(data, data.shape)
-        X = xr.DataArray(dask.array.stack(X), dims=("observations", "features"), coords={
-            "observations": data.obs_names,
-            "features": data.var_names,
-        })
-    elif isinstance(data, xr.DataArray):
-        X = data
-    elif isinstance(data, xr.Dataset):
-        X = data["X"]
-    else:
-        X = xr.DataArray(data, dims=("observations", "features"))
-        X["features"] = gene_names
+    X = data_utils.xarray_from_data(data, dims=("observations", "features"))
+    if gene_names is not None:
+        X.coords["features"] = gene_names
     
     return X
 
@@ -808,7 +790,7 @@ def test_lrt(
         design_scale=full_design_scale,
         gene_names=gene_names,
         init_model=reduced_model,
-        batch_size=X.shape[0], # workaround: batch_size=num_observations
+        batch_size=X.shape[0],  # workaround: batch_size=num_observations
         training_strategy=training_strategy,
     )
     

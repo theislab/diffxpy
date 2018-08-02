@@ -44,7 +44,7 @@ class TestSingle(unittest.TestCase):
         
         print('KS-test pvalue for null model match of test_wald_loc(): %f' % pval_h0)
         return pval_h0
-
+    
     def test_sparse_anndata(self, n_cells: int = 1000, n_genes: int = 1000):
         """
         Test if de.test_wald_loc() generates a uniform p-value distribution
@@ -64,8 +64,10 @@ class TestSingle(unittest.TestCase):
             "condition": np.random.randint(2, size=sim.num_observations)
         })
         
+        adata = anndata.AnnData(scipy.sparse.csr_matrix(sim.X.values))
+        # X = adata.X
         test = de.test_wald_loc(
-            data=anndata.AnnData(scipy.sparse.csr_matrix(sim.X.values)),
+            data=adata,
             factor_loc_totest="condition",
             formula="~ 1 + condition",
             sample_description=random_sample_description,
