@@ -1098,7 +1098,7 @@ def two_sample(
         full_formula_loc = '~ 1 + grouping'
         full_formula_scale = '~ 1 + grouping'
         reduced_formula_loc = '~ 1'
-        reduced_formula_scale = '~ 1'
+        reduced_formula_scale = '~ 1 + grouping'
         de_test = test_lrt(
             data=X,
             full_formula_loc=full_formula_loc,
