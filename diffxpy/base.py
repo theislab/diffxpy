@@ -79,7 +79,12 @@ class _Estimation(GeneralizedLinearModel, metaclass=abc.ABCMeta):
     
     @property
     @abc.abstractmethod
-    def hessian_diagonal(self, **kwargs) -> np.ndarray:
+    def fisher_loc(self, **kwargs) -> np.ndarray:
+        pass
+    
+    @property
+    @abc.abstractmethod
+    def fisher_scale(self, **kwargs) -> np.ndarray:
         pass
 
 
@@ -414,7 +419,11 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     
     def _test(self):
         theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
-        theta_sd = self.model_estim.hessian_diagonal[self.coef_loc_totest]
+        # standard deviation of estimates: genes x coefficient array with one coefficient per group
+        # $\text{SE}(\hat{\theta}_{ML}) = \frac{1}{Fisher(\hat{\theta}_{ML})}$
+        theta_sd = 1 / np.sqrt(
+            np.asarray(self.model_estim.fisher_loc[self.coef_loc_totest])
+        )
         return stats.wald_test(theta_mle=theta_mle, theta_sd=theta_sd, theta0=0)
     
     def summary(self, **kwargs) -> pd.DataFrame:
@@ -1269,7 +1278,7 @@ def test_pairwise(
         # values of parameter estimates: genes x coefficient array with one coefficient per group
         theta_mle = [np.squeeze(np.asarray(e.par_link_loc)) for e in group_models]
         # standard deviation of estimates: genes x coefficient array with one coefficient per group
-        theta_sd = [np.asarray(e.hessian_diagonal.isel(variables=0)) for e in group_models]
+        theta_sd = [np.asarray(e.fisher_loc) for e in group_models]
         
         for i, g1 in enumerate(groups):
             for j, g2 in enumerate(groups[(i + 1):]):
@@ -1431,7 +1440,8 @@ def test_vsrest(
         # values of parameter estimates: genes x coefficient array with one coefficient per group
         theta_mle = [np.squeeze(np.asarray(e.par_link_loc)) for e in group_models]
         # standard deviation of estimates: genes x coefficient array with one coefficient per group
-        theta_sd = [np.asarray(e.hessian_diagonal.isel(variables=0)) for e in group_models]
+        # $\text{SE}(\hat{\theta}_{ML}) = \frac{1}{Fisher(\hat{\theta}_{ML})}$
+        theta_sd = [1 / np.sqrt(np.asarray(e.fisher_loc)) for e in group_models]
         # average expression
         ave_expr = np.mean(X, axis=0)
         
