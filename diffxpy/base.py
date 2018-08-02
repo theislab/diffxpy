@@ -958,8 +958,8 @@ def test_t_test(
     grouping = _parse_grouping(data, grouping, sample_description)
     x0, x1 = _split_X(data, grouping)
     
-    pval = stats.t_test_raw(x0=x0, x1=x1)
-    logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0))
+    pval = stats.t_test_raw(x0=x0.data, x1=x1.data)
+    logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
     
     de_test = DifferentialExpressionTestTT(
         gene_ids=gene_names,
@@ -992,8 +992,8 @@ def test_wilcoxon(
     grouping = _parse_grouping(data, grouping, sample_description)
     x0, x1 = _split_X(data, grouping)
     
-    pval = stats.wilcoxon(x0=x0, x1=x1)
-    logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0))
+    pval = stats.wilcoxon(x0=x0.data, x1=x1.data)
+    logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
     
     de_test = DifferentialExpressionTestWilcoxon(
         gene_ids=gene_names,
