@@ -416,7 +416,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
         theta_sd = self.model_estim.hessian_diagonal[self.coef_loc_totest]
         return stats.wald_test(theta_mle=theta_mle, theta_sd=theta_sd, theta0=0)
-
+    
     def summary(self, **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
@@ -437,7 +437,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         self._gene_ids = np.asarray(gene_ids)
         self._logfc = logfc
         self._pval = pval
-
+        
         q = self.qval
     
     @property
@@ -523,7 +523,7 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         self._gene_ids = np.asarray(gene_ids)
         self._logfc = logfc
         self._pval = pval
-
+        
         q = self.qval
     
     @property
@@ -585,7 +585,7 @@ def _parse_data(data, gene_names):
             "observations": data.obs_names,
             "features": data.var_names,
         })
-    elif anndata is not None and isinstance(data, anndata.AnnData) and isinstance(data.X, scipy.sparse.csr_matrix)==False:
+    elif anndata is not None and isinstance(data, anndata.AnnData) and not isinstance(data.X, scipy.sparse.csr_matrix):
         X = data.X
     elif isinstance(data, scipy.sparse.csr_matrix):
         X = dask.array.from_array(data, data.shape)
