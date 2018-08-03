@@ -2,7 +2,7 @@ import numpy as np
 from scipy.special import polygamma
 import numpy.linalg
 
-def fim_nb_glm_mean_block(x, mu, disp, design_loc, design_scale, i, j):
+def hes_nb_glm_mean_block(x, mu, disp, design_loc, design_scale, i, j):
 	""" Compute entry of fisher information matrix 
 	in mean model block for a given gene.
 
@@ -32,7 +32,7 @@ def fim_nb_glm_mean_block(x, mu, disp, design_loc, design_scale, i, j):
     h_ij = -np.asarray(design_loc[:,i]) * np.asarray(design_loc[:,j]) * mu * x/disp / np.square(1+mu/disp)
 	return np.sum(h_ij)
 
-def fim_nb_glm_disp_block(x, mu, disp, design_loc, design_scale, i, j):
+def hes_nb_glm_disp_block(x, mu, disp, design_loc, design_scale, i, j):
 	""" Compute entry of fisher information matrix 
 	in dispersion model block for a given gene.
 
@@ -62,7 +62,7 @@ def fim_nb_glm_disp_block(x, mu, disp, design_loc, design_scale, i, j):
 	h_ij = disp * np.asarray(design_loc[:,i]) * np.asarray(design_loc[:,j]) * (polygamma(n=0, x=disp+x) + polygamma(n=0, x=disp) - mu/np.square(disp+mu)*(disp+x) + (mu - disp)/(disp+mu) + log(disp) + 1 -log(disp+mu)) + disp * polygamma(n=1, x=disp+x) + disp * polygamma(n=1, x=disp)
 	return np.sum(h_ij)
 
-def fim_nb_glm_meandisp_block(x, mu, disp, design_loc, design_scale, i, j):
+def hes_nb_glm_meandisp_block(x, mu, disp, design_loc, design_scale, i, j):
 	""" Compute entry of fisher information matrix 
 	in mean-dispersion model block for a given gene.
 
@@ -93,7 +93,7 @@ def fim_nb_glm_meandisp_block(x, mu, disp, design_loc, design_scale, i, j):
 	h_ij = disp * np.asarray(design_loc[:,i]) * np.asarray(design_loc[:,j]) * (x - mu)/np.square(1+mu/disp)
 	return np.sum(h_ij)
 
-def fim_nb_glm_bygene(x, mu, disp, design_loc, design_scale):
+def hes_nb_glm_bygene(x, mu, disp, design_loc, design_scale):
 	""" Compute fisher information matrix for a given gene.
 
     :param x: np.ndarray (cells,)
@@ -112,29 +112,30 @@ def fim_nb_glm_bygene(x, mu, disp, design_loc, design_scale):
     """
 	n_par_shape = design_shape.shape[1]
 	n_par = n_par_loc + n_par_shape
-	fim = np.zeros([n_par, n_par])
+	hes = np.zeros([n_par, n_par])
 	# Add in elements by block:
 	# Mean model block:
 	for i in np.arange(0, n_par_loc):
 		for j in np.arange(i, n_par_loc): # Block is on the diagonal and symmtric.
-			fim[i,j] = fim_nb_glm_mean_block(x=x, mu=mu, disp=disp, design_loc=design_loc, design_scale=design_scale, i=i, j=j)
-			fim[j,i] = fim[i,j]
+			hes[i,j] = hes_nb_glm_mean_block(x=x, mu=mu, disp=disp, design_loc=design_loc, design_scale=design_scale, i=i, j=j)
+			hes[j,i] = hes[i,j]
 	# Dispersion model block:
 	for i in np.arange(0, n_par_shape):
 		for j in np.arange(i, n_par_shape): # Block is on the diagonal and symmtric.
-			fim[n_par_loc+i,n_par_loc+j] = fim_nb_glm_disp_block(x=x, mu=mu, disp=disp, design_loc=design_loc, design_scale=design_scale, i=i, j=j)
-			fim[n_par_loc+j,n_par_loc+i] = fim[n_par_loc+i,n_par_loc+j]
+			hes[n_par_loc+i,n_par_loc+j] = hes_nb_glm_disp_block(x=x, mu=mu, disp=disp, design_loc=design_loc, design_scale=design_scale, i=i, j=j)
+			hes[n_par_loc+j,n_par_loc+i] = hes[n_par_loc+i,n_par_loc+j]
 	# Mean-dispersion model block:
 	for i in np.arange(0, n_par_loc):
 		for j in np.arange(0, n_par_shape): # Duplicate block across diagonal but block itself is not symmetric!
-			fim[i,n_par_loc+j] = fim_nb_glm_meandisp_block(x=x, mu=mu, disp=disp, design_loc=design_loc, design_scale=design_scale, i=i, j=j)
-			fim[n_par_loc+j,i] = fim[i,n_par_loc+j]
-	return(fim)
+			hes[i,n_par_loc+j] = hes_nb_glm_meandisp_block(x=x, mu=mu, disp=disp, design_loc=design_loc, design_scale=design_scale, i=i, j=j)
+			hes[n_par_loc+j,i] = hes[i,n_par_loc+j]
+	return(hes)
 
 def theta_covar_bygene(x, mu, disp, design_loc, design_scale):
 	""" Compute model coefficient covariance matrix for a given gene.
 
-	Based on the fisher information matrix.
+	Based on the hessian matrix via fisher information matrix (fim).
+	covar = inv(fim) = inv(-hess)
 
     :param x: np.ndarray (cells,)
 		Observations for a given gene.
@@ -150,19 +151,30 @@ def theta_covar_bygene(x, mu, disp, design_loc, design_scale):
 	:return: np.ndarray (#parameters location model + #parameters shape model, #parameters location model + #parameters shape model)
 		Model coefficient covariance matrix.
     """
-	fim = fim_nb_glm_bygene(x=x, mu=mu, disp=disp, design_loc=design_loc, design_scale=design_scale)
-	return numpy.linalp.pinv(fim)
+	hes = hes_nb_glm_bygene(x=x, mu=mu, disp=disp, design_loc=design_loc, design_scale=design_scale)
+	return numpy.linalp.pinv(-hes)
 
-def theta_sd(theta_covar):
-	""" Extract standard deviation of model coefficient from covariance matrix for a given gene.
+def theta_sd_bygene(x, mu, disp, design_loc, design_scale):
+	""" Compute model coefficient standard deviation vector for a given gene.
 
-	Based on the fisher information matrix.
+	Based on the hessian matrix via fisher information matrix (fim).
+	covar = inv(fim) = inv(-hess)
+	var = diagonal of covar
 
-    :param theta_covar: np.ndarray (#parameters location model + #parameters shape model, #parameters location model + #parameters shape model)
-		Model coefficient covariance matrix.
-    
-    :return theta_sd: np.ndarray (cells,)
-		Standard deviation of model coefficients.
+    :param x: np.ndarray (cells,)
+		Observations for a given gene.
+    :param mu: np.ndarray (cells,)
+		Estimated mean parameters across cells for a given gene.
+    :param mu: np.ndarray (cells,)
+		Estimated dispersion parameters across cells for a given gene.
+    :param design_loc: np.ndarray, matrix, xarray (cells, #parameters location model)
+		Design matrix of location model.
+    :param design_shape: np.ndarray, matrix, xarray (cells, #parameters shape model)
+		Design matrix of shape model.
+	
+	:return: np.ndarray (#parameters location model + #parameters shape model,)
+		Model coefficient standard deviation vector.
     """
-    return np.sqrt(theta_covar.diagonal())
+    hes = hes_nb_glm_bygene(x=x, mu=mu, disp=disp, design_loc=design_loc, design_scale=design_scale)
+	return np.sqrt(numpy.linalp.pinv(-hes).diagonal())
 
