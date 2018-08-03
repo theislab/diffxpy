@@ -874,7 +874,7 @@ def test_wald_loc(
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
-        logger.info("additional kwargs: %s", str(kwargs))
+        logger.debug("additional kwargs: %s", str(kwargs))
     
     if formula_loc is None:
         formula_loc = formula
