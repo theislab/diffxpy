@@ -3,7 +3,7 @@ from scipy.special import polygamma
 import numpy.linalg
 
 def hes_nb_glm_mean_block(x, mu, disp, design_loc, design_scale, i, j):
-	""" Compute entry of fisher information matrix 
+	""" Compute entry of hessian 
 	in mean model block for a given gene.
 
     Sum the following across cells:
@@ -33,7 +33,7 @@ def hes_nb_glm_mean_block(x, mu, disp, design_loc, design_scale, i, j):
 	return np.sum(h_ij)
 
 def hes_nb_glm_disp_block(x, mu, disp, design_loc, design_scale, i, j):
-	""" Compute entry of fisher information matrix 
+	""" Compute entry of hessian
 	in dispersion model block for a given gene.
 
     Sum the following across cells:
@@ -63,7 +63,7 @@ def hes_nb_glm_disp_block(x, mu, disp, design_loc, design_scale, i, j):
 	return np.sum(h_ij)
 
 def hes_nb_glm_meandisp_block(x, mu, disp, design_loc, design_scale, i, j):
-	""" Compute entry of fisher information matrix 
+	""" Compute entry of hessian 
 	in mean-dispersion model block for a given gene.
 
     Sum the following across cells:
@@ -94,7 +94,7 @@ def hes_nb_glm_meandisp_block(x, mu, disp, design_loc, design_scale, i, j):
 	return np.sum(h_ij)
 
 def hes_nb_glm_bygene(x, mu, disp, design_loc, design_scale):
-	""" Compute fisher information matrix for a given gene.
+	""" Compute hessian for a given gene.
 
     :param x: np.ndarray (cells,)
 		Observations for a given gene.
