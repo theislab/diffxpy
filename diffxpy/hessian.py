@@ -10,6 +10,9 @@ def hes_nb_glm_mean_block(x, mu, disp, design_loc, design_scale, i, j):
 	h_ij = -x^m_i*x^m_j*mu*(x/disp)/(1+mu(disp))^2
 
 	Make sure that only element wise operations happen here!
+	Do not simplify design matrix elements: they are only 0 or 1 for discrete 
+	groups but continuous if space, time, pseudotime or spline basis covariates 
+	are supplied!
 	
 	:param x: np.ndarray (cells,)
 		Observations for a given gene.
@@ -40,6 +43,9 @@ def hes_nb_glm_disp_block(x, mu, disp, design_loc, design_scale, i, j):
 	h_ij = disp*x^m_i*x^m_j*[psi_0(disp+x)+psi_0(disp)-mu/(disp+mu)^2*(disp+x)+(mu-disp)/(disp+mu)+log(disp)+1-log(disp+mu)] + disp*psi_1(disp+x) + disp*psi_1(disp)
 	
 	Make sure that only element wise operations happen here!
+	Do not simplify design matrix elements: they are only 0 or 1 for discrete 
+	groups but continuous if space, time, pseudotime or spline basis covariates 
+	are supplied!
 	
 	:param x: np.ndarray (cells,)
 		Observations for a given gene.
@@ -71,6 +77,9 @@ def hes_nb_glm_meandisp_block(x, mu, disp, design_loc, design_scale, i, j):
 	h_ij = mu*x^m_i*x^m_j*(x-mu)/(1+mu/disp)^2
 	
 	Make sure that only element wise operations happen here!
+	Do not simplify design matrix elements: they are only 0 or 1 for discrete 
+	groups but continuous if space, time, pseudotime or spline basis covariates 
+	are supplied!
 	
 	:param x: np.ndarray (cells,)
 		Observations for a given gene.
