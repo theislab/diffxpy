@@ -152,7 +152,7 @@ def theta_covar_bygene(x, mu, disp, design_loc, design_scale):
 		Model coefficient covariance matrix.
     """
 	hes = hes_nb_glm_bygene(x=x, mu=mu, disp=disp, design_loc=design_loc, design_scale=design_scale)
-	return numpy.linalp.pinv(-hes)
+	return numpy.linalg.pinv(-hes)
 
 def theta_sd_bygene(x, mu, disp, design_loc, design_scale):
 	""" Compute model coefficient standard deviation vector for a given gene.
@@ -176,5 +176,5 @@ def theta_sd_bygene(x, mu, disp, design_loc, design_scale):
 		Model coefficient standard deviation vector.
     """
     hes = hes_nb_glm_bygene(x=x, mu=mu, disp=disp, design_loc=design_loc, design_scale=design_scale)
-	return np.sqrt(numpy.linalp.pinv(-hes).diagonal())
+	return np.sqrt(numpy.linalg.pinv(-hes).diagonal())
 
