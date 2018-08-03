@@ -21,7 +21,7 @@ from batchglm.api.models.glm import Model as GeneralizedLinearModel
 
 from . import stats
 from . import correction
-from batch_bfgs import optim_bfgs
+from .batch_bfgs.optim import Estim_BFGS
 
 logger = logging.getLogger(__name__)
 
@@ -391,6 +391,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     
     model_estim: _Estimation
     coef_loc_totest: int
+    theta_mle: np.ndarray
+    theta_sd: np.ndarray
     
     def __init__(self, model_estim: _Estimation, col_index):
         super().__init__()
@@ -398,6 +400,23 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         self.coef_loc_totest = col_index
         p = self.pval
         q = self.qval
+
+        # add in info from bfgs
+        if model_estim.log_probs() is not None:
+            self.log_probs = model_estim.log_probs()
+        else:
+            self.log_probs = None
+        try:
+            if model_estim._error_codes is not None:
+                self._error_codes = model_estim._error_codes
+        except Exception as e:
+            self._error_codes = None
+
+        try:
+            if model_estim._niter is not None:
+                self._niter = model_estim._niter
+        except Exception as e:
+            self._niter = None
     
     @property
     def gene_ids(self) -> np.ndarray:
@@ -411,21 +430,22 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         """
         Returns one fold change per gene
         """
-        design = np.unique(self.model_estim.design_loc, axis=0)
-        dmat = np.zeros_like(design)
-        dmat[:, self.coef_loc_totest] = design[:, self.coef_loc_totest]
+        #design = np.unique(self.model_estim.design_loc, axis=0)
+        #dmat = np.zeros_like(design)
+        #dmat[:, self.coef_loc_totest] = design[:, self.coef_loc_totest]
         
-        loc = dmat @ self.model_estim.par_link_loc[self.coef_loc_totest]
-        return loc[1] - loc[0]
-    
+        #loc = dmat @ self.model_estim.par_link_loc[self.coef_loc_totest]
+        #return loc[1] - loc[0]
+        return self.model_estim.par_link_loc[self.coef_loc_totest]
+        
     def _test(self):
-        theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
+        self.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
         # standard deviation of estimates: genes x coefficient array with one coefficient per group
         # $\text{SE}(\hat{\theta}_{ML}) = \frac{1}{Fisher(\hat{\theta}_{ML})}$
-        theta_sd = 1 / np.sqrt(
+        self.theta_sd = np.sqrt(
             np.asarray(self.model_estim.fisher_loc[self.coef_loc_totest])
         )
-        return stats.wald_test(theta_mle=theta_mle, theta_sd=theta_sd, theta0=0)
+        return stats.wald_test(theta_mle=self.theta_mle, theta_sd=self.theta_sd, theta0=0)
     
     def summary(self, **kwargs) -> pd.DataFrame:
         """
@@ -433,6 +453,15 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         """
         res = super().summary(**kwargs)
         res["grad"] = self.model_gradient.data
+        res["coef_mle"] = self.theta_mle
+        res["coef_sd"] = self.theta_sd
+        # add in info from bfgs
+        if self.log_probs is not None:
+            res["ll"] = self.log_probs
+        if self._error_codes is not None:
+            res["err"] = self._error_codes
+        if self._niter is not None:
+            res["niter"] = self._niter
         
         return res
 
@@ -652,11 +681,11 @@ def _fit(
     :param close_session: If True, will finalize the estimator. Otherwise, return the estimator itself.
     """
     if training_strategy is 'BFGS':
-        lib_size = np.zeros(data.shape[0])+1
+        lib_size = np.zeros(data.shape[0])
         if noise_model == "nb" or noise_model == "negative_binomial":
-            estim = optim_bfgs.Estim_BFGS(X=data, X_mu=design_loc, X_disp=design_scale, 
-                lib_size=lib_size, batch_size=batch_size)
-            estim.run(nproc=3, maxiter=1000, debug=False)
+            estim = Estim_BFGS(X=data, design_loc=design_loc, design_scale=design_scale, 
+                lib_size=lib_size, batch_size=batch_size, feature_names=gene_names)
+            estim.run(nproc=3, maxiter=10000, debug=False)
             model = estim.return_batchglm_formated_model()
         else:
             raise ValueError('base.test(): `noise_model` not recognized.')

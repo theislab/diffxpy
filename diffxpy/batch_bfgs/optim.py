@@ -1,103 +1,168 @@
 from scipy.optimize import minimize
+from scipy.sparse import csr_matrix
 import numpy as np
+from numpy.linalg import pinv
 import numpy.random 
 from multiprocessing import Pool
+import xarray as xa
 
-from objectives import *
-from ..base import _Estimation
+from .objectives import *
+
+class Estim_BFGS_Model():
+
+    def __init__(self, Estim_BFGS, nproc):
+        self._num_observations = Estim_BFGS.X.shape[0]
+        self._num_features = Estim_BFGS.X.shape[1]
+        self._features = Estim_BFGS.feature_names
+        self._observations = Estim_BFGS.X.shape[0]
+        self._design_loc = Estim_BFGS.design_loc
+        self._design_scale = Estim_BFGS.design_scale
+        self._loss = xa.DataArray(Estim_BFGS.full_loss(nproc))
+        self._log_probs = -self._loss
+        self._probs = np.exp(self._log_probs)
+        self._mles = xa.DataArray(np.transpose(Estim_BFGS.mles()))
+        self._gradient = xa.DataArray(np.zeros([Estim_BFGS.X.shape[1]]))
+        self._fisher = np.transpose(Estim_BFGS.fim_diags())
+        self._idx_loc = np.arange(0, Estim_BFGS.design_loc.shape[1])
+        self._idx_scale = np.arange(Estim_BFGS.design_loc.shape[1], Estim_BFGS.design_loc.shape[1]+Estim_BFGS.design_scale.shape[1])
+        self._error_codes = Estim_BFGS.error_codes()
+        self._niter = Estim_BFGS.niter()
+
+    @property
+    def num_observations(self) -> int:
+        return self._num_observations
+    
+    @property
+    def num_features(self) -> int:
+        return self._num_features
+    
+    @property
+    def features(self) -> np.ndarray:
+        return self._features
+    
+    @property
+    def observations(self) -> np.ndarray:
+        return self._observations
+
+    @property
+    def design_loc(self, **kwargs):
+        return self._design_loc
+
+    @property
+    def design_scale(self, **kwargs):
+        return self._design_scale
+
+    @property
+    def probs(self):
+        return self._probs
+
+    #@property
+    def log_probs(self):
+        return self._log_probs
+    
+    @property
+    def loss(self, **kwargs):
+        return self._loss
+    
+    @property
+    def gradient(self, **kwargs):
+        return self._gradient
+    
+    @property
+    def mles(self, **kwargs):
+        return self._mles
+
+    @property
+    def par_link_loc(self, **kwargs):
+        return self._mles[self._idx_loc,:]
+
+    @property
+    def par_link_scale(self, **kwargs):
+        return self._mles[self._idx_scale,:]
+
+    @property
+    def fisher_loc(self, **kwargs):
+        return xa.DataArray(self._fisher[self._idx_loc,:])
+
+    @property
+    def fisher_scale(self, **kwargs):
+        return xa.DataArray(self._fisher[self._idx_scale,:])
+
+    @property
+    def error_codes(self, **kwargs):
+        return self._error_codes
+
 
 class Estim_BFGS():
     """ Class that handles multiple parallel starts of parameter estimation on one machine.
     """
-    class Estim_BFGS_Model(_Estimation):
-        @property
-        def num_observations(self) -> int:
-            pass
-        
-        @property
-        def num_features(self) -> int:
-            pass
-        
-        @property
-        def features(self) -> np.ndarray:
-            pass
-        
-        @property
-        def observations(self) -> np.ndarray:
-            pass
-        
-        def probs(self) -> np.ndarray:
-            pass
-        
-        def log_probs(self) -> np.ndarray:
-            pass
-        
-        @property
-        def loss(self, **kwargs) -> np.ndarray:
-            pass
-        
-        @property
-        def gradient(self, **kwargs) -> np.ndarray:
-            pass
-        
-        @property
-        def hessian_diagonal(self, **kwargs) -> np.ndarray:
-            pass
 
-    def __init__(self, X, X_mu, X_disp, lib_size, batch_size=100):
+    def __init__(self, X, design_loc, design_scale, lib_size, batch_size=100, feature_names=None):
         """ Constructor of ManyGenes()
         """
         self.X = X
-        self.X_mu = X_mu
-        self.X_disp = X_disp
+        self.design_loc = np.asmatrix(design_loc)
+        self.design_scale = np.asmatrix(design_scale)
         self.lib_size = lib_size
         self.batch_size = batch_size
-        self.__is_sparse = isinstance(X, 'csr-matrix')
+        self.feature_names = feature_names
+        self.__is_sparse = isinstance(X, csr_matrix)
         self.res = None
 
-
-    def __init_mu_theta(self, x, X_mu):
-        return np.concatenate([np.mean(x), np.zeros([X_disp.shape[2]-1])])
-
-
-    def __init_disp_theta(self, x, X_mu):
-        return np.zeros([X_disp.shape[2]])
-
-
-    def __get_gene(self, i):
-        if self.__is_sparse:
-            return self.X[:,i].todense().flatten()
+    def __init_mu_theta(self, x):
+        if self.design_loc.shape[1] > 1:
+            return np.concatenate([[np.log(np.mean(x)+1e-08)], np.zeros([self.design_loc.shape[1]-1])])
+            #return np.zeros([self.design_loc.shape[1]])
         else:
-            return self.X[:,i].flatten()
+            return [np.log(np.mean(x)+1e-08)]
+
+
+    def __init_disp_theta(self, x):
+        if self.design_scale.shape[1] > 1:
+            return np.zeros([self.design_scale.shape[1]])
+        else:
+            return [0]
+
+
+    def get_gene(self, i):
+        """
+
+        Has to be public so that it can be passed via starmap.
+        """
+        if self.__is_sparse:
+            return np.asarray(self.X[:,i].data.todense())
+        else:
+            return np.asarray(self.X[:,i].data)
         
 
-    def __run_optim(self, x, maxiter=1000, debug=False):
-        """ Run single optimisation
+    def run_optim(self, x, maxiter=10000, debug=False):
+        """ Run single optimisation.
+
+        Has to be public so that it can be passed via starmap.
 
         Parameters
         ----------
         """ 
-        x0 = np.concatenate(self.__init_mu_theta(x, X_mu),
-            self.__init_disp_theta(x, X_disp))
+        x0 = np.concatenate([self.__init_mu_theta(x), self.__init_disp_theta(x)])
         
-        if debug==False:
+        if debug:
+            minimize_out = minimize(fun=objective, x0=x0,
+                args=(x, self.design_loc, self.design_scale, self.lib_size, self.batch_size),
+                method='BFGS', options={'maxiter':maxiter, 'gtol': 1e-05})
+        else:
             try:
                 minimize_out = minimize(fun=objective, x0=x0,
-                    args=(self.x, self.X_mu, self.X_disp, self.lib_size, self.batch_size),
+                    args=(x, self.design_loc, self.design_scale, self.lib_size, self.batch_size),
                     method='BFGS', options={'maxiter':maxiter, 'gtol': 1e-05})
                 err = ''
             except Exception as e:
                 minimize_out = None
                 err = e
                 print(e)
-        else:
-            minimize_out = minimize(fun=objective, x0=x0,
-                    args=(self.x, self.X_mu, self.X_disp, self.lib_size, self.batch_size),
-                    method='BFGS', options={'maxiter':maxiter, 'gtol': 1e-05})
         
         return minimize_out
         
-    def run(self, nproc=1, maxiter=1000, debug=False):
+    def run(self, nproc=1, maxiter=10000, debug=False):
         """ Run multiple optimisation starts
         
         Parameters
@@ -112,24 +177,33 @@ class Estim_BFGS():
         if debug==True:
             self.res = [] # list of FitResults instances.
             for i in range(self.X.shape[1]):
-                self.res.append(self.__run_optim(x=self.__get_gene(i), maxiter=maxiter, debug=debug))
-                i = i+1
+                self.res.append(self.run_optim(x=self.get_gene(i), maxiter=maxiter, debug=debug))
         else:
             with Pool(processes=nproc) as p:
-                self.res = p.starmap(self.__run_optim, [(self.__get_gene(i), maxiter, debug) 
+                self.res = p.starmap(self.run_optim, [(self.get_gene(i), maxiter, False) 
                     for i in range(self.X.shape[1])])
 
-    def return_batchglm_formated_model(self):
-        model = Estim_BFGS_Model()
-        model.num_observations = self.X.shape[0]
-        model.num_features = self.X.shape[1]
-        model.features = self.X.shape[1]
-        model.observations = self.X.shape[0]
-        model.probs = np.exp([-x.fun for x in self.res])
-        model.log_probs = -np.array([x.fun for x in self.res])
-        model.loss = np.array([x.fun for x in self.res])
-        model.gradient = np.zeros([self.X.shape[0]])
-        model.hessian_diagonal = np.hstack([x.hess.diag() for x in self.res])
+    def full_loss(self, nproc=1):
+        with Pool(processes=nproc) as p:
+            loss =  np.asarray(p.starmap(objective, [(x.x, self.get_gene(i), 
+                self.design_loc, self.design_scale, self.lib_size, None) 
+                for i,x in enumerate(self.res)]))
+        return np.asarray(loss)
+
+    def mles(self):
+        return np.vstack([x.x for x in self.res])
+
+    def fim_diags(self):
+        return np.vstack([x.hess_inv.diagonal() for x in self.res])
+
+    def niter(self):
+        return np.array([x.nit for x in self.res])
+
+    def error_codes(self):
+        return np.array([x.status for x in self.res])
+
+    def return_batchglm_formated_model(self, nproc=1):
+        model = Estim_BFGS_Model(self, nproc)
         return(model)
 
     
