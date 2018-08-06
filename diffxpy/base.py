@@ -80,12 +80,12 @@ class _Estimation(GeneralizedLinearModel, metaclass=abc.ABCMeta):
     
     @property
     @abc.abstractmethod
-    def fisher_loc(self, **kwargs) -> np.ndarray:
+    def hessians(self, **kwargs) -> np.ndarray:
         pass
     
     @property
     @abc.abstractmethod
-    def fisher_scale(self, **kwargs) -> np.ndarray:
+    def fisher_inv(self, **kwargs) -> np.ndarray:
         pass
 
 
@@ -400,7 +400,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         self.coef_loc_totest = col_index
         p = self.pval
         q = self.qval
-
+        
         # add in info from bfgs
         if model_estim.log_probs() is not None:
             self.log_probs = model_estim.log_probs()
@@ -411,7 +411,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 self._error_codes = model_estim._error_codes
         except Exception as e:
             self._error_codes = None
-
+        
         try:
             if model_estim._niter is not None:
                 self._niter = model_estim._niter
@@ -430,14 +430,14 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         """
         Returns one fold change per gene
         """
-        #design = np.unique(self.model_estim.design_loc, axis=0)
-        #dmat = np.zeros_like(design)
-        #dmat[:, self.coef_loc_totest] = design[:, self.coef_loc_totest]
+        # design = np.unique(self.model_estim.design_loc, axis=0)
+        # dmat = np.zeros_like(design)
+        # dmat[:, self.coef_loc_totest] = design[:, self.coef_loc_totest]
         
-        #loc = dmat @ self.model_estim.par_link_loc[self.coef_loc_totest]
-        #return loc[1] - loc[0]
+        # loc = dmat @ self.model_estim.par_link_loc[self.coef_loc_totest]
+        # return loc[1] - loc[0]
         return self.model_estim.par_link_loc[self.coef_loc_totest]
-        
+    
     def _test(self):
         self.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
         # standard deviation of estimates: genes x coefficient array with one coefficient per group
@@ -683,8 +683,8 @@ def _fit(
     if training_strategy is 'BFGS':
         lib_size = np.zeros(data.shape[0])
         if noise_model == "nb" or noise_model == "negative_binomial":
-            estim = Estim_BFGS(X=data, design_loc=design_loc, design_scale=design_scale, 
-                lib_size=lib_size, batch_size=batch_size, feature_names=gene_names)
+            estim = Estim_BFGS(X=data, design_loc=design_loc, design_scale=design_scale,
+                               lib_size=lib_size, batch_size=batch_size, feature_names=gene_names)
             estim.run(nproc=3, maxiter=10000, debug=False)
             model = estim.return_batchglm_formated_model()
         else:
