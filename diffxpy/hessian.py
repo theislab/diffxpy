@@ -241,7 +241,7 @@ def theta_sd_bygene(
         Observations for a given gene.
     :param mu: np.ndarray (cells,)
         Estimated mean parameters across cells for a given gene.
-    :param mu: np.ndarray (cells,)
+    :param disp: np.ndarray (cells,)
         Estimated dispersion parameters across cells for a given gene.
     :param design_loc: np.ndarray, matrix, xarray (cells, #parameters location model)
         Design matrix of location model.

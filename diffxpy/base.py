@@ -398,8 +398,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         super().__init__()
         self.model_estim = model_estim
         self.coef_loc_totest = col_index
-        p = self.pval
-        q = self.qval
+        # p = self.pval
+        # q = self.qval
         
         # add in info from bfgs
         if model_estim.log_probs() is not None:
@@ -680,7 +680,7 @@ def _fit(
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param close_session: If True, will finalize the estimator. Otherwise, return the estimator itself.
     """
-    if training_strategy is 'BFGS':
+    if training_strategy.lower() == 'bfgs':
         lib_size = np.zeros(data.shape[0])
         if noise_model == "nb" or noise_model == "negative_binomial":
             estim = Estim_BFGS(X=data, design_loc=design_loc, design_scale=design_scale,
