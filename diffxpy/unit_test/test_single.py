@@ -36,7 +36,7 @@ class TestSingle(unittest.TestCase):
             factor_loc_totest="condition",
             formula="~ 1 + condition",
             sample_description=random_sample_description,
-            training_strategy='QUICK'
+            # training_strategy='QUICK'
         )
         
         # Compare p-value distribution under null model against uniform distribution.

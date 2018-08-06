@@ -442,8 +442,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         self.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
         # standard deviation of estimates: genes x coefficient array with one coefficient per group
         # $\text{SE}(\hat{\theta}_{ML}) = \frac{1}{Fisher(\hat{\theta}_{ML})}$
-        self.theta_sd = np.sqrt(
-            np.asarray(self.model_estim.fisher_loc[self.coef_loc_totest])
+        self.theta_sd = 1 / np.sqrt(
+            np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1)[:, self.coef_loc_totest]
         )
         return stats.wald_test(theta_mle=self.theta_mle, theta_sd=self.theta_sd, theta0=0)
     
@@ -1321,7 +1321,10 @@ def test_pairwise(
         # values of parameter estimates: genes x coefficient array with one coefficient per group
         theta_mle = [np.squeeze(np.asarray(e.par_link_loc)) for e in group_models]
         # standard deviation of estimates: genes x coefficient array with one coefficient per group
-        theta_sd = [np.asarray(e.fisher_loc) for e in group_models]
+        # theta_sd = 1 / sqrt(diagonal(fisher_inv))
+        theta_sd = [1 / np.sqrt(
+            np.diagonal(e.fisher_inv, axis1=-2, axis2=-1)[:, :e.par_link_loc.shape[-1]]
+        ) for e in group_models]
         
         for i, g1 in enumerate(groups):
             for j, g2 in enumerate(groups[(i + 1):]):
@@ -1491,7 +1494,11 @@ def test_vsrest(
         theta_mle = [np.squeeze(np.asarray(e.par_link_loc)) for e in group_models]
         # standard deviation of estimates: genes x coefficient array with one coefficient per group
         # $\text{SE}(\hat{\theta}_{ML}) = \frac{1}{Fisher(\hat{\theta}_{ML})}$
-        theta_sd = [1 / np.sqrt(np.asarray(e.fisher_loc)) for e in group_models]
+        theta_sd = [
+            1 / np.sqrt(
+                np.diagonal(e.fisher_inv, axis1=-2, axis2=-1)[:, :e.par_link_loc.shape[-1]]
+            ) for e in group_models
+        ]
         # average expression
         ave_expr = np.mean(X, axis=0)
         
