@@ -1340,6 +1340,7 @@ def test_pairwise(
     tests = np.tile([None], [X.shape[1], len(groups), len(groups)])
 
     if test == 'z-test':
+        # -1 in formula removes intercept
         dmat = data_utils.design_matrix(sample_description, formula="~ 1 - 1 + grouping")
         model = _fit(
             noise_model=noise_model,
@@ -1352,9 +1353,9 @@ def test_pairwise(
             **kwargs
         )
 
-        # values of parameter estimates: genes x coefficient array with one coefficient per group
+        # values of parameter estimates: coefficients x genes array with one coefficient per group
         theta_mle = model.par_link_loc
-        # standard deviation of estimates: genes x coefficient array with one coefficient per group
+        # standard deviation of estimates: coefficients x genes array with one coefficient per group
         # theta_sd = sqrt(diagonal(fisher_inv))
         theta_sd = np.sqrt(np.diagonal(model.fisher_inv, axis1=-2, axis2=-1)).T
 
@@ -1512,8 +1513,12 @@ def test_vsrest(
     logfc = np.zeros([len(groups), X.shape[1]])
 
     if test == 'fast-wald':
+        # TODO: remove this warning when fast-wald is working
+        logger.warning("fast-wald is not ready for usage yet!")
+
+        # -1 in formula removes intercept
         dmat = data_utils.design_matrix(sample_description, formula="~ 1 - 1 + grouping")
-        model = _fit(
+        full_model = _fit(
             noise_model=noise_model,
             data=X,
             design_loc=dmat,
@@ -1524,17 +1529,34 @@ def test_vsrest(
             **kwargs
         )
 
-        # values of parameter estimates: genes x coefficient array with one coefficient per group
-        theta_mle = model.par_link_loc
-        # standard deviation of estimates: genes x coefficient array with one coefficient per group
-        # $\text{SE}(\hat{\theta}_{ML}) = Fisher(\hat{\theta}_{ML})$
-        theta_sd = np.sqrt(np.diagonal(model.fisher_inv, axis1=-2, axis2=-1)).T
-        # average expression in linker-space
-        ave_expr = model.link_loc(np.mean(X, axis=0))
+        # values of parameter estimates: coefficients x genes array with one coefficient per group
+        theta_mle1 = full_model.par_link_loc
+        # standard deviation of estimates: coefficients x genes array with one coefficient per group
+        # theta_sd = sqrt(diagonal(fisher_inv))
+        theta_sd1 = np.sqrt(np.diagonal(full_model.fisher_inv, axis1=-2, axis2=-1)).T
+
+        dmat = data_utils.design_matrix(sample_description, formula="~ 1")
+        reduced_model = _fit(
+            noise_model=noise_model,
+            data=X,
+            design_loc=dmat,
+            design_scale=dmat,
+            gene_names=gene_names,
+            batch_size=batch_size,
+            training_strategy=training_strategy,
+            **kwargs
+        )
+
+        # values of parameter estimates: coefficients x genes array with one coefficient per group
+        theta_mle0 = reduced_model.par_link_loc[0]
+        # standard deviation of estimates: coefficients x genes array with one coefficient per group
+        # theta_sd = sqrt(diagonal(fisher_inv))
+        theta_sd0 = np.sqrt(np.diagonal(reduced_model.fisher_inv, axis1=-2, axis2=-1)).T[0]
 
         for i, g1 in enumerate(groups):
-            pvals[i] = stats.wald_test(theta_mle=theta_mle[i], theta_sd=theta_sd[i], theta0=ave_expr)
-            logfc[i] = ave_expr - theta_mle[i]
+            pvals[i] = stats.two_coef_z_test(theta_mle0=theta_mle0, theta_mle1=theta_mle1[i],
+                                             theta_sd0=theta_sd0, theta_sd1=theta_sd1[i])
+            logfc[i] = theta_mle0 - theta_mle1[i]
     else:
         for i, g1 in enumerate(groups):
             test_grouping = np.where(grouping == g1, "group", "rest")
