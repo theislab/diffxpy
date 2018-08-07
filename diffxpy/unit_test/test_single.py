@@ -42,6 +42,9 @@ class TestSingle(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         print('KS-test pvalue for null model match of test_wald_loc(): %f' % pval_h0)
+
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+
         return pval_h0
 
     def test_wald_de(self, n_cells: int = 1000, n_genes: int = 1000):
@@ -148,6 +151,9 @@ class TestSingle(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         print('KS-test pvalue for null model match of test_lrt(): %f' % pval_h0)
+
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+
         return pval_h0
 
     def test_t_test(self, n_cells: int = 1000, n_genes: int = 1000):
@@ -179,6 +185,9 @@ class TestSingle(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         print('KS-test pvalue for null model match of test_t_test(): %f' % pval_h0)
+
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+
         return pval_h0
 
     def test_wilcoxon(self, n_cells: int = 1000, n_genes: int = 1000):
@@ -210,6 +219,9 @@ class TestSingle(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         print('KS-test pvalue for null model match of test_wilcoxon(): %f' % pval_h0)
+
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+
         return pval_h0
 
 
