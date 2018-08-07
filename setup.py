@@ -13,6 +13,7 @@ setup(
         'patsy',
         'batchglm',
         'xarray',
+        'statsmodels',
     ],
     extras_require={
         'optional': [
