@@ -1,3 +1,5 @@
+import logging
+
 from scipy.optimize import minimize
 from scipy.sparse import csr_matrix
 import numpy as np
@@ -8,9 +10,11 @@ import xarray as xr
 
 from .objectives import *
 
+logger = logging.getLogger(__name__)
+
 
 class Estim_BFGS_Model():
-    
+
     def __init__(self, Estim_BFGS, nproc):
         self._num_observations = Estim_BFGS.X.shape[0]
         self._num_features = Estim_BFGS.X.shape[1]
@@ -30,63 +34,63 @@ class Estim_BFGS_Model():
         self._error_codes = Estim_BFGS.error_codes()
         self._niter = Estim_BFGS.niter()
         self._estim_bfgs = Estim_BFGS
-    
+
     @property
     def num_observations(self) -> int:
         return self._num_observations
-    
+
     @property
     def num_features(self) -> int:
         return self._num_features
-    
+
     @property
     def features(self) -> np.ndarray:
         return self._features
-    
+
     @property
     def observations(self) -> np.ndarray:
         return self._observations
-    
+
     @property
     def design_loc(self, **kwargs):
         return self._design_loc
-    
+
     @property
     def design_scale(self, **kwargs):
         return self._design_scale
-    
+
     @property
     def probs(self):
         return self._probs
-    
+
     # @property
     def log_probs(self):
         return self._log_probs
-    
+
     @property
     def loss(self, **kwargs):
         return self._loss
-    
+
     @property
     def gradient(self, **kwargs):
         return self._gradient
-    
+
     @property
     def mles(self, **kwargs):
         return self._mles
-    
+
     @property
     def par_link_loc(self, **kwargs):
         return self._mles[self._idx_loc, :]
-    
+
     @property
     def par_link_scale(self, **kwargs):
         return self._mles[self._idx_scale, :]
-    
+
     @property
     def fisher_inv(self):
         return self._fisher_inv
-    
+
     @property
     def error_codes(self, **kwargs):
         return self._error_codes
@@ -95,13 +99,16 @@ class Estim_BFGS_Model():
 class Estim_BFGS():
     """ Class that handles multiple parallel starts of parameter estimation on one machine.
     """
-    
+
     def __init__(self, X, design_loc, design_scale, lib_size=0, batch_size=None, feature_names=None):
         """ Constructor of ManyGenes()
         """
         if np.size(lib_size):
             lib_size = np.broadcast_to(lib_size, X.shape[0])
-        
+
+        if batch_size is not None:
+            logger.warning("Using BFGS with batching is currently not supported!")
+
         self.X = X
         self.design_loc = np.asmatrix(design_loc)
         self.design_scale = np.asmatrix(design_scale)
@@ -110,20 +117,20 @@ class Estim_BFGS():
         self.feature_names = feature_names
         self.__is_sparse = isinstance(X, csr_matrix)
         self.res = None
-    
+
     def __init_mu_theta(self, x):
         if self.design_loc.shape[1] > 1:
             return np.concatenate([[np.log(np.mean(x) + 1e-08)], np.zeros([self.design_loc.shape[1] - 1])])
             # return np.zeros([self.design_loc.shape[1]])
         else:
             return [np.log(np.mean(x) + 1e-08)]
-    
+
     def __init_disp_theta(self, x):
         if self.design_scale.shape[1] > 1:
             return np.zeros([self.design_scale.shape[1]])
         else:
             return [0]
-    
+
     def get_gene(self, i):
         """
 
@@ -133,7 +140,7 @@ class Estim_BFGS():
             return np.asarray(self.X[:, i].data.todense())
         else:
             return np.asarray(self.X[:, i].data)
-    
+
     def run_optim(self, x, maxiter=10000, debug=False):
         """ Run single optimisation.
 
@@ -143,7 +150,7 @@ class Estim_BFGS():
         ----------
         """
         x0 = np.concatenate([self.__init_mu_theta(x), self.__init_disp_theta(x)])
-        
+
         if debug:
             minimize_out = minimize(
                 fun=objective,
@@ -166,9 +173,9 @@ class Estim_BFGS():
                 minimize_out = None
                 err = e
                 print(e)
-        
+
         return minimize_out
-    
+
     def run(self, nproc=1, maxiter=10000, debug=False):
         """ Run multiple optimisation starts
         
@@ -191,7 +198,7 @@ class Estim_BFGS():
                     self.run_optim,
                     [(self.get_gene(i), maxiter, False) for i in range(self.X.shape[1])]
                 )
-    
+
     def full_loss(self, nproc=1):
         with Pool(processes=nproc) as p:
             loss = np.asarray(p.starmap(
@@ -200,23 +207,23 @@ class Estim_BFGS():
                  for i, x in enumerate(self.res)]
             ))
         return np.asarray(loss)
-    
+
     def mles(self):
         return np.vstack([x.x for x in self.res])
-    
+
     def fim_diags(self):
         return np.vstack([x.hess_inv.diagonal() for x in self.res])
-    
+
     @property
     def fisher_inv(self):
         return np.stack([x.hess_inv for x in self.res])
-    
+
     def niter(self):
         return np.array([x.nit for x in self.res])
-    
+
     def error_codes(self):
         return np.array([x.status for x in self.res])
-    
+
     def return_batchglm_formated_model(self, nproc=1):
         model = Estim_BFGS_Model(self, nproc)
         return (model)
