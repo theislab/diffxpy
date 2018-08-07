@@ -231,6 +231,9 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         full = np.sum(self.full_estim.log_probs(), axis=0)
         reduced = np.sum(self.reduced_estim.log_probs(), axis=0)
 
+        if np.any(full < reduced):
+            logger.warning("Test assumption failed: full model is (partially) less probable than reduced model!")
+
         return stats.likelihood_ratio_test(
             ll_full=full,
             ll_reduced=reduced,
@@ -526,6 +529,32 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
     The individual test object inherit directly from this class.
     """
 
+    def __init__(self, correction_type: str):
+        """
+
+        :param correction_type: Choose between global and test-wise correction.
+            Can be:
+
+            - "global": correct all p-values in one operation
+            - "by_test": correct the p-values of each test individually
+        """
+        super().__init__()
+        self._correction_type = correction_type
+
+    def _correction(self, method):
+        if self._correction_type.lower() == "global":
+            pvals = np.reshape(self.pval, -1)
+            qvals = correction.correct(pvals=pvals, method=method)
+            qvals = np.reshape(qvals, self.pval.shape)
+            return qvals
+        elif self._correction_type.lower() == "by_test":
+            qvals = np.apply_along_axis(
+                func1d=lambda pvals: correction.correct(pvals=pvals, method=method),
+                axis=-1,
+                arr=self.pval,
+            )
+            return qvals
+
     def summary(self, **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
@@ -557,8 +586,8 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
     Pairwise unit_test between more than 2 groups per gene.
     """
 
-    def __init__(self, gene_ids, pval, logfc):
-        super().__init__()
+    def __init__(self, gene_ids, pval, logfc, correction_type: str):
+        super().__init__(correction_type=correction_type)
         self._gene_ids = np.asarray(gene_ids)
         self._logfc = logfc
         self._pval = pval
@@ -584,8 +613,8 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
     Tests between between each group and the rest for more than 2 groups per gene.
     """
 
-    def __init__(self, gene_ids, pval, logfc):
-        super().__init__()
+    def __init__(self, gene_ids, pval, logfc, correction_type: str):
+        super().__init__(correction_type=correction_type)
         self._gene_ids = np.asarray(gene_ids)
         self._pval = pval
         self._logfc = logfc
@@ -795,6 +824,9 @@ def test_lrt(
     """
     if len(kwargs) != 0:
         logger.info("additional kwargs: %s", str(kwargs))
+
+    # TODO: remove this warning when lrt is working
+    logger.warning("test_lrt is not ready for usage yet!")
 
     if full_formula_loc is None:
         full_formula_loc = full_formula
@@ -1205,6 +1237,7 @@ def test_pairwise(
         gene_names: str = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
+        pval_correction: str = "global",
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         return_full_test_objs: bool = False,
@@ -1261,6 +1294,11 @@ def test_pairwise(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
         
         - 'nb': default
+    :param pval_correction: Choose between global and test-wise correction.
+        Can be:
+
+        - "global": correct all p-values in one operation
+        - "by_test": correct the p-values of each test individually
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
@@ -1302,29 +1340,23 @@ def test_pairwise(
     tests = np.tile([None], [X.shape[1], len(groups), len(groups)])
 
     if test == 'z-test':
-        # fit each group individually
-        group_models = []
-        for g in groups:
-            sel = grouping == g
-            model = _fit(
-                noise_model=noise_model,
-                data=X[sel],
-                design_loc=np.ones([np.sum(sel), 1]),
-                design_scale=np.ones([np.sum(sel), 1]),
-                gene_names=gene_names,
-                batch_size=batch_size,
-                training_strategy=training_strategy,
-                **kwargs
-            )
-            group_models.append(model)
+        dmat = data_utils.design_matrix(sample_description, formula="~ 1 - 1 + grouping")
+        model = _fit(
+            noise_model=noise_model,
+            data=X,
+            design_loc=dmat,
+            design_scale=dmat,
+            gene_names=gene_names,
+            batch_size=batch_size,
+            training_strategy=training_strategy,
+            **kwargs
+        )
 
         # values of parameter estimates: genes x coefficient array with one coefficient per group
-        theta_mle = [np.squeeze(np.asarray(e.par_link_loc)) for e in group_models]
+        theta_mle = model.par_link_loc
         # standard deviation of estimates: genes x coefficient array with one coefficient per group
-        # theta_sd =  sqrt(diagonal(fisher_inv))
-        theta_sd = [np.sqrt(
-            np.diagonal(e.fisher_inv, axis1=-2, axis2=-1)[:, :e.par_link_loc.shape[-1]]
-        ) for e in group_models]
+        # theta_sd = sqrt(diagonal(fisher_inv))
+        theta_sd = np.sqrt(np.diagonal(model.fisher_inv, axis1=-2, axis2=-1)).T
 
         for i, g1 in enumerate(groups):
             for j, g2 in enumerate(groups[(i + 1):]):
@@ -1360,7 +1392,8 @@ def test_pairwise(
                     tests[i, j] = de_test_temp
                     tests[j, i] = de_test_temp
 
-    de_test = DifferentialExpressionTestPairwise(gene_ids=gene_names, pval=pvals, logfc=logfc)
+    de_test = DifferentialExpressionTestPairwise(gene_ids=gene_names, pval=pvals, logfc=logfc,
+                                                 correction_type=pval_correction)
 
     if return_full_test_objs:
         return de_test, tests
@@ -1375,6 +1408,7 @@ def test_vsrest(
         gene_names: str = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
+        pval_correction: str = "global",
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         **kwargs
@@ -1436,6 +1470,11 @@ def test_vsrest(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
         
         - 'nb': default
+    :param pval_correction: Choose between global and test-wise correction.
+        Can be:
+
+        - "global": correct all p-values in one operation
+        - "by_test": correct the p-values of each test individually
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
@@ -1455,7 +1494,6 @@ def test_vsrest(
               ]
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
-    :param return_full_test_objs: [Debugging] return matrix of test objects; currently valid for test != "z-test"
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
@@ -1474,37 +1512,29 @@ def test_vsrest(
     logfc = np.zeros([len(groups), X.shape[1]])
 
     if test == 'fast-wald':
-        # fit each group individually
-        group_models = []
-        for g in groups:
-            sel = grouping == g
-            model = _fit(
-                noise_model=noise_model,
-                data=X[sel],
-                design_loc=np.ones([np.sum(sel), 1]),
-                design_scale=np.ones([np.sum(sel), 1]),
-                gene_names=gene_names,
-                batch_size=batch_size,
-                training_strategy=training_strategy,
-                **kwargs
-            )
-            group_models.append(model)
+        dmat = data_utils.design_matrix(sample_description, formula="~ 1 - 1 + grouping")
+        model = _fit(
+            noise_model=noise_model,
+            data=X,
+            design_loc=dmat,
+            design_scale=dmat,
+            gene_names=gene_names,
+            batch_size=batch_size,
+            training_strategy=training_strategy,
+            **kwargs
+        )
 
         # values of parameter estimates: genes x coefficient array with one coefficient per group
-        theta_mle = [np.squeeze(np.asarray(e.par_link_loc)) for e in group_models]
+        theta_mle = model.par_link_loc
         # standard deviation of estimates: genes x coefficient array with one coefficient per group
         # $\text{SE}(\hat{\theta}_{ML}) = Fisher(\hat{\theta}_{ML})$
-        theta_sd = [
-            np.sqrt(
-                np.diagonal(e.fisher_inv, axis1=-2, axis2=-1)[:, :e.par_link_loc.shape[-1]]
-            ) for e in group_models
-        ]
-        # average expression
-        ave_expr = np.mean(X, axis=0)
+        theta_sd = np.sqrt(np.diagonal(model.fisher_inv, axis1=-2, axis2=-1)).T
+        # average expression in linker-space
+        ave_expr = model.link_loc(np.mean(X, axis=0))
 
         for i, g1 in enumerate(groups):
             pvals[i] = stats.wald_test(theta_mle=theta_mle[i], theta_sd=theta_sd[i], theta0=ave_expr)
-            logfc[i] = theta_mle[i]
+            logfc[i] = ave_expr - theta_mle[i]
     else:
         for i, g1 in enumerate(groups):
             test_grouping = np.where(grouping == g1, "group", "rest")
@@ -1522,5 +1552,6 @@ def test_vsrest(
             pvals[i] = de_test_temp.pval
             logfc[i] = de_test_temp.log_fold_change()
 
-    de_test = DifferentialExpressionTestVsRest(gene_ids=gene_names, pval=pvals, logfc=logfc)
+    de_test = DifferentialExpressionTestVsRest(gene_ids=gene_names, pval=pvals, logfc=logfc,
+                                               correction_type=pval_correction)
     return de_test

@@ -141,10 +141,11 @@ class TestSingle(unittest.TestCase):
 
         test = de.test_lrt(
             data=sim.X,
-            full_formula="~ 1 + condition",
-            reduced_formula="~ 1",
+            full_formula_loc="~ 1 + condition",
+            full_formula_scale="~ 1 + condition",
+            reduced_formula_loc="~ 1",
+            reduced_formula_scale="~ 1",
             sample_description=random_sample_description,
-            training_strategy='QUICK'
         )
 
         # Compare p-value distribution under null model against uniform distribution.

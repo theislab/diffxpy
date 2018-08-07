@@ -8,9 +8,9 @@ from batchglm.api.models.nb_glm import Simulator, Estimator, InputData
 import diffxpy as de
 
 
-class TestVsRest(unittest.TestCase):
+class TestPairwise(unittest.TestCase):
 
-    def test_wald(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_ztest(self, n_cells: int = 1000, n_genes: int = 1000):
         """
         Test if de.test_wald_loc() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -29,16 +29,16 @@ class TestVsRest(unittest.TestCase):
             "condition": np.random.randint(2, size=sim.num_observations)
         })
 
-        test = de.test_vsrest(
+        test = de.test_pairwise(
             data=sim.X,
             grouping="condition",
-            test="fast-wald",
+            test="z-test",
             noise_model="nb",
             sample_description=random_sample_description,
         )
 
         # Compare p-value distribution under null model against uniform distribution.
-        pval_h0 = stats.kstest(test.pval.flatten(), 'uniform').pvalue
+        pval_h0 = stats.kstest(test.pval[~np.eye(test.pval.shape[0]).astype(bool)].flatten(), 'uniform').pvalue
 
         print('KS-test pvalue for null model match of test_wald_loc(): %f' % pval_h0)
 
@@ -46,7 +46,7 @@ class TestVsRest(unittest.TestCase):
 
         return pval_h0
 
-    def test_wald_de(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_ztest_de(self, n_cells: int = 1000, n_genes: int = 1000):
         """
         Test if de.test_lrt() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -70,18 +70,24 @@ class TestVsRest(unittest.TestCase):
 
         sample_description = sim.sample_description
 
-        test = de.test_vsrest(
+        test = de.test_pairwise(
             data=sim.X,
             grouping="condition",
-            test="fast-wald",
+            test="z-test",
             noise_model="nb",
             sample_description=sample_description,
         )
 
         print('fraction of non-DE genes with q-value < 0.05: %.1f%%' %
-              (100 * np.mean(np.sum(test.qval[:, :num_non_de] < 0.05) / num_non_de)))
+              (100 * np.mean(
+                  np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), :num_non_de] < 0.05) /
+                  num_non_de
+              )))
         print('fraction of DE genes with q-value < 0.05: %.1f%%' %
-              (100 * np.mean(np.sum(test.qval[:, num_non_de:] < 0.05) / (n_genes - num_non_de))))
+              (100 * np.mean(
+                  np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), num_non_de:] < 0.05) /
+                  (n_genes - num_non_de)
+              )))
 
         return test.qval
 
@@ -104,7 +110,7 @@ class TestVsRest(unittest.TestCase):
             "condition": np.random.randint(2, size=sim.num_observations)
         })
 
-        test = de.test_vsrest(
+        test = de.test_pairwise(
             data=sim.X,
             grouping="condition",
             test="lrt",
@@ -113,7 +119,7 @@ class TestVsRest(unittest.TestCase):
         )
 
         # Compare p-value distribution under null model against uniform distribution.
-        pval_h0 = stats.kstest(test.pval.flatten(), 'uniform').pvalue
+        pval_h0 = stats.kstest(test.pval[~np.eye(test.pval.shape[0]).astype(bool)].flatten(), 'uniform').pvalue
 
         print('KS-test pvalue for null model match of test_wald_loc(): %f' % pval_h0)
 
