@@ -10,7 +10,8 @@ import diffxpy as de
 
 class TestVsRest(unittest.TestCase):
 
-    def test_wald(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_fast_wald(self, n_cells: int = 1000, n_genes: int = 1000, n_groups: int = 2, 
+        batch_size=500, training_strategy="AUTO"):
         """
         Test if de.test_wald_loc() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -26,7 +27,7 @@ class TestVsRest(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.num_observations)
+            "condition": np.random.randint(n_groups, size=sim.num_observations)
         })
 
         test = de.test_vsrest(
@@ -35,6 +36,8 @@ class TestVsRest(unittest.TestCase):
             test="fast-wald",
             noise_model="nb",
             sample_description=random_sample_description,
+            batch_size=batch_size,
+            training_strategy=training_strategy,
         )
 
         # Compare p-value distribution under null model against uniform distribution.
@@ -46,7 +49,8 @@ class TestVsRest(unittest.TestCase):
 
         return pval_h0
 
-    def test_wald_de(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_accuracy_fast_wald(self, n_cells: int = 1000, n_genes: int = 1000, 
+        batch_size=500, training_strategy="AUTO"):
         """
         Test if de.test_lrt() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -76,6 +80,8 @@ class TestVsRest(unittest.TestCase):
             test="fast-wald",
             noise_model="nb",
             sample_description=sample_description,
+            batch_size=batch_size,
+            training_strategy=training_strategy,
         )
 
         print('fraction of non-DE genes with q-value < 0.05: %.1f%%' %
@@ -85,7 +91,7 @@ class TestVsRest(unittest.TestCase):
 
         return test.qval
 
-    def test_lrt(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_lrt(self, n_cells: int = 1000, n_genes: int = 1000, batch_size=500, training_strategy="AUTO"):
         """
         Test if de.test_wald_loc() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -110,6 +116,8 @@ class TestVsRest(unittest.TestCase):
             test="lrt",
             noise_model="nb",
             sample_description=random_sample_description,
+            batch_size=batch_size,
+            training_strategy=training_strategy,
         )
 
         # Compare p-value distribution under null model against uniform distribution.
