@@ -1449,6 +1449,7 @@ def test_vsrest(
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
     - fast-wald:
+        DOES NOT WORK!
         Requires the fitting of 1 generalized linear models.
         model location parameter: ~ group
         model scale parameter: ~ group
@@ -1515,6 +1516,7 @@ def test_vsrest(
     if test == 'fast-wald':
         # TODO: remove this warning when fast-wald is working
         logger.warning("fast-wald is not ready for usage yet!")
+        return None
 
         # -1 in formula removes intercept
         dmat = data_utils.design_matrix(sample_description, formula="~ 1 - 1 + grouping")
