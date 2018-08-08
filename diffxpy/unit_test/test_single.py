@@ -37,6 +37,7 @@ class TestSingle(unittest.TestCase):
             formula="~ 1 + condition",
             sample_description=random_sample_description,
         )
+        summary = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
@@ -113,6 +114,7 @@ class TestSingle(unittest.TestCase):
             sample_description=random_sample_description,
             training_strategy='QUICK'
         )
+        summary = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
@@ -147,6 +149,7 @@ class TestSingle(unittest.TestCase):
             reduced_formula_scale="~ 1",
             sample_description=random_sample_description,
         )
+        summary = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
@@ -181,6 +184,7 @@ class TestSingle(unittest.TestCase):
             grouping="condition",
             sample_description=random_sample_description
         )
+        summary = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
@@ -250,6 +254,7 @@ class TestSingle(unittest.TestCase):
             grouping="condition",
             sample_description=random_sample_description
         )
+        summary = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue

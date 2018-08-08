@@ -77,6 +77,7 @@ class TestPairwise(unittest.TestCase):
             noise_model="nb",
             sample_description=sample_description,
         )
+        summary = test.summary()
 
         print('fraction of non-DE genes with q-value < 0.05: %.1f%%' %
               (100 * np.mean(
