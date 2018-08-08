@@ -191,6 +191,41 @@ class TestSingle(unittest.TestCase):
 
         return pval_h0
 
+    def test_t_test_zero_variance(self, n_cells: int = 1000, n_genes: int = 1000):
+        """
+        Test if de.test_t_test() generates a uniform p-value distribution
+        if it is given data simulated based on the null model. Returns the p-value
+        of the two-side Kolmgorov-Smirnov test for equality of the observed
+        p-value distriubution and a uniform distribution.
+
+        :param n_cells: Number of cells to simulate (number of observations per test).
+        :param n_genes: Number of genes to simulate (number of tests).
+        """
+
+        sim = Simulator(num_observations=n_cells, num_features=n_genes)
+        sim.generate_sample_description(num_batches=0, num_confounders=0)
+        sim.generate()
+        sim.data.X[:, 0] = np.exp(sim.a)[0, 0]
+
+        random_sample_description = pd.DataFrame({
+            "condition": np.random.randint(2, size=sim.num_observations)
+        })
+
+        test = de.test_t_test(
+            data=sim.X,
+            grouping="condition",
+            sample_description=random_sample_description
+        )
+
+        # Compare p-value distribution under null model against uniform distribution.
+        pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
+
+        print('KS-test pvalue for null model match of test_t_test(): %f' % pval_h0)
+
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+
+        return pval_h0
+
     def test_wilcoxon(self, n_cells: int = 1000, n_genes: int = 1000):
         """
         Test if de.test_wilcoxon() generates a uniform p-value distribution
