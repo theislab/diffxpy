@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.stats
+from typing import Union
 
 
 def likelihood_ratio_test(
@@ -160,7 +161,7 @@ def t_test_moments(
 def wald_test(
         theta_mle: np.ndarray,
         theta_sd: np.ndarray,
-        theta0: int = 0
+        theta0: Union[int, np.ndarray] = 0
 ):
     """
     Perform single coefficient Wald test.
@@ -184,8 +185,11 @@ def wald_test(
     """
     if theta_mle.shape[0] != theta_sd.shape[0]:
         raise ValueError('stats.wald_test(): theta_mle and theta_sd have to contain the same number of entries')
+    if theta0.shape[0] > 1:
+        if theta_mle.shape[0] != theta0.shape[0]:
+            raise ValueError('stats.wald_test(): theta_mle and theta0 have to contain the same number of entries')
     
-    wald_statistic = (theta_mle - theta0) / theta_sd
+    wald_statistic = np.divide(theta_mle - theta0, theta_sd)
     pvals = 1 - scipy.stats.norm(loc=0, scale=1).cdf(wald_statistic)  # check whether this is two-sided
     return pvals
 

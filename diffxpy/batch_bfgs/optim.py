@@ -27,7 +27,7 @@ class Estim_BFGS_Model():
         self._probs = np.exp(self._log_probs)
         self._mles = xr.DataArray(np.transpose(Estim_BFGS.mles()))
         self._gradient = xr.DataArray(np.zeros([Estim_BFGS.X.shape[1]]))
-        self._fisher_inv = Estim_BFGS.fisher_inv
+        self._fisher_inv = xr.DataArray(Estim_BFGS.fisher_inv)
         self._idx_loc = np.arange(0, Estim_BFGS.design_loc.shape[1])
         self._idx_scale = np.arange(Estim_BFGS.design_loc.shape[1],
                                     Estim_BFGS.design_loc.shape[1] + Estim_BFGS.design_scale.shape[1])
@@ -86,6 +86,9 @@ class Estim_BFGS_Model():
     @property
     def par_link_scale(self, **kwargs):
         return self._mles[self._idx_scale, :]
+
+    def link_loc(self, x):
+        return np.log(x)
 
     @property
     def fisher_inv(self):
