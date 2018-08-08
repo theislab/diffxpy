@@ -404,11 +404,6 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # p = self.pval
         # q = self.qval
 
-        # add in info from bfgs
-        if model_estim.log_probs() is not None:
-            self.log_probs = model_estim.log_probs()
-        else:
-            self.log_probs = None
         try:
             if model_estim._error_codes is not None:
                 self._error_codes = model_estim._error_codes
@@ -420,6 +415,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 self._niter = model_estim._niter
         except Exception as e:
             self._niter = None
+
+    @property
+    def log_probs(self):
+        return np.sum(self.model_estim.log_probs(), axis=0)
 
     @property
     def gene_ids(self) -> np.ndarray:
