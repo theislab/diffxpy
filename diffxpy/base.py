@@ -443,11 +443,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
     def _test(self):
         self.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
-        # standard deviation of estimates: genes x coefficient array with one coefficient per group
-        # $\text{SE}(\hat{\theta}_{ML}) = Fisher(\hat{\theta}_{ML})$
-        self.theta_sd = np.sqrt(
-            np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1)[:, self.coef_loc_totest]
-        )
+        # standard deviation of estimates: coefficients x genes array with one coefficient per group
+        # theta_sd = sqrt(diagonal(fisher_inv))
+        self.theta_sd = np.sqrt(np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1)).T[self.coef_loc_totest]
+
         return stats.wald_test(theta_mle=self.theta_mle, theta_sd=self.theta_sd, theta0=0)
 
     def summary(self, **kwargs) -> pd.DataFrame:
@@ -1029,7 +1028,7 @@ def test_t_test(
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
     gene_names = _parse_gene_names(data, gene_names)
-    grouping = _parse_grouping(data, grouping, sample_description)
+    grouping = _parse_grouping(data, sample_description, grouping)
     x0, x1 = _split_X(data, grouping)
 
     pval = stats.t_test_raw(x0=x0.data, x1=x1.data)
@@ -1063,7 +1062,7 @@ def test_wilcoxon(
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
     gene_names = _parse_gene_names(data, gene_names)
-    grouping = _parse_grouping(data, grouping, sample_description)
+    grouping = _parse_grouping(data, sample_description, grouping)
     x0, x1 = _split_X(data, grouping)
 
     pval = stats.wilcoxon(x0=x0.data, x1=x1.data)
@@ -1174,7 +1173,7 @@ def two_sample(
     if test is None:
         test = 'wald'
 
-    if test == 'wald':
+    if test.lower() == 'wald':
         if noise_model is None:
             raise ValueError("Please specify noise_model")
         formula_loc = '~ 1 + grouping'
@@ -1192,7 +1191,7 @@ def two_sample(
             training_strategy=training_strategy,
             **kwargs
         )
-    elif test == 'lrt':
+    elif test.lower() == 'lrt':
         if noise_model is None:
             raise ValueError("Please specify noise_model")
         full_formula_loc = '~ 1 + grouping'
@@ -1212,13 +1211,13 @@ def two_sample(
             training_strategy=training_strategy,
             **kwargs
         )
-    elif test == 't-test':
+    elif test.lower() == 't-test' or test.lower() == "t_test" or test.lower() == "ttest":
         de_test = test_t_test(
             data=X,
             gene_names=gene_names,
             grouping=grouping,
         )
-    elif test == 'wilcoxon':
+    elif test.lower() == 'wilcoxon':
         de_test = test_wilcoxon(
             data=X,
             gene_names=gene_names,
@@ -1339,7 +1338,7 @@ def test_pairwise(
     logfc[np.eye(logfc.shape[0]).astype(bool)] = 0
     tests = np.tile([None], [X.shape[1], len(groups), len(groups)])
 
-    if test == 'z-test':
+    if test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest':
         # -1 in formula removes intercept
         dmat = data_utils.design_matrix(sample_description, formula="~ 1 - 1 + grouping")
         model = _fit(
@@ -1513,7 +1512,7 @@ def test_vsrest(
     pvals = np.zeros([len(groups), X.shape[1]])
     logfc = np.zeros([len(groups), X.shape[1]])
 
-    if test == 'fast-wald':
+    if test.lower() == 'fast-wald' or test.lower() == 'fast_wald' or test.lower() == 'fastwald':
         # TODO: remove this warning when fast-wald is working
         logger.warning("fast-wald is not ready for usage yet!")
         return None
@@ -1536,11 +1535,11 @@ def test_vsrest(
         # standard deviation of estimates: coefficients x genes array with one coefficient per group
         # theta_sd = sqrt(diagonal(fisher_inv))
         theta_sd = np.sqrt(np.diagonal(model.fisher_inv, axis1=-2, axis2=-1)).T
-        
+
         for i, g1 in enumerate(groups):
             # average expression in linker-space
-            ave_expr_rest = model.link_loc(np.mean(X[np.where(grouping!=g1)[0],:], axis=0))
-            pvals[i] = stats.wald_test(theta_mle=theta_mle[i,:], theta_sd=theta_sd[i,:], theta0=ave_expr_rest)
+            ave_expr_rest = model.link_loc(np.mean(X[np.where(grouping != g1)[0], :], axis=0))
+            pvals[i] = stats.wald_test(theta_mle=theta_mle[i, :], theta_sd=theta_sd[i, :], theta0=ave_expr_rest)
             logfc[i] = ave_expr_rest - theta_mle[i]
     else:
         for i, g1 in enumerate(groups):

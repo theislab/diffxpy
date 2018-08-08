@@ -62,7 +62,7 @@ def wilcoxon(
     if np.any(x0.shape[axis] != x1.shape[axis]):
         raise ValueError(
             'stats.wilcoxon(): the first axis (number of tests) is not allowed to differ between x0 and x1!')
-    
+
     pvals = np.asarray([
         scipy.stats.mannwhitneyu(
             x=x0[:, i].flatten(),
@@ -99,14 +99,14 @@ def t_test_raw(
     if np.any(x0.shape[axis] != x1.shape[axis]):
         raise ValueError(
             'stats.wilcoxon(): the first axis (number of tests) is not allowed to differ between x0 and x1!')
-    
+
     mu0 = np.mean(x0, axis=0).flatten()
     var0 = np.var(x0, axis=0).flatten()
     mu1 = np.mean(x1, axis=0).flatten()
     var1 = np.var(x1, axis=0).flatten()
     n0 = x0.shape[0]
     n1 = x1.shape[0]
-    
+
     pval = t_test_moments(mu0=mu0, mu1=mu1, var0=var0, var1=var1, n0=n0, n1=n1)
     return pval
 
@@ -142,10 +142,10 @@ def t_test_moments(
         raise ValueError('stats.t_test_moments(): mu and mu1 have to contain the same number of entries')
     if len(var0) != len(var1):
         raise ValueError('stats.t_test_moments(): mu and mu1 have to contain the same number of entries')
-    
+
     s_delta = np.sqrt((var0 / n0) + (var1 / n1))
     t = (mu0 - mu1) / s_delta
-    
+
     df = (
             np.square((var0 / n0) + (var1 / n1)) /
             (
@@ -153,7 +153,7 @@ def t_test_moments(
                     (np.square(var1 / n1) / (n1 - 1))
             )
     )
-    
+
     pval = 1 - scipy.stats.t(df).cdf(t)
     return pval
 
@@ -183,12 +183,15 @@ def wald_test(
     :param theta0: float
         Reference parameter values against which coefficient is tested.
     """
+    if np.size(theta0) == 1:
+        theta0 = np.broadcast_to(theta0, theta_mle.shape)
+
     if theta_mle.shape[0] != theta_sd.shape[0]:
         raise ValueError('stats.wald_test(): theta_mle and theta_sd have to contain the same number of entries')
     if theta0.shape[0] > 1:
         if theta_mle.shape[0] != theta0.shape[0]:
             raise ValueError('stats.wald_test(): theta_mle and theta0 have to contain the same number of entries')
-    
+
     wald_statistic = np.divide(theta_mle - theta0, theta_sd)
     pvals = 1 - scipy.stats.norm(loc=0, scale=1).cdf(wald_statistic)  # check whether this is two-sided
     return pvals
@@ -229,7 +232,7 @@ def two_coef_z_test(
         raise ValueError('stats.two_coef_z_test(): theta_sd0 and theta_sd1 have to contain the same number of entries')
     if theta_mle0.shape[0] != theta_sd0.shape[0]:
         raise ValueError('stats.two_coef_z_test(): theta_mle0 and theta_sd0 have to contain the same number of entries')
-    
+
     z_statistic = (theta_mle0 - theta_mle1) / np.sqrt(np.square(theta_sd0) + np.square(theta_sd1))
     pvals = 1 - scipy.stats.norm(loc=0, scale=1).cdf(z_statistic)  # check whether this is two-sided
     return pvals
