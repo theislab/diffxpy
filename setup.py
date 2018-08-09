@@ -10,6 +10,7 @@ setup(
     install_requires=[
         'numpy',
         'scipy',
+        'pandas',
         'patsy',
         'batchglm',
         'xarray',
@@ -23,10 +24,10 @@ setup(
         #     "scanpy",
         #     "anndata"
         # ],
-        # 'plotting_deps': [
-        #     "plotnine",
-        #     "matplotlib"
-        # ]
+        'plotting_deps': [
+            "seaborn",
+            "matplotlib"
+        ],
         'docs': [
             'sphinx',
             'sphinx-autodoc-typehints',
