@@ -145,7 +145,7 @@ def t_test_moments(
 
     s_delta = np.sqrt((var0 / n0) + (var1 / n1))
 
-    t = (mu0 - mu1) / np.nextafter(0, 1, out=s_delta, where=s_delta == 0)
+    t_statistic = np.abs((mu0 - mu1) / np.nextafter(0, 1, out=s_delta, where=s_delta == 0))
 
     divisor = (
             (np.square(var0 / n0) / (n0 - 1)) +
@@ -156,7 +156,7 @@ def t_test_moments(
     df = np.square((var0 / n0) + (var1 / n1)) / divisor
     df = np.nextafter(0, 1, out=df, where=df == 0)
 
-    pval = 1 - scipy.stats.t(df).cdf(t)
+    pval = 2*(1 - scipy.stats.t(df).cdf(t_statistic))
     return pval
 
 
