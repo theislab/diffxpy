@@ -194,8 +194,8 @@ def wald_test(
         if theta_mle.shape[0] != theta0.shape[0]:
             raise ValueError('stats.wald_test(): theta_mle and theta0 have to contain the same number of entries')
 
-    wald_statistic = np.divide(theta_mle - theta0, theta_sd)
-    pvals = 1 - scipy.stats.norm(loc=0, scale=1).cdf(wald_statistic)  # check whether this is two-sided
+    wald_statistic = np.abs(np.divide(theta_mle - theta0, theta_sd))
+    pvals = 2*(1 - scipy.stats.norm(loc=0, scale=1).cdf(wald_statistic))  # two-tailed test
     return pvals
 
 
@@ -235,6 +235,6 @@ def two_coef_z_test(
     if theta_mle0.shape[0] != theta_sd0.shape[0]:
         raise ValueError('stats.two_coef_z_test(): theta_mle0 and theta_sd0 have to contain the same number of entries')
 
-    z_statistic = (theta_mle0 - theta_mle1) / np.sqrt(np.square(theta_sd0) + np.square(theta_sd1))
-    pvals = 1 - scipy.stats.norm(loc=0, scale=1).cdf(z_statistic)  # check whether this is two-sided
+    z_statistic = np.abs((theta_mle0 - theta_mle1) / np.sqrt(np.square(theta_sd0) + np.square(theta_sd1)))
+    pvals = 2*(1 - scipy.stats.norm(loc=0, scale=1).cdf(z_statistic))  # two-tailed test
     return pvals
