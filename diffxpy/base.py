@@ -1403,7 +1403,7 @@ def test_pairwise(
 def test_vsrest(
         data,
         grouping: Union[str, np.ndarray, list],
-        test: str = 'fast-wald',
+        test: str = 'wald',
         gene_names: str = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
@@ -1446,12 +1446,6 @@ def test_vsrest(
     - wilcoxon:
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
-    - fast-wald:
-        DOES NOT WORK!
-        Requires the fitting of 1 generalized linear models.
-        model location parameter: ~ group
-        model scale parameter: ~ group
-        Test each groups location coefficient against the overall average expression.
         
     :param data: input data
     :param grouping: str, array
@@ -1460,7 +1454,6 @@ def test_vsrest(
         - array of length `num_observations` containing group labels
     :param test: str, statistical test to use. Possible options:
     
-        - 'fast-wald': default
         - 'wald'
         - 'lrt'
         - 't-test'
@@ -1511,51 +1504,21 @@ def test_vsrest(
     pvals = np.zeros([len(groups), X.shape[1]])
     logfc = np.zeros([len(groups), X.shape[1]])
 
-    if test.lower() == 'fast-wald' or test.lower() == 'fast_wald' or test.lower() == 'fastwald':
-        # TODO: remove this warning when fast-wald is working
-        logger.warning("fast-wald is not ready for usage yet!")
-        return None
-
-        # -1 in formula removes intercept
-        dmat = data_utils.design_matrix(sample_description, formula="~ 1 - 1 + grouping")
-        model = _fit(
-            noise_model=noise_model,
+    for i, g1 in enumerate(groups):
+        test_grouping = np.where(grouping == g1, "group", "rest")
+        de_test_temp = two_sample(
             data=X,
-            design_loc=dmat,
-            design_scale=dmat,
+            grouping=test_grouping,
+            test=test,
             gene_names=gene_names,
+            sample_description=sample_description,
+            noise_model=noise_model,
             batch_size=batch_size,
             training_strategy=training_strategy,
             **kwargs
         )
-
-        # values of parameter estimates: coefficients x genes array with one coefficient per group
-        theta_mle = model.par_link_loc
-        # standard deviation of estimates: coefficients x genes array with one coefficient per group
-        # theta_sd = sqrt(diagonal(fisher_inv))
-        theta_sd = np.sqrt(np.diagonal(model.fisher_inv, axis1=-2, axis2=-1)).T
-
-        for i, g1 in enumerate(groups):
-            # average expression in linker-space
-            ave_expr_rest = model.link_loc(np.mean(X[np.where(grouping != g1)[0], :], axis=0))
-            pvals[i] = stats.wald_test(theta_mle=theta_mle[i, :], theta_sd=theta_sd[i, :], theta0=ave_expr_rest)
-            logfc[i] = ave_expr_rest - theta_mle[i]
-    else:
-        for i, g1 in enumerate(groups):
-            test_grouping = np.where(grouping == g1, "group", "rest")
-            de_test_temp = two_sample(
-                data=X,
-                grouping=test_grouping,
-                test=test,
-                gene_names=gene_names,
-                sample_description=sample_description,
-                noise_model=noise_model,
-                batch_size=batch_size,
-                training_strategy=training_strategy,
-                **kwargs
-            )
-            pvals[i] = de_test_temp.pval
-            logfc[i] = de_test_temp.log_fold_change()
+        pvals[i] = de_test_temp.pval
+        logfc[i] = de_test_temp.log_fold_change()
 
     de_test = DifferentialExpressionTestVsRest(gene_ids=gene_names, pval=pvals, logfc=logfc,
                                                correction_type=pval_correction)
