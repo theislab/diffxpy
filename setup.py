@@ -11,13 +11,14 @@ setup(
         'numpy',
         'scipy',
         'patsy',
-        'sgdglm',
+        'batchglm',
+        'xarray',
+        'statsmodels',
     ],
     extras_require={
         'optional': [
-            'xarray',
             'anndata',
-        ]
+        ],
         # 'scanpy_deps': [
         #     "scanpy",
         #     "anndata"
@@ -26,6 +27,13 @@ setup(
         #     "plotnine",
         #     "matplotlib"
         # ]
+        'docs': [
+            'sphinx',
+            'sphinx-autodoc-typehints',
+            'sphinx_rtd_theme',
+            'jinja2',
+            'docutils',
+        ],
     }
 
 )

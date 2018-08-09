@@ -1,0 +1,372 @@
+\documentclass[bibliography=totoc,10pt]{scrartcl}
+
+\usepackage[utf8]{inputenc}
+\usepackage{url}		% bib
+\usepackage{bbm}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{caption} 	% for table caption
+\usepackage{subcaption}	% for images
+\usepackage[title,titletoc,toc]{appendix}	% appendix
+\usepackage{mathtools}
+\usepackage{booktabs}	% multicolumn
+\usepackage{adjustbox}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+\renewcommand{\baselinestretch}{1}
+\usepackage{geometry}
+ \geometry{
+ a4paper,
+ total={170mm,257mm},
+ left=30mm,
+ right=30mm,
+ top=30mm,
+ bottom=30mm
+ }
+
+\allowdisplaybreaks
+
+\title{Closed form of hessian of negative binomial GLM with model for dispersion and mean parameter}
+\author{David Fischer}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\end{abstract}
+
+\tableofcontents
+
+\section{Model description}
+\subsection{Likelihood}
+The negative binomial likelihood of the GLM is:
+\begin{equation}
+\begin{split}
+L(y|\theta^m_i, \theta^r_i) &= \frac{\Gamma(r(\theta^r)+y)}{y! \Gamma(r(\theta^r))} (\frac{m(\theta^m)}{r(\theta^r)+m(\theta^m)})^y (\frac{r(\theta^r)}{r(\theta^r)+m(\theta^m)})^{r(\theta^r)} \\
+\end{split}
+\end{equation}
+
+The negative binomial log-likelihood of the GLM is:
+\begin{equation}
+\begin{split}
+LL(y|\theta^m_i, \theta^r_i) &= \log L(y|\theta^m_i, \theta^r_i) \\
+&= \log(\Gamma(r(\theta^r)+y)) - \log(y! \Gamma(r(\theta^r))) + y*(\log(m(\theta^m)) -\log(r(\theta^r)+m(\theta^m))) \\
+&+ r(\theta^r)*(\log(r(\theta^r)) -\log(r(\theta^r)+m(\theta^m))) \\
+\end{split}
+\end{equation}
+
+\subsection{Parameter models}
+The mean ($m$) and dispersion ($r$) model of the GLM  with design matrices $X^m$ and $X^r$ look as follows:
+\begin{equation}
+\begin{split}
+r(\theta^r) &= \exp(\langle X^r, \theta^r_i \rangle) \\
+\end{split}
+\end{equation}
+
+\begin{equation}
+\begin{split}
+m(\theta^m) &= \exp(\langle X^m, \theta^m_i \rangle) \\
+\end{split}
+\end{equation}
+
+\subsection{Derivatives of parameter models}
+Using the chain rule $\frac{f(m)}{d \theta^m_i}=\frac{f(m)}{m}\frac{m}{d \theta^m_i}$ we can decompose the first derivative. Firstly, the derivative of the mean model with respect to its parameters is:
+\begin{equation}
+\begin{split}
+\frac{d}{d \theta^m_i} m(\theta^m) &= \frac{d}{d \theta^m_i} \exp(\langle X^m, \theta^m_i \rangle) \\
+&= \exp(\langle X^m * \theta^m \rangle) * X^m_{i}  \\
+&= m(\theta^m) * X^m_{i}  \\
+\end{split}
+\end{equation}
+Where $X^m_{i}$ is the column of $X^m$ that corresponds to $\theta^m_i$. Equivalently for the dispersion model: 
+\begin{equation}
+\begin{split}
+\frac{d}{d \theta^r_i} r( \theta^r) &= \frac{d}{d \theta^r_i} \exp(\langle X^r, \theta^r_i \rangle) \\
+&= \exp(\langle X^r * \theta^r \rangle) * X^r_{i}  \\
+&= r(\theta^r) * X^r_{i}  \\
+\end{split}
+\end{equation}
+
+\section{Miscancellous}
+\subsection{Polygamma function}
+In the following, we also need the polygamma function $\psi$ to compute the derivative of the gamma function:
+\begin{equation}
+\begin{split}
+\frac{d^{(n+1)}}{d y^{(n+1)}} \log(\Gamma(y)) &= \psi_n(y) \\
+\end{split}
+\end{equation}
+\begin{equation}
+\begin{split}
+\frac{d}{d \theta^r_i} \log \Gamma(r(\theta^r)) &= \frac{d}{d \theta^r_i} \bigg( r(\theta^r) \bigg) * \psi_0(r(\theta^r)) \\
+&= r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)) \\
+\end{split}
+\end{equation}
+\begin{equation}
+\begin{split}
+\frac{d^2}{d (\theta^r_i)^2} \log \Gamma(r(\theta^r)) &= \frac{d}{d \theta^r_i} \frac{d}{d \theta^r_i} \log(\Gamma(y)) \\
+&= \frac{d}{d \theta^r_i} \bigg( r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)) \bigg) \\
+&= X^r_{i} * \frac{d}{d \theta^r_i} \bigg( r(\theta^r)  \bigg)* \psi_0(r(\theta^r)) + X^r_{i} * r(\theta^r)  *  \frac{d}{d \theta^r_i} \bigg(  \psi_0(r(\theta^r)) \bigg)   \\
+&= X^r_{i} * r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)) + X^r_{i} * r(\theta^r)  * r(\theta^r) * X^r_{i} *  \psi_1(r(\theta^r)) \bigg)   \\
+&= r(\theta^r) * (X^r_{i})^2 * ( \psi_0(r(\theta^r)) +  r(\theta^r) *  \psi_1(r(\theta^r)) )   \\
+\end{split}
+\end{equation}
+$\psi_0(y)$ and $\psi_1(y)$ can be directly evaluated with $scipy.special.polygamma()$.
+
+Note that due to the chain rule, both homogenous and heterogenous secondary derivatives of the polygamma function can be computed via $\psi_1$:
+\begin{equation}
+\begin{split}
+\frac{d^2}{d x_i x_j} \log \Gamma(y(x)) &= \frac{d y}{d x_i} \frac{d y}{d x_j} \frac{d^2 }{d y^2}  \log \Gamma(y(x)) \\
+&= \frac{d y}{d x_i} \frac{d y}{d x_j} \psi_1(y(x)) \\
+\end{split}
+\end{equation}
+\begin{equation}
+\begin{split}
+\frac{d^2}{d \theta^r_i \theta^r_j} \log \Gamma(r(\theta^r)) &= \frac{d}{d \theta^r_j} \frac{d}{d \theta^r_i} \log(\Gamma(y)) \\
+&= \frac{d}{d \theta^r_j} \bigg( r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)) \bigg) \\
+&= X^r_{i} * \frac{d}{d \theta^r_j} \bigg( r(\theta^r)  \bigg)* \psi_0(r(\theta^r)) + X^r_{i} * r(\theta^r)  *  \frac{d}{d \theta^r_j} \bigg(  \psi_0(r(\theta^r)) \bigg)   \\
+&= X^r_{i} * r(\theta^r) * X^r_{j} * \psi_0(r(\theta^r)) + X^r_{i} * r(\theta^r)  * r(\theta^r) * X^r_{j} *  \psi_1(r(\theta^r)) \bigg)   \\
+&= r(\theta^r) * X^r_{i} * X^r_{j} * \psi_0(r(\theta^r) +  r(\theta^r) *  \psi_1(r(\theta^r)) )   \\
+\end{split}
+\end{equation}
+
+\section{Jacobians}
+\subsection{Jacobian mean model}
+The Jacobians of the GLM wrt to the $m$ model is:
+\begin{equation}
+\begin{split}
+\frac{d}{d \theta^m_i} LL(y|\theta^m, \theta^r) &= \frac{d}{d \theta^m_i} \log(\Gamma(r(\theta^r)+y)) - \frac{d}{d \theta^m_i} \log(y! \Gamma(r(\theta^r))) \\
+&+ \frac{d}{d \theta^m_i} y* \bigg( \log(m(\theta^m)) -\log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+ \frac{d}{d \theta^m_i} r(\theta^r) \bigg( \log(r(\theta^r)) -\log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&= y* \bigg( \frac{d}{d \theta^m_i} \log(m(\theta^m)) - \frac{d}{d \theta^m_i}\log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+ r(\theta^r) * \bigg( \frac{d}{d \theta^m_i}\log(r(\theta^r)) - \frac{d}{d \theta^m_i} (\log(r(\theta^r))+m(\theta^m)) \bigg) \\
+&= y*(\frac{1}{m(\theta^m)}  \frac{d m(\theta^m)}{d \theta^m_i} - \frac{1}{r(\theta^r)+m(\theta^m)}  \frac{d m(\theta^m)}{d \theta^m_i}) \\
+&- \frac{r(\theta^r)}{r(\theta^r)+m(\theta^m)}  \frac{d m(\theta^m)}{d \theta^m_i} \\
+&=  \frac{d m(\theta^m)}{d \theta^m_i} (\frac{y}{m(\theta^m)} - \frac{y+r(\theta^r)}{r(\theta^r)+m(\theta^m)}) \\
+&=  m(\theta^m) * X^m_{i}  (\frac{y}{m(\theta^m)} - \frac{y+r(\theta^r)}{r(\theta^r)+m(\theta^m)}) \\
+&=  X^m_{i}*y - X^m_{i}*(y+r(\theta^r))*\frac{m(\theta^m)}{r(\theta^r)+m(\theta^m)} \\
+\end{split}
+\end{equation}
+
+\subsection{Jacobian dispersion model}
+The Jacobians of the GLM wrt to the $r$ model is:
+\begin{equation}
+\begin{split}
+\frac{d}{d \theta^r_i} LL(y|\theta^m, \theta^r) &= \frac{d}{d \theta^r_i} \log(\Gamma(r(\theta^r)+y)) - \frac{d}{d \theta^r_i} \log(y! \Gamma(r(\theta^r))) \\
+&+ y * \frac{d}{d \theta^r_i} \bigg( \log(m(\theta^m)) -\log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+ \frac{d}{d \theta^r_i} \bigg( r(\theta^r) * \bigg( \log(r(\theta^r)) - \log(r(\theta^r)+m(\theta^m)) \bigg) \bigg) \\
+&= r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)+y)+ r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)) \\
+&- y*\frac{d}{d \theta^r_i} \bigg( \log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+ \frac{d}{d \theta^r_i} \bigg( r(\theta^r)*\log(r(\theta^r)) \bigg) - \frac{d}{d \theta^r_i} \bigg( r(\theta^r) \log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&= r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)+y)+ r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)) \\
+&- y*\frac{1}{r(\theta^r)+m(\theta^m)} r(\theta^r) * X^r_{i}   \\
+&+  \bigg( r(\theta^r) * X^r_{i}  * \log(r(\theta^r)) + r(\theta^r) * r(\theta^r) * X^r_{i}  * \frac{1}{r(\theta^r)} \bigg) \\
+&- \bigg(r(\theta^r) * X^r_{i}  * \log(r(\theta^r)+m(\theta^m)) +  r(\theta^r) * r(\theta^r) * X^r_{i}  * \frac{1}{r(\theta^r)+m(\theta^m)} \bigg) \\
+&= r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)+y)+ r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)) \\
+&- \frac{1}{r(\theta^r)+m(\theta^m)} r(\theta^r) * X^r_{i}  *(r(\theta^r) + y) \\
+&+ r(\theta^r) * X^r_{i}  * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg)  \\
+\end{split}
+\end{equation}
+
+\section{Block-wise entries of hessian matriy}
+The hessian can be decomposed into a block-wise hessian of the form $H=[[H^{m,m}, H^{m,r}],[H^{r,m},H^{r,r}]]$, where $H^{r,m}=H^{m,r}$ as $H$ is symmetric.
+
+\subsection{Mean-model block $H^{m,m}$}
+\subsubsection{Mean-model block diagonal elements}
+The diagonal elements of the mean-model-block of the hessian (using the quotient rule) are:
+\begin{equation}
+\begin{split}
+H^{m,m}_{i,i} &= \frac{d^2}{d \theta^m_i d \theta^m_i} LL(y|\theta^m, \theta^r) \\
+&= \frac{d}{d \theta^m_i} \frac{d}{d \theta^m_i} LL(y|\theta^m, \theta^r) \\
+&= \frac{d}{d \theta^m_i} \bigg( X^m_{i}*y - X^m_{i}*(y+r(\theta^r))*\frac{m(\theta^m)}{r(\theta^r)+m(\theta^m)} \bigg) \\
+&= -X^m_{i}*(y+r(\theta^r)) \frac{d}{d \theta^m_i} \frac{m(\theta^m)}{r(\theta^r)+m(\theta^m)} \\
+&=  -X^m_{i}*(y+r(\theta^r))* \frac{\frac{d}{d \theta^m_i} \bigg(m(\theta^m) \bigg) * (r(\theta^r)+m(\theta^m)) - m(\theta^m)* \frac{d}{d \theta^m_i} \bigg(r(\theta^r)+m(\theta^m) \bigg)}{(r(\theta^r)+m(\theta^m))^2 } \\
+&=  -X^m_{i}*(y+r(\theta^r))* \frac{ m(\theta^m) * X^m_{i}  * (r(\theta^r)+m(\theta^m)) - m(\theta^m)* m(\theta^m) * X^m_{i} }{(r(\theta^r)+m(\theta^m))^2 } \\
+&=  -X^m_{i}*(y+r(\theta^r))* m(\theta^m) * X^m_{i} * \frac{ r(\theta^r)+m(\theta^m) - m(\theta^m)}{(r(\theta^r)+m(\theta^m))^2 } \\
+&=  -X^m_{i}*(y+r(\theta^r))* m(\theta^m) * X^m_{i} * \frac{ r(\theta^r)}{(r(\theta^r)+m(\theta^m))^2 } \\
+&=  -X^m_{i}* X^m_{i} *m(\theta^m) * \frac{y/r(\theta^r) + 1}{(1+m(\theta^m)/r(\theta^r))^2 } \\
+\end{split}
+\end{equation}
+
+\subsubsection{Mean-model block off-diagonal elements}
+The off-diagonal elements of the mean-model-block of the hessian are:
+\begin{equation}
+\begin{split}
+H^{m,m}_{i,j} &= \frac{d^2}{d \theta^m_i d \theta^m_j} LL(y|\theta^m, \theta^r) \\
+&= \frac{d}{d \theta^m_j} \frac{d}{d \theta^m_i} LL(y|\theta^m, \theta^r) \\
+&= \frac{d}{d \theta^m_j} \bigg( X^m_{i}*y - X^m_{i}*(y+r(\theta^r))*\frac{m(\theta^m)}{r(\theta^r)+m(\theta^m)} \bigg) \\
+&= -X^m_{i}*(y+r(\theta^r)) \frac{d}{d \theta^m_j} \frac{m(\theta^m)}{r(\theta^r)+m(\theta^m)} \\
+&=  -X^m_{i}*(y+r(\theta^r))* \frac{\frac{d}{d \theta^m_j} \bigg(m(\theta^m) \bigg) * (r(\theta^r)+m(\theta^m)) - m(\theta^m)* \frac{d}{d \theta^m_j} \bigg(r(\theta^r)+m(\theta^m) \bigg)}{(r(\theta^r)+m(\theta^m))^2 } \\
+&=  -X^m_{i}*(y+r(\theta^r))* \frac{ m(\theta^m) * X^m_{j}  * (r(\theta^r)+m(\theta^m)) - m(\theta^m)* m(\theta^m) * X^m_{j} }{(r(\theta^r)+m(\theta^m))^2 } \\
+&=  -X^m_{i}*(y+r(\theta^r))* m(\theta^m) * X^m_{j} * \frac{ r(\theta^r)+m(\theta^m) - m(\theta^m)}{(r(\theta^r)+m(\theta^m))^2 } \\
+&=  -X^m_{i}*(y+r(\theta^r))* m(\theta^m) * X^m_{j} * \frac{ r(\theta^r)}{(r(\theta^r)+m(\theta^m))^2 } \\
+&=  -X^m_{i}* X^m_{j} * m(\theta^m) * \frac{y/r(\theta^r)+1}{(1+m(\theta^m)/r(\theta^r))^2 } \\
+\end{split}
+\end{equation}
+
+\subsubsection{Mean-model block elements}
+The equation is always the same and does not simplify for the diagonal:
+\begin{equation}
+\begin{split}
+H^{m,m}_{i,j} &=  -X^m_{i}* X^m_{j} * m(\theta^m) * \frac{y/r(\theta^r)+1}{(1+m(\theta^m)/r(\theta^r))^2 } \\
+\end{split}
+\end{equation}
+This is also the result from Zwilling et al.
+
+\subsection{Dispersion-model block $H^{r,r}$}
+\subsubsection{Dispersion-model block diagonal elements}
+The diagonal elements of the dispersion-model-block of the hessian (using the quotient rule) are:
+This should yield the same apart of $i,j$ as the off-diagonal elements in the next section. This is true.
+\begin{equation}
+\begin{split}
+H^{r,r}_{i,i} &= \frac{d^2}{d \theta^r_i d \theta^r_i} LL(y|\theta^m, \theta^r) \\
+&= \frac{d}{d \theta^r_i} \frac{d}{d \theta^m_i} LL(y|\theta^m, \theta^r) \\
+&= \frac{d}{d \theta^r_i} \bigg(   r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)+y)+ r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)) \\
+&- \frac{1}{r(\theta^r)+m(\theta^m)} r(\theta^r) * X^r_{i}  *(r(\theta^r) + y) \\
+&+ r(\theta^r) * X^r_{i}  * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg)  \bigg) \\
+&= \frac{d}{d \theta^r_i} \bigg(  \frac{d}{d \theta^r_i} \log \Gamma(r(\theta^r)+y) \bigg) + \frac{d}{d \theta^r_i} \bigg( \frac{d}{d \theta^r_i} \log \Gamma(r(\theta^r)) \bigg) \\
+&- \frac{d}{d \theta^r_i} \bigg(  \frac{1}{r(\theta^r)+m(\theta^m)} r(\theta^r) * X^r_{i}  *(r(\theta^r) + y) \bigg) \\
+&+ \frac{d}{d \theta^r_i} \bigg( r(\theta^r) * X^r_{i}  * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg)  \bigg) \\
+&= r(\theta^r) * (X^r_{i})^2 * \psi_0(r(\theta^r)+y) +  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) \\
+&+ r(\theta^r) * (X^r_{i})^2 * \psi_0(r(\theta^r) +  r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+&- \frac{d}{d \theta^r_i} \bigg(  \frac{r(\theta^r) * X^r_{i} }{r(\theta^r)+m(\theta^m)} *(r(\theta^r) + y) \bigg) \\
+&+ \frac{d}{d \theta^r_i} \bigg( r(\theta^r) * X^r_{i}  * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg)  \bigg) \\
+&= r(\theta^r) * (X^r_{i})^2 * \psi_0(r(\theta^r)+y) +  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) \\
+&+ r(\theta^r) * (X^r_{i})^2 * \psi_0(r(\theta^r) +  r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+&- \bigg(  \frac{d}{d \theta^r_i} \frac{r(\theta^r) * X^r_{i} }{r(\theta^r)+m(\theta^m)} *(r(\theta^r) + y) + \frac{r(\theta^r) * X^r_{i} }{r(\theta^r)+m(\theta^m)} *\frac{d}{d \theta^r_i}  (r(\theta^r) + y) \bigg) \\
+&+ X^r_{i} * \bigg(  \frac{d}{d \theta^r_i}  \bigg( r(\theta^r) \bigg) * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+ r(\theta^r) * \frac{d}{d \theta^r_i} \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg)  \bigg) \\
+&= r(\theta^r) * (X^r_{i})^2 * \psi_0(r(\theta^r)+y) +  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) \\
+&+ r(\theta^r) * (X^r_{i})^2 * \psi_0(r(\theta^r) +  r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+&- \bigg( \frac{r(\theta^r) * X^r_{i} * X^r_{i} *(r(\theta^r)+m(\theta^m)) - r(\theta^r) * X^r_{i}*r(\theta^r) * X^r_{i}}{(r(\theta^r)+m(\theta^m))^2} *(r(\theta^r) + y) + \frac{r(\theta^r) * X^r_{i} }{r(\theta^r)+m(\theta^m)} *r(\theta^r) * X^r_{i} \bigg) \\
+&+ X^r_{i} * \bigg(  r(\theta^r) * X^r_{i} * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+ r(\theta^r) * \bigg( r(\theta^r) * X^r_{i} \frac{1}{r(\theta^r)} - r(\theta^r) * X^r_{i} \frac{1}{r(\theta^r)+m(\theta^m)} \bigg)  \bigg) \\
+\end{split}
+\end{equation}
+
+\begin{equation}
+\begin{split}
+H^{r,r}_{i,i} &= r(\theta^r) * (X^r_{i})^2 * \psi_0(r(\theta^r)+y) +  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) \\
+&+ r(\theta^r) * (X^r_{i})^2 * \psi_0(r(\theta^r) +  r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+&- \bigg( \frac{r(\theta^r) * X^r_{i} * X^r_{i}* m(\theta^m) }{(r(\theta^r)+m(\theta^m))^2} *(r(\theta^r) + y) + \frac{r(\theta^r) * X^r_{i} }{r(\theta^r)+m(\theta^m)} *r(\theta^r) * X^r_{i} \bigg) \\
+&+ X^r_{i} * \bigg(  r(\theta^r) * X^r_{i} * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+ r(\theta^r) *X^r_{i} * \bigg( 1 - \frac{r(\theta^r)}{r(\theta^r)+m(\theta^m)} \bigg)  \bigg) \\
+&= r(\theta^r) * (X^r_{i})^2 * \psi_0(r(\theta^r)+y) +  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) \\
+&+ r(\theta^r) * (X^r_{i})^2 * \psi_0(r(\theta^r) +  r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+&- \frac{r(\theta^r) * (X^r_{i})^2 * m(\theta^m) }{(r(\theta^r)+m(\theta^m))^2} *(r(\theta^r) + y) - \frac{r(\theta^r) * X^r_{i} }{r(\theta^r)+m(\theta^m)} *r(\theta^r) * X^r_{i}  \\
+&+ r(\theta^r) * (X^r_{i})^2 * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+ r(\theta^r) * (X^r_{i})^2 * \frac{m(\theta^m)}{r(\theta^r)+m(\theta^m)} \\
+&= r(\theta^r) * (X^r_{i})^2 * \psi_0(r(\theta^r)+y) +  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) \\
+&+ r(\theta^r) * (X^r_{i})^2 * \psi_0(r(\theta^r) +  r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+&- \frac{r(\theta^r) * (X^r_{i})^2 * m(\theta^m) }{(r(\theta^r)+m(\theta^m))^2} *(r(\theta^r) + y) \\
+&+ r(\theta^r) * (X^r_{i})^2 * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+ r(\theta^r) * (X^r_{i})^2 * \frac{m(\theta^m)-r(\theta^r)}{r(\theta^r)+m(\theta^m)} \\
+&= r(\theta^r) * (X^r_{i})^2 * \bigg( \psi_0(r(\theta^r)+y) +  \psi_0(r(\theta^r)) -  \frac{m(\theta^m) }{(r(\theta^r)+m(\theta^m))^2} *(r(\theta^r) + y) \\
+&+ \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) + \frac{m(\theta^m)-r(\theta^r)}{r(\theta^r)+m(\theta^m)} \bigg) \\
+&+  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) + r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+\end{split}
+\end{equation}
+
+\subsubsection{Dispersion-model block off-diagonal elements}
+The off-diagonal elements of the dispersion-model-block of the hessian are:
+
+\begin{equation}
+\begin{split}
+H^{r,r}_{i,j} &= \frac{d^2}{d \theta^r_i d \theta^r_i} LL(y|\theta^m, \theta^r) \\
+&= \frac{d}{d \theta^r_j} \frac{d}{d \theta^m_i} LL(y|\theta^m, \theta^r) \\
+&= \frac{d}{d \theta^r_j} \bigg(   r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)+y)+ r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)) \\
+&- \frac{1}{r(\theta^r)+m(\theta^m)} r(\theta^r) * X^r_{i}  *(r(\theta^r) + y) \\
+&+ r(\theta^r) * X^r_{i}  * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg)  \bigg) \\
+&= \frac{d}{d \theta^r_j} \bigg(  \frac{d}{d \theta^r_i} \log \Gamma(r(\theta^r)+y) \bigg) + \frac{d}{d \theta^r_j} \bigg( \frac{d}{d \theta^r_i} \log \Gamma(r(\theta^r)) \bigg) \\
+&- \frac{d}{d \theta^r_j} \bigg(  \frac{1}{r(\theta^r)+m(\theta^m)} r(\theta^r) * X^r_{i}  *(r(\theta^r) + y) \bigg) \\
+&+ \frac{d}{d \theta^r_j} \bigg( r(\theta^r) * X^r_{i}  * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg)  \bigg) \\
+&= r(\theta^r) * X^r_{i} * X^r_{j} * \psi_0(r(\theta^r)+y) +  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) \\
+&+ r(\theta^r) * X^r_{i} * X^r_{j} * \psi_0(r(\theta^r) +  r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+&- \frac{d}{d \theta^r_j} \bigg(  \frac{r(\theta^r) * X^r_{i} }{r(\theta^r)+m(\theta^m)} *(r(\theta^r) + y) \bigg) \\
+&+ \frac{d}{d \theta^r_j} \bigg( r(\theta^r) * X^r_{i}  * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg)  \bigg) \\
+&= r(\theta^r) * X^r_{i} * X^r_{j} * \psi_0(r(\theta^r)+y) +  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) \\
+&+ r(\theta^r) * X^r_{i} * X^r_{j} * \psi_0(r(\theta^r) +  r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+&- \bigg(  \frac{d}{d \theta^r_j} \frac{r(\theta^r) * X^r_{i} }{r(\theta^r)+m(\theta^m)} *(r(\theta^r) + y) + \frac{r(\theta^r) * X^r_{i} }{r(\theta^r)+m(\theta^m)} *\frac{d}{d \theta^r_j}  (r(\theta^r) + y) \bigg) \\
+&+ X^r_{i} * \bigg(  \frac{d}{d \theta^r_j}  \bigg( r(\theta^r) \bigg) * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+ r(\theta^r) * \frac{d}{d \theta^r_j} \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg)  \bigg) \\
+&= r(\theta^r) * X^r_{i} * X^r_{j} * \psi_0(r(\theta^r)+y) +  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) \\
+&+ r(\theta^r) * X^r_{i} * X^r_{j} * \psi_0(r(\theta^r) +  r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+&- \bigg( \frac{r(\theta^r) * X^r_{j} * X^r_{i} *(r(\theta^r)+m(\theta^m)) - r(\theta^r) * X^r_{i}*r(\theta^r) * X^r_{j}}{(r(\theta^r)+m(\theta^m))^2} *(r(\theta^r) + y) + \frac{r(\theta^r) * X^r_{i} }{r(\theta^r)+m(\theta^m)} *r(\theta^r) * X^r_{j} \bigg) \\
+&+ X^r_{i} * \bigg(  r(\theta^r) * X^r_{j} * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+ r(\theta^r) * \bigg( r(\theta^r) * X^r_{j} \frac{1}{r(\theta^r)} - r(\theta^r) * X^r_{j} \frac{1}{r(\theta^r)+m(\theta^m)} \bigg)  \bigg) \\
+\end{split}
+\end{equation}
+
+\begin{equation}
+\begin{split}
+H^{r,r}_{i,j} &= r(\theta^r) * X^r_{i} * X^r_{j} * \psi_0(r(\theta^r)+y) +  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) \\
+&+ r(\theta^r) * X^r_{i} * X^r_{j} * \psi_0(r(\theta^r) +  r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+&- \bigg( \frac{r(\theta^r) * X^r_{j} * X^r_{i}* m(\theta^m) }{(r(\theta^r)+m(\theta^m))^2} *(r(\theta^r) + y) + \frac{r(\theta^r) * X^r_{i} }{r(\theta^r)+m(\theta^m)} *r(\theta^r) * X^r_{j} \bigg) \\
+&+ X^r_{i} * \bigg(  r(\theta^r) * X^r_{j} * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+ r(\theta^r) *X^r_{j} * \bigg( 1 - \frac{r(\theta^r)}{r(\theta^r)+m(\theta^m)} \bigg)  \bigg) \\
+&= r(\theta^r) * X^r_{i} * X^r_{j} * \psi_0(r(\theta^r)+y) +  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) \\
+&+ r(\theta^r) * X^r_{i} * X^r_{j} * \psi_0(r(\theta^r) +  r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+&- \bigg( r(\theta^r) * X^r_{j} * X^r_{i} * \frac{m(\theta^m) }{(r(\theta^r)+m(\theta^m))^2} *(r(\theta^r) + y) - r(\theta^r) * X^r_{i} * X^r_{j} *  \frac{r(\theta^r)}{r(\theta^r)+m(\theta^m)}  \\
+&+ r(\theta^r) * X^r_{i} * X^r_{j} \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+ r(\theta^r) * X^r_{i} * X^r_{j} \frac{m(\theta^m)}{r(\theta^r)+m(\theta^m)} \bigg) \\
+&= r(\theta^r) * X^r_{i} * X^r_{j} * \bigg(  \psi_0(r(\theta^r)+y) + \psi_0(r(\theta^r) - \frac{m(\theta^m) }{(r(\theta^r)+m(\theta^m))^2} *(r(\theta^r) + y) \\
+&-  \frac{r(\theta^r)}{r(\theta^r)+m(\theta^m)} + \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) + \frac{m(\theta^m)}{r(\theta^r)+m(\theta^m)}\bigg) \\
+&+  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) +  r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+&= r(\theta^r) * X^r_{i} * X^r_{j} * \bigg(  \psi_0(r(\theta^r)+y) + \psi_0(r(\theta^r) - \frac{m(\theta^m) }{(r(\theta^r)+m(\theta^m))^2} *(r(\theta^r) + y) \\
+&+  \frac{m(\theta^m) - r(\theta^r)}{r(\theta^r)+m(\theta^m)} + \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg) \\
+&+  r(\theta^r) *  \psi_1(r(\theta^r)+y) ) +  r(\theta^r) *  \psi_1(r(\theta^r)) ) \\
+\end{split}
+\end{equation}
+
+\subsection{Offdiagonal-model block $H^{r,m}$}
+Two-alternative derivations which should and do yield the same.
+\subsubsection{Offdiagonal-model block derived from mean-model jacobian}
+The off-diagonal elements of the off-block-diagonal hessian (mean-dispersion-model-block) are:
+\begin{equation}
+\begin{split}
+H^{r,m}_{i,j} &= \frac{d^2}{d \theta^m_i d \theta^r_j} LL(y|\theta^m, \theta^r) \\
+&= \frac{d}{d \theta^r_j} \frac{d}{d \theta^m_i} LL(y|\theta^m, \theta^r) \\
+&= \frac{d}{d \theta^r_j} \bigg( X^m_{i}*y - X^m_{i}*(y+r(\theta^r))*\frac{m(\theta^m)}{r(\theta^r)+m(\theta^m)} \bigg) \\
+&= -X^m_{i}* \frac{d}{d \theta^r_j} \bigg(  (y+r(\theta^r)) \frac{m(\theta^m)}{r(\theta^r)+m(\theta^m)} \bigg) \\
+&= -X^m_{i}* \bigg(  r(\theta^r) * X^r_{j} * \frac{m(\theta^m)}{r(\theta^r)+m(\theta^m)} - (y+r(\theta^r)) *  r(\theta^r) * X^r_{j}  * \frac{m(\theta^m)}{(r(\theta^r)+m(\theta^m))^2} \bigg) \\
+&= - m(\theta^m) * X^m_{i}   * r(\theta^r) * X^r_{j}  * \bigg( \frac{1}{r(\theta^r)+m(\theta^m)} - \frac{y+r(\theta^r)}{(r(\theta^r)+m(\theta^m))^2} \bigg) \\
+&= - m(\theta^m) * X^m_{i}   * r(\theta^r) * X^r_{j}  *  \frac{r(\theta^r)+m(\theta^m)-y-r(\theta^r)}{(r(\theta^r)+m(\theta^m))^2} \\
+&= - m(\theta^m) * X^m_{i}   * r(\theta^r) * X^r_{j}  *  \frac{m(\theta^m)-y}{(r(\theta^r)+m(\theta^m))^2} \\
+&= m(\theta^m) * X^m_{i}   * r(\theta^r) * X^r_{j}  *  \frac{y - m(\theta^m)}{(r(\theta^r)+m(\theta^m))^2} \\
+&=  X^m_{i} * X^r_{j}  * m(\theta^m) * \frac{y - m(\theta^m)}{(1+m(\theta^m)/ r(\theta^r))^2} \\
+\end{split}
+\end{equation}
+
+\subsubsection{Offdiagonal-model block derived from dispersion-model jacobian}
+Validation of the off-diagonal elements of the off-block-diagonal hessian (mean-dispersion-model-block) via the Jacobian of the dispersion model:
+\begin{equation}
+\begin{split}
+H^{r,m}_{i,j} &= \frac{d^2}{d \theta^m_i d \theta^r_j} LL(y|\theta^m, \theta^r) \\
+&= \frac{d}{d \theta^m_j} \frac{d}{d \theta^r_i} LL(y|\theta^m, \theta^r) \\
+&= \frac{d}{d \theta^m_j} \bigg( r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)+y)+ r(\theta^r) * X^r_{i} * \psi_0(r(\theta^r)) \\
+&- \frac{1}{r(\theta^r)+m(\theta^m)} r(\theta^r) * X^r_{i}  *(r(\theta^r) + y) \\
+&+ r(\theta^r) * X^r_{i}  * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg) \bigg) \\
+&= -\frac{d}{d \theta^m_j} \bigg( \frac{1}{r(\theta^r)+m(\theta^m)} r(\theta^r) * X^r_{i}  *(r(\theta^r) + y) \bigg) \\
+&+ \frac{d}{d \theta^m_j} \bigg( r(\theta^r) * X^r_{i}  * \bigg( \log(r(\theta^r)) + 1 - \log(r(\theta^r)+m(\theta^m)) \bigg) \bigg) \\
+&= -r(\theta^r) * X^r_{i}  *(r(\theta^r) + y) * \frac{d}{d \theta^m_j} \frac{1}{r(\theta^r)+m(\theta^m)}  \\
+&- r(\theta^r) * X^r_{i}  * \frac{d}{d \theta^m_j} \bigg( \log(r(\theta^r)+m(\theta^m))  \bigg) \\
+&= r(\theta^r) * X^r_{i}  *(r(\theta^r) + y) * m(\theta^m) * X^m_{j}  \frac{1}{(r(\theta^r)+m(\theta^m))^2}  \\
+&- r(\theta^r) * X^r_{i}  * m(\theta^m) * X^m_{j}  \frac{1}{r(\theta^r)+m(\theta^m)} \\
+&= r(\theta^r) * X^r_{i}  * m(\theta^m) * X^m_{j}  \bigg( \frac{r(\theta^r) + y}{(r(\theta^r)+m(\theta^m))^2}  - \frac{1}{r(\theta^r)+m(\theta^m)} \bigg) \\
+&= r(\theta^r) * X^r_{i}  * m(\theta^m) * X^m_{j}  \frac{r(\theta^r) + y - r(\theta^r) - m(\theta^m) }{(r(\theta^r)+m(\theta^m))^2}  \\
+&= r(\theta^r) * X^r_{i}  * m(\theta^m) * X^m_{j}  \frac{y  - m(\theta^m) }{(r(\theta^r)+m(\theta^m))^2}  \\
+&=  X^m_{i} * X^r_{j}  * m(\theta^m) * \frac{y - m(\theta^m)}{(1+m(\theta^m)/ r(\theta^r))^2} \\
+\end{split}
+\end{equation}
+
+\subsubsection{Offdiagonal-model block elements}
+\begin{equation}
+\begin{split}
+H^{r,m}_{i,j} &=X^m_{i} * X^r_{j}  * m(\theta^m) * \frac{y - m(\theta^m)}{(1+m(\theta^m)/ r(\theta^r))^2} \\
+\end{split}
+\end{equation}
+This is the result from Zwilling et al. $*-1$.
+
+\end{document}
