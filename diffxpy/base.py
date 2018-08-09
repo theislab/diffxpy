@@ -42,6 +42,21 @@ class _Estimation(GeneralizedLinearModel, metaclass=abc.ABCMeta):
 
     @property
     @abc.abstractmethod
+    def X(self) -> np.ndarray:
+        pass
+
+    @property
+    @abc.abstractmethod
+    def design_loc(self) -> np.ndarray:
+        pass
+
+    @property
+    @abc.abstractmethod
+    def design_scale(self) -> np.ndarray:
+        pass
+
+    @property
+    @abc.abstractmethod
     def num_observations(self) -> int:
         pass
 
@@ -160,9 +175,36 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     def summary(self, **kwargs) -> pd.DataFrame:
         pass
 
-    # @abc.abstractmethod
-    def plot(self, **kwargs):
-        pass
+    def plot_volcano(self):
+        """
+        returns a volcano plot of p-value vs. log fold change
+
+        :return: Tuple of matplotlib (figure, axis)
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        pvals = self.pval
+        pvals = np.nextafter(0, 1, out=pvals, where=pvals == 0)
+        neg_log_pvals = -(np.log(pvals) / np.log(10))
+        neg_log_pvals = np.clip(neg_log_pvals, 0, 30, neg_log_pvals)
+
+        fig, ax = plt.subplots()
+
+        sns.scatterplot(y=neg_log_pvals, x=self.log2_fold_change(), ax=ax)
+
+        ax.set(xlabel="log2FC", ylabel='-log10(pval)')
+
+        return fig, ax
+
+    def plot_diagnostics(self):
+        """
+        Directly plots a set of diagnostic diagrams
+        """
+        import matplotlib.pyplot as plt
+
+        volcano = self.plot_volcano()
+        plt.show()
 
 
 class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=abc.ABCMeta):
@@ -466,18 +508,50 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         return res
 
+    def plot_vs_ttest(self):
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        grouping = np.asarray(self.model_estim.design_loc[:, self.coef_loc_totest])
+        ttest = test_t_test(
+            data=self.model_estim.X,
+            grouping=grouping,
+            gene_ids=self.gene_ids,
+        )
+        ttest_pvals = ttest.pval
+
+        fig, ax = plt.subplots()
+
+        sns.scatterplot(x=ttest_pvals, y=self.pval, ax=ax)
+
+        ax.set(xlabel="t-test", ylabel='wald test')
+
+        return fig, ax
+
+    def plot_diagnostics(self):
+        import matplotlib.pyplot as plt
+
+        volcano = self.plot_volcano()
+        plt.show()
+        ttest_comp = self.plot_vs_ttest()
+        plt.show()
+
 
 class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
     """
     Single t-test test per gene.
     """
 
-    def __init__(self, gene_ids, pval, logfc):
+    def __init__(self, data, grouping, gene_ids):
         super().__init__()
+        self.data = data
+        self.grouping = grouping
         self._gene_ids = np.asarray(gene_ids)
-        self._logfc = logfc
-        self._pval = pval
 
+        x0, x1 = _split_X(data, grouping)
+
+        self._pval = stats.t_test_raw(x0=x0.data, x1=x1.data)
+        self._logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
         q = self.qval
 
     @property
@@ -499,12 +573,16 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
     Single wilcoxon rank sum test per gene.
     """
 
-    def __init__(self, gene_ids, pval, logfc):
+    def __init__(self, data, grouping, gene_ids):
         super().__init__()
+        self.data = data
+        self.grouping = grouping
         self._gene_ids = np.asarray(gene_ids)
-        self._logfc = logfc
-        self._pval = pval
 
+        x0, x1 = _split_X(data, grouping)
+
+        self._pval = stats.wilcoxon(x0=x0.data, x1=x1.data)
+        self._logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
         q = self.qval
 
     @property
@@ -519,6 +597,34 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
             return self._logfc
         else:
             return self._logfc / np.log(base)
+
+    def plot_vs_ttest(self):
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        grouping = self.grouping
+        ttest = test_t_test(
+            data=self.data,
+            grouping=grouping,
+            gene_ids=self.gene_ids,
+        )
+        ttest_pvals = ttest.pval
+
+        fig, ax = plt.subplots()
+
+        sns.scatterplot(x=ttest_pvals, y=self.pval, ax=ax)
+
+        ax.set(xlabel="t-test", ylabel='wilcoxon test')
+
+        return fig, ax
+
+    def plot_diagnostics(self):
+        import matplotlib.pyplot as plt
+
+        volcano = self.plot_volcano()
+        plt.show()
+        ttest_comp = self.plot_vs_ttest()
+        plt.show()
 
 
 class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=abc.ABCMeta):
@@ -888,7 +994,7 @@ def test_wald_loc(
         formula: str = None,
         formula_loc: str = None,
         formula_scale: str = None,
-        gene_names: str = None,
+        gene_names: Union[str, np.ndarray] = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = "nb",
         batch_size: int = None,
@@ -1011,7 +1117,7 @@ def _split_X(data, grouping):
 def test_t_test(
         data,
         grouping,
-        gene_names=None,
+        gene_ids=None,
         sample_description=None
 ):
     """
@@ -1023,20 +1129,16 @@ def test_t_test(
     
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
-    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param gene_ids: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
-    gene_names = _parse_gene_names(data, gene_names)
+    gene_ids = _parse_gene_names(data, gene_ids)
     grouping = _parse_grouping(data, sample_description, grouping)
-    x0, x1 = _split_X(data, grouping)
-
-    pval = stats.t_test_raw(x0=x0.data, x1=x1.data)
-    logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
 
     de_test = DifferentialExpressionTestTT(
-        gene_ids=gene_names,
-        pval=pval,
-        logfc=logfc,
+        data=data,
+        grouping=grouping,
+        gene_ids=gene_ids,
     )
 
     return de_test
@@ -1062,15 +1164,11 @@ def test_wilcoxon(
     """
     gene_names = _parse_gene_names(data, gene_names)
     grouping = _parse_grouping(data, sample_description, grouping)
-    x0, x1 = _split_X(data, grouping)
-
-    pval = stats.wilcoxon(x0=x0.data, x1=x1.data)
-    logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
 
     de_test = DifferentialExpressionTestWilcoxon(
+        data=data,
+        grouping=grouping,
         gene_ids=gene_names,
-        pval=pval,
-        logfc=logfc,
     )
 
     return de_test
@@ -1213,7 +1311,7 @@ def two_sample(
     elif test.lower() == 't-test' or test.lower() == "t_test" or test.lower() == "ttest":
         de_test = test_t_test(
             data=X,
-            gene_names=gene_names,
+            gene_ids=gene_names,
             grouping=grouping,
         )
     elif test.lower() == 'wilcoxon':
