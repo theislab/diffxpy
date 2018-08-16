@@ -12,7 +12,7 @@ import diffxpy as de
 
 class TestSingle(unittest.TestCase):
 
-    def test_wald(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_wald(self, n_cells: int = 1000, n_genes: int = 1000):
         """
         Test if de.test_wald_loc() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -122,7 +122,7 @@ class TestSingle(unittest.TestCase):
         print('KS-test pvalue for null model match of test_wald_loc(): %f' % pval_h0)
         return pval_h0
 
-    def test_lrt(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_lrt(self, n_cells: int = 1000, n_genes: int = 1000):
         """
         Test if de.test_lrt() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -160,7 +160,7 @@ class TestSingle(unittest.TestCase):
 
         return pval_h0
 
-    def test_t_test(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_ttest(self, n_cells: int = 1000, n_genes: int = 1000):
         """
         Test if de.test_t_test() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -230,7 +230,7 @@ class TestSingle(unittest.TestCase):
 
         return pval_h0
 
-    def test_wilcoxon(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_wilcoxon(self, n_cells: int = 1000, n_genes: int = 1000):
         """
         Test if de.test_wilcoxon() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
