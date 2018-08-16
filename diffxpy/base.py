@@ -690,17 +690,28 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
     Pairwise unit_test between more than 2 groups per gene.
     """
 
-    def __init__(self, gene_ids, pval, logfc, correction_type: str):
+    def __init__(self, gene_ids, pval, logfc, tests, correction_type: str):
         super().__init__(correction_type=correction_type)
         self._gene_ids = np.asarray(gene_ids)
         self._logfc = logfc
         self._pval = pval
+        self._tests = tests
 
         q = self.qval
 
     @property
     def gene_ids(self) -> np.ndarray:
         return self._gene_ids
+
+    @property
+    def tests(self):
+        """
+        If `keep_full_test_objs` was set to `True`, this will return a matrix of differential expression tests.
+        """
+        if self._tests is None:
+            raise ValueError("Individual tests were not kept!")
+
+        return self._tests
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -712,18 +723,113 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
             return self._logfc / np.log(base)
 
 
+class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
+    """
+    Pairwise unit_test between more than 2 groups per gene.
+    """
+
+    model_estim: _Estimation
+    theta_mle: np.ndarray
+    theta_sd: np.ndarray
+
+    def __init__(self, model_estim: _Estimation, grouping, correction_type: str):
+        super().__init__(correction_type=correction_type)
+        self.model_estim = model_estim
+        self.grouping = grouping
+
+        # values of parameter estimates: coefficients x genes array with one coefficient per group
+        self._theta_mle = model_estim.par_link_loc
+        # standard deviation of estimates: coefficients x genes array with one coefficient per group
+        # theta_sd = sqrt(diagonal(fisher_inv))
+        self._theta_sd = np.sqrt(np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1)).T
+        self._logfc = None
+
+        p = self.pval
+        q = self.qval
+
+    def _test(self, **kwargs):
+        groups = np.unique(self.grouping)
+        num_features = self.model_estim.X.shape[1]
+
+        pvals = np.tile(np.NaN, [len(groups), len(groups), num_features])
+        pvals[np.eye(pvals.shape[0]).astype(bool)] = 0
+
+        theta_mle = self._theta_mle
+        theta_sd = self._theta_sd
+
+        for i, g1 in enumerate(groups):
+            for j, g2 in enumerate(groups[(i + 1):]):
+                j = j + i + 1
+
+                pvals[i, j] = stats.two_coef_z_test(theta_mle0=theta_mle[i], theta_mle1=theta_mle[j],
+                                                    theta_sd0=theta_sd[i], theta_sd1=theta_sd[j])
+                pvals[j, i] = pvals[i, j]
+
+        return pvals
+
+    @property
+    def log_probs(self):
+        return np.sum(self.model_estim.log_probs(), axis=0)
+
+    @property
+    def gene_ids(self) -> np.ndarray:
+        return np.asarray(self.model_estim.features)
+
+    @property
+    def model_gradient(self):
+        return self.model_estim.gradient
+
+    def log_fold_change(self, base=np.e, **kwargs):
+        """
+        Returns matrix of fold changes per gene
+        """
+        if self._logfc is None:
+            groups = np.unique(self.grouping)
+            num_features = self.model_estim.X.shape[1]
+
+            logfc = np.tile(np.NaN, [len(groups), len(groups), num_features])
+            logfc[np.eye(logfc.shape[0]).astype(bool)] = 0
+
+            theta_mle = self._theta_mle
+
+            for i, g1 in enumerate(groups):
+                for j, g2 in enumerate(groups[(i + 1):]):
+                    j = j + i + 1
+
+                    logfc[i, j] = theta_mle[j] - theta_mle[i]
+                    logfc[j, i] = logfc[i, j]
+
+            self._logfc = logfc
+
+        if base == np.e:
+            return self._logfc
+        else:
+            return self._logfc / np.log(base)
+
+
 class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
     """
     Tests between between each group and the rest for more than 2 groups per gene.
     """
 
-    def __init__(self, gene_ids, pval, logfc, correction_type: str):
+    def __init__(self, gene_ids, pval, logfc, tests, correction_type: str):
         super().__init__(correction_type=correction_type)
         self._gene_ids = np.asarray(gene_ids)
         self._pval = pval
         self._logfc = logfc
+        self._tests = tests
 
         q = self.qval
+
+    @property
+    def tests(self):
+        """
+        If `keep_full_test_objs` was set to `True`, this will return a matrix of differential expression tests.
+        """
+        if self._tests is None:
+            raise ValueError("Individual tests were not kept!")
+
+        return self._tests
 
     @property
     def gene_ids(self) -> np.ndarray:
@@ -1336,7 +1442,7 @@ def test_pairwise(
         pval_correction: str = "global",
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
-        return_full_test_objs: bool = False,
+        keep_full_test_objs: bool = False,
         **kwargs
 ):
     """
@@ -1414,7 +1520,7 @@ def test_pairwise(
               ]
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
-    :param return_full_test_objs: [Debugging] return matrix of test objects; currently valid for test != "z-test"
+    :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test"
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
@@ -1427,13 +1533,6 @@ def test_pairwise(
     sample_description = _parse_sample_description(data, sample_description)
     grouping = _parse_grouping(data, sample_description, grouping)
     sample_description = pd.DataFrame({"grouping": grouping})
-
-    groups = np.unique(grouping)
-    pvals = np.tile(np.NaN, [len(groups), len(groups), X.shape[1]])
-    pvals[np.eye(pvals.shape[0]).astype(bool)] = 0
-    logfc = np.tile(np.NaN, [len(groups), len(groups), X.shape[1]])
-    logfc[np.eye(logfc.shape[0]).astype(bool)] = 0
-    tests = np.tile([None], [X.shape[1], len(groups), len(groups)])
 
     if test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest':
         # -1 in formula removes intercept
@@ -1449,22 +1548,39 @@ def test_pairwise(
             **kwargs
         )
 
-        # values of parameter estimates: coefficients x genes array with one coefficient per group
-        theta_mle = model.par_link_loc
-        # standard deviation of estimates: coefficients x genes array with one coefficient per group
-        # theta_sd = sqrt(diagonal(fisher_inv))
-        theta_sd = np.sqrt(np.diagonal(model.fisher_inv, axis1=-2, axis2=-1)).T
+        # # values of parameter estimates: coefficients x genes array with one coefficient per group
+        # theta_mle = model.par_link_loc
+        # # standard deviation of estimates: coefficients x genes array with one coefficient per group
+        # # theta_sd = sqrt(diagonal(fisher_inv))
+        # theta_sd = np.sqrt(np.diagonal(model.fisher_inv, axis1=-2, axis2=-1)).T
+        #
+        # for i, g1 in enumerate(groups):
+        #     for j, g2 in enumerate(groups[(i + 1):]):
+        #         j = j + i + 1
+        #
+        #         pvals[i, j] = stats.two_coef_z_test(theta_mle0=theta_mle[i], theta_mle1=theta_mle[j],
+        #                                             theta_sd0=theta_sd[i], theta_sd1=theta_sd[j])
+        #         pvals[j, i] = pvals[i, j]
+        #         logfc[i, j] = theta_mle[j] - theta_mle[i]
+        #         logfc[j, i] = logfc[i, j]
 
-        for i, g1 in enumerate(groups):
-            for j, g2 in enumerate(groups[(i + 1):]):
-                j = j + i + 1
-
-                pvals[i, j] = stats.two_coef_z_test(theta_mle0=theta_mle[i], theta_mle1=theta_mle[j],
-                                                    theta_sd0=theta_sd[i], theta_sd1=theta_sd[j])
-                pvals[j, i] = pvals[i, j]
-                logfc[i, j] = theta_mle[j] - theta_mle[i]
-                logfc[j, i] = logfc[i, j]
+        de_test = DifferentialExpressionTestZTest(
+            model_estim=model,
+            grouping=grouping,
+            correction_type=pval_correction
+        )
     else:
+        groups = np.unique(grouping)
+        pvals = np.tile(np.NaN, [len(groups), len(groups), X.shape[1]])
+        pvals[np.eye(pvals.shape[0]).astype(bool)] = 0
+        logfc = np.tile(np.NaN, [len(groups), len(groups), X.shape[1]])
+        logfc[np.eye(logfc.shape[0]).astype(bool)] = 0
+
+        if keep_full_test_objs:
+            tests = np.tile([None], [X.shape[1], len(groups), len(groups)])
+        else:
+            tests = None
+
         for i, g1 in enumerate(groups):
             for j, g2 in enumerate(groups[(i + 1):]):
                 j = j + i + 1
@@ -1485,17 +1601,17 @@ def test_pairwise(
                 pvals[j, i] = pvals[i, j]
                 logfc[i, j] = de_test_temp.log_fold_change()
                 logfc[j, i] = - logfc[i, j]
-                if return_full_test_objs:
+                if keep_full_test_objs:
                     tests[i, j] = de_test_temp
                     tests[j, i] = de_test_temp
 
-    de_test = DifferentialExpressionTestPairwise(gene_ids=gene_names, pval=pvals, logfc=logfc,
-                                                 correction_type=pval_correction)
+        de_test = DifferentialExpressionTestPairwise(gene_ids=gene_names,
+                                                     pval=pvals,
+                                                     logfc=logfc,
+                                                     tests=tests,
+                                                     correction_type=pval_correction)
 
-    if return_full_test_objs:
-        return de_test, tests
-    else:
-        return de_test
+    return de_test
 
 
 def test_vsrest(
@@ -1508,6 +1624,7 @@ def test_vsrest(
         pval_correction: str = "global",
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        keep_full_test_objs: bool = False,
         **kwargs
 ):
     """
@@ -1585,6 +1702,7 @@ def test_vsrest(
               ]
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test"
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
@@ -1602,6 +1720,11 @@ def test_vsrest(
     pvals = np.zeros([len(groups), X.shape[1]])
     logfc = np.zeros([len(groups), X.shape[1]])
 
+    if keep_full_test_objs:
+        tests = np.tile([None], [len(groups), X.shape[1]])
+    else:
+        tests = None
+
     for i, g1 in enumerate(groups):
         test_grouping = np.where(grouping == g1, "group", "rest")
         de_test_temp = two_sample(
@@ -1617,7 +1740,13 @@ def test_vsrest(
         )
         pvals[i] = de_test_temp.pval
         logfc[i] = de_test_temp.log_fold_change()
+        if keep_full_test_objs:
+            tests[i] = de_test_temp
 
-    de_test = DifferentialExpressionTestVsRest(gene_ids=gene_names, pval=pvals, logfc=logfc,
+    de_test = DifferentialExpressionTestVsRest(gene_ids=gene_names,
+                                               pval=pvals,
+                                               logfc=logfc,
+                                               tests=tests,
                                                correction_type=pval_correction)
+
     return de_test
