@@ -662,24 +662,34 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
     def summary(self, **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
+
+        :return: pandas.DataFrame with the following columns:
+
+            - gene: the gene id's
+            - pval: the minimum per-gene p-value of all tests
+            - qval: the minimum per-gene q-value of all tests
+            - log2fc: the maximal/minimal (depending on which one is higher) log2 fold change of the genes
         """
         assert self.gene_ids is not None
 
         # calculate maximum logFC of lower triangular fold change matrix
-        raw_logfc = self.log2_fold_change(return_type="xarray")
-        argm = np.argmax(raw_logfc, axis=0)
-        args = np.argmax(raw_logfc[argm], axis=0)
-        argm = argm[args]
-        logfc = raw_logfc[argm, args] * np.where(argm > args, 1, -1)
+        raw_logfc = self.log2_fold_change()
+
+        # first flatten all dimensions up to the last 'gene' dimension
+        flat_logfc = raw_logfc.reshape(-1, raw_logfc.shape[-1])
+        # next, get argmax of flattened logfc and unravel the true indices from it
+        r, c = np.unravel_index(flat_logfc.argmax(0), raw_logfc.shape[:2])
+        # if logfc is maximal in the lower triangular matrix, multiply it with -1
+        logfc = raw_logfc[r, c, np.arange(raw_logfc.shape[-1])] * np.where(r <= c, 1, -1)
 
         res = pd.DataFrame({
             "gene": self.gene_ids,
             # return minimal pval by gene:
-            "pval": np.min(self.pval, axis=1),
+            "pval": np.min(self.pval.reshape(-1, self.pval.shape[-1]), axis=0),
             # return minimal qval by gene:
-            "qval": np.min(self.qval, axis=1),
+            "qval": np.min(self.qval.reshape(-1, self.qval.shape[-1]), axis=0),
             # return maximal logFC by gene:
-            "log2fc": logfc
+            "log2fc": np.asarray(logfc)
         })
 
         return res
@@ -752,7 +762,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         num_features = self.model_estim.X.shape[1]
 
         pvals = np.tile(np.NaN, [len(groups), len(groups), num_features])
-        pvals[np.eye(pvals.shape[0]).astype(bool)] = 0
+        pvals[np.eye(pvals.shape[0]).astype(bool)] = 1
 
         theta_mle = self._theta_mle
         theta_sd = self._theta_sd
@@ -797,7 +807,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
                     j = j + i + 1
 
                     logfc[i, j] = theta_mle[j] - theta_mle[i]
-                    logfc[j, i] = logfc[i, j]
+                    logfc[j, i] = -logfc[i, j]
 
             self._logfc = logfc
 
@@ -1717,11 +1727,11 @@ def test_vsrest(
     sample_description = pd.DataFrame({"grouping": grouping})
 
     groups = np.unique(grouping)
-    pvals = np.zeros([len(groups), X.shape[1]])
-    logfc = np.zeros([len(groups), X.shape[1]])
+    pvals = np.zeros([1, len(groups), X.shape[1]])
+    logfc = np.zeros([1, len(groups), X.shape[1]])
 
     if keep_full_test_objs:
-        tests = np.tile([None], [len(groups), X.shape[1]])
+        tests = np.tile([None], [1, len(groups), X.shape[1]])
     else:
         tests = None
 
@@ -1738,10 +1748,10 @@ def test_vsrest(
             training_strategy=training_strategy,
             **kwargs
         )
-        pvals[i] = de_test_temp.pval
-        logfc[i] = de_test_temp.log_fold_change()
+        pvals[0, i] = de_test_temp.pval
+        logfc[0, i] = de_test_temp.log_fold_change()
         if keep_full_test_objs:
-            tests[i] = de_test_temp
+            tests[0, i] = de_test_temp
 
     de_test = DifferentialExpressionTestVsRest(gene_ids=gene_names,
                                                pval=pvals,

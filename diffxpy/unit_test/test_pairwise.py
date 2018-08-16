@@ -36,6 +36,7 @@ class TestPairwise(unittest.TestCase):
             noise_model="nb",
             sample_description=random_sample_description,
         )
+        summary = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval[~np.eye(test.pval.shape[0]).astype(bool)].flatten(), 'uniform').pvalue
@@ -81,12 +82,12 @@ class TestPairwise(unittest.TestCase):
 
         print('fraction of non-DE genes with q-value < 0.05: %.1f%%' %
               (100 * np.mean(
-                  np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), :num_non_de] < 0.05) /
+                  np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), :num_non_de] < 0.05) / 2 /
                   num_non_de
               )))
         print('fraction of DE genes with q-value < 0.05: %.1f%%' %
               (100 * np.mean(
-                  np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), num_non_de:] < 0.05) /
+                  np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), num_non_de:] < 0.05) / 2 /
                   (n_genes - num_non_de)
               )))
 
@@ -153,6 +154,7 @@ class TestPairwise(unittest.TestCase):
             test="t-test",
             sample_description=random_sample_description,
         )
+        summary = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval[~np.eye(test.pval.shape[0]).astype(bool)].flatten(), 'uniform').pvalue
@@ -188,6 +190,7 @@ class TestPairwise(unittest.TestCase):
             test="wilcoxon",
             sample_description=random_sample_description,
         )
+        summary = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval[~np.eye(test.pval.shape[0]).astype(bool)].flatten(), 'uniform').pvalue
