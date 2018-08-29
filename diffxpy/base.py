@@ -550,8 +550,22 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
 
         x0, x1 = _split_X(data, grouping)
 
-        self._pval = stats.t_test_raw(x0=x0.data, x1=x1.data)
+        # Only compute p-values for genes with non-zero observations and non-zero group-wise variance.
+        self._ave_geq_zero = np.asarray(np.mean(data, axis=0)).flatten()>0
+        self._var_geq_zero = np.logical_or(
+            np.asarray(np.var(x0, axis=0)).flatten()>0,
+            np.asarray(np.var(x1, axis=0)).flatten()>0
+            )
+        idx_tt = np.where(np.logical_and(self._ave_geq_zero==True, self._var_geq_zero==True))[0]
+        pval = np.zeros([self._gene_ids.shape[0]])+np.nan
+        pval[idx_tt] = stats.t_test_raw(x0=x0[:,idx_tt], x1=x1[:,idx_tt])
+        self._pval = pval
         self._logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
+        # Return 0 if LFC was non-zero and variances are zero,
+        # this causes division by zero in the test statistic. This
+        # is a highly significant result if one believes the variance estimate.
+        pval[np.logical_and(np.logical_and(self._var_geq_zero==False, self._ave_geq_zero==True), 
+            self._logfc!=0)] = 0
         q = self.qval
 
     @property
@@ -566,6 +580,16 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             return self._logfc
         else:
             return self._logfc / np.log(base)
+
+    def summary(self, **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+        """
+        res = super().summary(**kwargs)
+        res["zero_mean"] = self._ave_geq_zero==False
+        res["zero_variance"] = self._var_geq_zero==False
+        
+        return res
 
 
 class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
@@ -862,7 +886,7 @@ def _parse_gene_names(data, gene_names):
             gene_names = data["features"]
         else:
             raise ValueError("Missing gene names")
-
+    
     return np.asarray(gene_names)
 
 
@@ -1233,7 +1257,7 @@ def _split_X(data, grouping):
 def test_t_test(
         data,
         grouping,
-        gene_ids=None,
+        gene_names=None,
         sample_description=None
 ):
     """
@@ -1248,13 +1272,14 @@ def test_t_test(
     :param gene_ids: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
-    gene_ids = _parse_gene_names(data, gene_ids)
-    grouping = _parse_grouping(data, sample_description, grouping)
-
+    gene_names = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
+    grouping = _parse_grouping(X, sample_description, grouping)
+    
     de_test = DifferentialExpressionTestTT(
-        data=data,
+        data=X,
         grouping=grouping,
-        gene_ids=gene_ids,
+        gene_ids=gene_names,
     )
 
     return de_test
