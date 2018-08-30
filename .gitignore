@@ -10,6 +10,8 @@ playground/*
 venv/*
 resources/*
 **/__pycache__
+*.ipynb_checkpoints/
+*/*.ipynb_checkpoints/
 
 !**/.gitignore
 
