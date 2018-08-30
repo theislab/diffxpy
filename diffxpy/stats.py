@@ -156,7 +156,7 @@ def t_test_moments(
     df = np.square((var0 / n0) + (var1 / n1)) / divisor
     df = np.nextafter(0, 1, out=df, where=df == 0)
 
-    pval = 2*(1 - scipy.stats.t(df).cdf(t_statistic))
+    pval = 2 * (1 - scipy.stats.t(df).cdf(t_statistic))
     return pval
 
 
@@ -195,7 +195,7 @@ def wald_test(
             raise ValueError('stats.wald_test(): theta_mle and theta0 have to contain the same number of entries')
 
     wald_statistic = np.abs(np.divide(theta_mle - theta0, theta_sd))
-    pvals = 2*(1 - scipy.stats.norm(loc=0, scale=1).cdf(wald_statistic))  # two-tailed test
+    pvals = 2 * (1 - scipy.stats.norm(loc=0, scale=1).cdf(wald_statistic))  # two-tailed test
     return pvals
 
 
@@ -236,5 +236,5 @@ def two_coef_z_test(
         raise ValueError('stats.two_coef_z_test(): theta_mle0 and theta_sd0 have to contain the same number of entries')
 
     z_statistic = np.abs((theta_mle0 - theta_mle1) / np.sqrt(np.square(theta_sd0) + np.square(theta_sd1)))
-    pvals = 2*(1 - scipy.stats.norm(loc=0, scale=1).cdf(z_statistic))  # two-tailed test
+    pvals = 2 * (1 - scipy.stats.norm(loc=0, scale=1).cdf(z_statistic))  # two-tailed test
     return pvals
