@@ -74,8 +74,8 @@ def wilcoxon(
 
 
 def t_test_raw(
-        x0: np.ndarray,
-        x1: np.ndarray,
+        x0,
+        x1,
 ):
     """
     Perform two-sided t-test allowing for unequal group variances (Welch's t-test) on raw data
@@ -100,10 +100,10 @@ def t_test_raw(
         raise ValueError(
             'stats.wilcoxon(): the first axis (number of tests) is not allowed to differ between x0 and x1!')
 
-    mu0 = np.mean(x0, axis=0).flatten()
-    var0 = np.var(x0, axis=0).flatten()
-    mu1 = np.mean(x1, axis=0).flatten()
-    var1 = np.var(x1, axis=0).flatten()
+    mu0 = np.asarray(np.mean(x0, axis=0)).flatten()
+    var0 = np.asarray(np.var(x0, axis=0)).flatten()
+    mu1 = np.asarray(np.mean(x1, axis=0)).flatten()
+    var1 = np.asarray(np.var(x1, axis=0)).flatten()
     n0 = x0.shape[0]
     n1 = x1.shape[0]
 
