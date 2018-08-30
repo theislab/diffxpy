@@ -184,14 +184,15 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         import matplotlib.pyplot as plt
         import seaborn as sns
 
-        pvals = self.pval
+        pvals = np.reshape(self.pval, -1)
         pvals = np.nextafter(0, 1, out=pvals, where=pvals == 0)
         neg_log_pvals = -(np.log(pvals) / np.log(10))
         neg_log_pvals = np.clip(neg_log_pvals, 0, 30, neg_log_pvals)
+        logfc = np.reshape(self.log2_fold_change(), -1)
 
         fig, ax = plt.subplots()
 
-        sns.scatterplot(y=neg_log_pvals, x=self.log2_fold_change(), ax=ax)
+        sns.scatterplot(y=neg_log_pvals, x=logfc, ax=ax)
 
         ax.set(xlabel="log2FC", ylabel='-log10(pval)')
 
