@@ -19,9 +19,9 @@ import patsy
 import batchglm.data as data_utils
 from batchglm.api.models.glm import Model as GeneralizedLinearModel
 
-from . import stats
+from ..stats import stats
 from . import correction
-from .batch_bfgs.optim import Estim_BFGS
+from ..models.batch_bfgs.optim import Estim_BFGS
 
 logger = logging.getLogger(__name__)
 
@@ -514,7 +514,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         import seaborn as sns
 
         grouping = np.asarray(self.model_estim.design_loc[:, self.coef_loc_totest])
-        ttest = test_t_test(
+        ttest = t_test(
             data=self.model_estim.X,
             grouping=grouping,
             gene_ids=self.gene_ids,
@@ -606,7 +606,7 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
 
         x0, x1 = _split_X(data, grouping)
 
-        self._pval = stats.wilcoxon(x0=x0.data, x1=x1.data)
+        self._pval = stats.wilcoxon_test(x0=x0.data, x1=x1.data)
         self._logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
         q = self.qval
 
@@ -628,7 +628,7 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
         import seaborn as sns
 
         grouping = self.grouping
-        ttest = test_t_test(
+        ttest = t_test(
             data=self.data,
             grouping=grouping,
             gene_ids=self.gene_ids,
@@ -1001,7 +1001,7 @@ def _fit(
     return model
 
 
-def test_lrt(
+def lrt(
         data,
         reduced_formula: str = None,
         full_formula: str = None,
@@ -1071,7 +1071,7 @@ def test_lrt(
         logger.info("additional kwargs: %s", str(kwargs))
 
     # TODO: remove this warning when lrt is working
-    logger.warning("test_lrt is not ready for usage yet!")
+    logger.warning("lrt is not ready for usage yet!")
 
     if full_formula_loc is None:
         full_formula_loc = full_formula
@@ -1128,7 +1128,7 @@ def test_lrt(
     return de_test
 
 
-def test_wald_loc(
+def wald(
         data,
         factor_loc_totest: str,
         coef_to_test: object = None,  # e.g. coef_to_test="B"
@@ -1255,7 +1255,7 @@ def _split_X(data, grouping):
     return x0, x1
 
 
-def test_t_test(
+def t_test(
         data,
         grouping,
         gene_ids=None,
@@ -1286,7 +1286,7 @@ def test_t_test(
     return de_test
 
 
-def test_wilcoxon(
+def wilcoxon(
         data,
         grouping,
         gene_names=None,
@@ -1417,7 +1417,7 @@ def two_sample(
             raise ValueError("Please specify noise_model")
         formula_loc = '~ 1 + grouping'
         formula_scale = '~ 1 + grouping'
-        de_test = test_wald_loc(
+        de_test = wald(
             data=X,
             factor_loc_totest="grouping",
             coef_to_test=None,
@@ -1437,7 +1437,7 @@ def two_sample(
         full_formula_scale = '~ 1 + grouping'
         reduced_formula_loc = '~ 1'
         reduced_formula_scale = '~ 1 + grouping'
-        de_test = test_lrt(
+        de_test = lrt(
             data=X,
             full_formula_loc=full_formula_loc,
             reduced_formula_loc=reduced_formula_loc,
@@ -1451,13 +1451,13 @@ def two_sample(
             **kwargs
         )
     elif test.lower() == 't-test' or test.lower() == "t_test" or test.lower() == "ttest":
-        de_test = test_t_test(
+        de_test = t_test(
             data=X,
             gene_ids=gene_names,
             grouping=grouping,
         )
     elif test.lower() == 'wilcoxon':
-        de_test = test_wilcoxon(
+        de_test = wilcoxon(
             data=X,
             gene_names=gene_names,
             grouping=grouping,
@@ -1468,7 +1468,7 @@ def two_sample(
     return de_test
 
 
-def test_pairwise(
+def pairwise(
         data,
         grouping: Union[str, np.ndarray, list],
         test: str = 'z-test',
@@ -1650,7 +1650,7 @@ def test_pairwise(
     return de_test
 
 
-def test_vsrest(
+def versus_rest(
         data,
         grouping: Union[str, np.ndarray, list],
         test: str = 'wald',

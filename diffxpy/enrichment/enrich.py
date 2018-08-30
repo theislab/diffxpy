@@ -1,34 +1,9 @@
 import numpy as np
 import pandas as pd
-from scipy.stats import hypergeom
 
-from . import stats
-from . import correction
-from .base import _DifferentialExpressionTest
-
-def hypergeom_test(
-    intersections: np.ndarray,
-    enquiry: int,
-    references: np.ndarray,
-    background: int
-    ) -> np.ndarray:
-    """ Run a hypergeometric test.
-
-    The scipy docs have a nice explanation of the hypergeometric ditribution and its parameters.
-    This function wraps scipy.stats.hypergeom() and can compare multiple reference (enquiry)
-    sets against one target set.
-
-    :param intersections: np.ndarray
-        Array with number of overlaps of reference sets with enquiry set.
-    :param enquiry: np.ndarray
-        Size of each enquiry set to be tested.
-    :param references: int
-        Array with size of reference sets.
-    :param background: int
-        Size of background set.
-    """
-    pvals = np.array([1-hypergeom(M=background, n=references[i], N=enquiry).cdf(x-1) for i,x in enumerate(intersections)])
-    return(pvals)
+from ..stats import stats
+from ..testing import correction
+from ..testing.base import _DifferentialExpressionTest
 
 class RefSets():
     """
@@ -204,6 +179,52 @@ class RefSets():
         else:
             x.intersect = self.get_set(id).genes.intersection(enq_set)
 
+def test(
+    RefSets: RefSets,
+    DETest: _DifferentialExpressionTest = None,
+    pval: np.array = None,
+    gene_ids: list = None,
+    de_threshold=0.05,
+    all_ids = None,
+    clean_ref = True
+    ):
+    """ Perform gene set enrichment.
+
+    Wrapper for Enrich. Just wrote this so that Enrich shows up with a
+    nice doc string and that the call to this is de.enrich.test which
+    makes more sense to me than de.enrich.Enrich.
+
+    :param RefSets:
+        The annotated gene sets against which enrichment is tested.
+    :param DETest:
+        The differential expression results object which is tested
+        for enrichment in the gene sets.
+    :param pval:
+        Alternative to DETest, vector of p-values for differential expression.
+    :param gene_ids:
+        If pval was supplied instead of DETest, use gene_ids to supply the
+        vector of gene identifiers (strings) that correspond to the p-values
+        which can be matched against the identifieres in the sets in RefSets.
+    :param de_threshold:
+        Significance threshold at which a differential test (a multiple-testing 
+        corrected p-value) is called siginficant. This 
+    :param all_ids:
+        Set of all gene identifiers, this is used as the background set in the
+        hypergeometric test. Only supply this if not all genes were tested
+        and are supplied above in DETest or gene_ids.
+    :param clean_ref:
+        Whether or not to only retain gene identifiers in RefSets that occur in 
+        the background set of identifiers supplied here through all_ids.
+    """
+    return Enrich(
+        RefSets = RefSets,
+        DETest = DETest,
+        pval = pval,
+        gene_ids = gene_ids,
+        de_threshold = de_threshold,
+        all_ids = all_ids,
+        clean_ref = clean_ref)
+
 class Enrich():
     """
     """
@@ -290,7 +311,7 @@ class Enrich():
     def _test(self):
         """
         """
-        pval = hypergeom_test(
+        pval = stats.hypergeom_test(
             intersections = self.n_overlaps, 
             enquiry = len(self._significant_ids), 
             references = self.RefSets._set_lens, 

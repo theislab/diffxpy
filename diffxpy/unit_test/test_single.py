@@ -7,14 +7,14 @@ import scipy.sparse
 import anndata
 
 from batchglm.api.models.nb_glm import Simulator, Estimator, InputData
-import diffxpy as de
+import diffxpy.api as de
 
 
 class TestSingle(unittest.TestCase):
 
     def test_null_distribution_wald(self, n_cells: int = 1000, n_genes: int = 1000):
         """
-        Test if de.test_wald_loc() generates a uniform p-value distribution
+        Test if de.wald() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
         of the two-side Kolmgorov-Smirnov test for equality of the observed 
         p-value distriubution and a uniform distribution.
@@ -31,7 +31,7 @@ class TestSingle(unittest.TestCase):
             "condition": np.random.randint(2, size=sim.num_observations)
         })
 
-        test = de.test_wald_loc(
+        test = de.test.wald(
             data=sim.X,
             factor_loc_totest="condition",
             formula="~ 1 + condition",
@@ -42,7 +42,7 @@ class TestSingle(unittest.TestCase):
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
-        print('KS-test pvalue for null model match of test_wald_loc(): %f' % pval_h0)
+        print('KS-test pvalue for null model match of wald(): %f' % pval_h0)
 
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
 
@@ -50,7 +50,7 @@ class TestSingle(unittest.TestCase):
 
     def test_wald_de(self, n_cells: int = 1000, n_genes: int = 1000):
         """
-        Test if de.test_lrt() generates a uniform p-value distribution
+        Test if de.lrt() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
         of the two-side Kolmgorov-Smirnov test for equality of the observed
         p-value distriubution and a uniform distribution.
@@ -72,7 +72,7 @@ class TestSingle(unittest.TestCase):
 
         sample_description = sim.sample_description
 
-        test = de.test_wald_loc(
+        test = de.test.wald(
             data=sim.X,
             factor_loc_totest="condition",
             formula="~ 1 + condition",
@@ -88,7 +88,7 @@ class TestSingle(unittest.TestCase):
 
     def test_sparse_anndata(self, n_cells: int = 1000, n_genes: int = 1000):
         """
-        Test if de.test_wald_loc() generates a uniform p-value distribution
+        Test if de.wald() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
         of the two-side Kolmgorov-Smirnov test for equality of the observed
         p-value distriubution and a uniform distribution.
@@ -107,7 +107,7 @@ class TestSingle(unittest.TestCase):
 
         adata = anndata.AnnData(scipy.sparse.csr_matrix(sim.X.values))
         # X = adata.X
-        test = de.test_wald_loc(
+        test = de.test.wald(
             data=adata,
             factor_loc_totest="condition",
             formula="~ 1 + condition",
@@ -119,12 +119,12 @@ class TestSingle(unittest.TestCase):
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
-        print('KS-test pvalue for null model match of test_wald_loc(): %f' % pval_h0)
+        print('KS-test pvalue for null model match of wald(): %f' % pval_h0)
         return pval_h0
 
     def test_null_distribution_lrt(self, n_cells: int = 1000, n_genes: int = 1000):
         """
-        Test if de.test_lrt() generates a uniform p-value distribution
+        Test if de.lrt() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
         of the two-side Kolmgorov-Smirnov test for equality of the observed 
         p-value distriubution and a uniform distribution.
@@ -141,7 +141,7 @@ class TestSingle(unittest.TestCase):
             "condition": np.random.randint(2, size=sim.num_observations)
         })
 
-        test = de.test_lrt(
+        test = de.test.lrt(
             data=sim.X,
             full_formula_loc="~ 1 + condition",
             full_formula_scale="~ 1 + condition",
@@ -154,7 +154,7 @@ class TestSingle(unittest.TestCase):
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
-        print('KS-test pvalue for null model match of test_lrt(): %f' % pval_h0)
+        print('KS-test pvalue for null model match of lrt(): %f' % pval_h0)
 
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
 
@@ -162,7 +162,7 @@ class TestSingle(unittest.TestCase):
 
     def test_null_distribution_ttest(self, n_cells: int = 1000, n_genes: int = 1000):
         """
-        Test if de.test_t_test() generates a uniform p-value distribution
+        Test if de.t_test() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
         of the two-side Kolmgorov-Smirnov test for equality of the observed 
         p-value distriubution and a uniform distribution.
@@ -179,7 +179,7 @@ class TestSingle(unittest.TestCase):
             "condition": np.random.randint(2, size=sim.num_observations)
         })
 
-        test = de.test_t_test(
+        test = de.test.t_test(
             data=sim.X,
             grouping="condition",
             sample_description=random_sample_description
@@ -189,15 +189,15 @@ class TestSingle(unittest.TestCase):
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
-        print('KS-test pvalue for null model match of test_t_test(): %f' % pval_h0)
+        print('KS-test pvalue for null model match of t_test(): %f' % pval_h0)
 
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
 
         return pval_h0
 
-    def test_t_test_zero_variance(self, n_cells: int = 1000, n_genes: int = 1000):
+    def t_test_zero_variance(self, n_cells: int = 1000, n_genes: int = 1000):
         """
-        Test if de.test_t_test() generates a uniform p-value distribution
+        Test if de.t_test() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
         of the two-side Kolmgorov-Smirnov test for equality of the observed
         p-value distriubution and a uniform distribution.
@@ -215,7 +215,7 @@ class TestSingle(unittest.TestCase):
             "condition": np.random.randint(2, size=sim.num_observations)
         })
 
-        test = de.test_t_test(
+        test = de.test.t_test(
             data=sim.X,
             grouping="condition",
             sample_description=random_sample_description
@@ -224,7 +224,7 @@ class TestSingle(unittest.TestCase):
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
-        print('KS-test pvalue for null model match of test_t_test(): %f' % pval_h0)
+        print('KS-test pvalue for null model match of t_test(): %f' % pval_h0)
 
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
 
@@ -232,7 +232,7 @@ class TestSingle(unittest.TestCase):
 
     def test_null_distribution_wilcoxon(self, n_cells: int = 1000, n_genes: int = 1000):
         """
-        Test if de.test_wilcoxon() generates a uniform p-value distribution
+        Test if de.wilcoxon() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
         of the two-side Kolmgorov-Smirnov test for equality of the observed 
         p-value distriubution and a uniform distribution.
@@ -249,7 +249,7 @@ class TestSingle(unittest.TestCase):
             "condition": np.random.randint(2, size=sim.num_observations)
         })
 
-        test = de.test_wilcoxon(
+        test = de.test.wilcoxon(
             data=sim.X,
             grouping="condition",
             sample_description=random_sample_description
@@ -259,7 +259,7 @@ class TestSingle(unittest.TestCase):
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
-        print('KS-test pvalue for null model match of test_wilcoxon(): %f' % pval_h0)
+        print('KS-test pvalue for null model match of wilcoxon(): %f' % pval_h0)
 
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
 

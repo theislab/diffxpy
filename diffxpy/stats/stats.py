@@ -36,7 +36,7 @@ def likelihood_ratio_test(
     return pvals
 
 
-def wilcoxon(
+def wilcoxon_test(
         x0: np.ndarray,
         x1: np.ndarray,
 ):
@@ -238,3 +238,28 @@ def two_coef_z_test(
     z_statistic = np.abs((theta_mle0 - theta_mle1) / np.sqrt(np.square(theta_sd0) + np.square(theta_sd1)))
     pvals = 2 * (1 - scipy.stats.norm(loc=0, scale=1).cdf(z_statistic))  # two-tailed test
     return pvals
+
+
+def hypergeom_test(
+    intersections: np.ndarray,
+    enquiry: int,
+    references: np.ndarray,
+    background: int
+    ) -> np.ndarray:
+    """ Run a hypergeometric test (gene set enrichment).
+
+    The scipy docs have a nice explanation of the hypergeometric ditribution and its parameters.
+    This function wraps scipy.stats.hypergeom() and can compare multiple reference (enquiry)
+    sets against one target set.
+
+    :param intersections: np.ndarray
+        Array with number of overlaps of reference sets with enquiry set.
+    :param enquiry: np.ndarray
+        Size of each enquiry set to be tested.
+    :param references: int
+        Array with size of reference sets.
+    :param background: int
+        Size of background set.
+    """
+    pvals = np.array([1-scipy.stats.hypergeom(M=background, n=references[i], N=enquiry).cdf(x-1) for i,x in enumerate(intersections)])
+    return(pvals)

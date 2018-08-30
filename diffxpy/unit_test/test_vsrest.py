@@ -5,7 +5,7 @@ import pandas as pd
 import scipy.stats as stats
 
 from batchglm.api.models.nb_glm import Simulator, Estimator, InputData
-import diffxpy as de
+import diffxpy.api as de
 
 
 class TestVsRest(unittest.TestCase):
@@ -30,7 +30,7 @@ class TestVsRest(unittest.TestCase):
             "condition": np.random.randint(n_groups, size=sim.num_observations)
         })
 
-        test = de.test_vsrest(
+        test = de.test.versus_rest(
             data=sim.X,
             grouping="condition",
             test="fast-wald",
@@ -71,7 +71,7 @@ class TestVsRest(unittest.TestCase):
             "condition": np.random.randint(n_groups, size=sim.num_observations)
         })
 
-        test = de.test_vsrest(
+        test = de.test.versus_rest(
             data=sim.X,
             grouping="condition",
             test="wald",
@@ -116,7 +116,7 @@ class TestVsRest(unittest.TestCase):
 
         sample_description = sim.sample_description
 
-        test = de.test_vsrest(
+        test = de.test.versus_rest(
             data=sim.X,
             grouping="condition",
             test="fast-wald",
@@ -153,7 +153,7 @@ class TestVsRest(unittest.TestCase):
             "condition": np.random.randint(2, size=sim.num_observations)
         })
 
-        test = de.test_vsrest(
+        test = de.test.versus_rest(
             data=sim.X,
             grouping="condition",
             test="lrt",
@@ -192,7 +192,7 @@ class TestVsRest(unittest.TestCase):
             "condition": np.random.randint(n_groups, size=sim.num_observations)
         })
 
-        test = de.test_vsrest(
+        test = de.test.versus_rest(
             data=sim.X,
             grouping="condition",
             test="wilcoxon",
@@ -228,7 +228,7 @@ class TestVsRest(unittest.TestCase):
             "condition": np.random.randint(n_groups, size=sim.num_observations)
         })
 
-        test = de.test_vsrest(
+        test = de.test.versus_rest(
             data=sim.X,
             grouping="condition",
             test="t-test",
