@@ -1275,7 +1275,7 @@ def t_test(
     """
     gene_ids = _parse_gene_names(data, gene_ids)
     X = _parse_data(data, gene_ids)
-    grouping = _parse_grouping(X, sample_description, grouping)
+    grouping = _parse_grouping(data, sample_description, grouping)
 
     de_test = DifferentialExpressionTestTT(
         data=X,
