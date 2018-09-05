@@ -123,6 +123,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     def __init__(self):
         self._pval = None
         self._qval = None
+        self._mean = None
 
     @property
     @abc.abstractmethod
@@ -157,6 +158,20 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
         """
         return correction.correct(pvals=self.pval, method=method)
+
+    def _ave(self):
+        """
+        Returns a xr.DataArray containing the mean expression by gene
+
+        :return: xr.DataArray
+        """
+        pass
+
+    @property
+    def mean(self):
+        if self._mean is None:
+            self._mean = self._ave()
+        return self._mean
 
     @property
     def pval(self):
@@ -226,7 +241,8 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
             "gene": self.gene_ids,
             "pval": self.pval,
             "qval": self.qval,
-            "log2fc": self.log2_fold_change()
+            "log2fc": self.log2_fold_change(),
+            "mean": self.mean
         })
 
         return res
@@ -283,6 +299,15 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
             df_full=self.full_estim.design_loc.shape[-1] + self.full_estim.design_scale.shape[-1],
             df_reduced=self.reduced_estim.design_loc.shape[-1] + self.reduced_estim.design_scale.shape[-1],
         )
+
+    def _ave(self):
+        """
+        Returns a xr.DataArray containing the mean expression by gene
+
+        :return: xr.DataArray
+        """
+
+        return np.mean(self.full_estim.X, axis=0)
 
     def _log_fold_change(self, factors: Union[Dict, Tuple, Set, List], base=np.e):
         """
@@ -471,6 +496,15 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     def model_gradient(self):
         return self.model_estim.gradient
 
+    def _ave(self):
+        """
+        Returns a xr.DataArray containing the mean expression by gene
+
+        :return: xr.DataArray
+        """
+
+        return np.mean(self.model_estim.X, axis=0)
+
     def log_fold_change(self, base=np.e, **kwargs):
         """
         Returns one fold change per gene
@@ -552,7 +586,8 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         x0, x1 = _split_X(data, grouping)
 
         # Only compute p-values for genes with non-zero observations and non-zero group-wise variance.
-        self._ave_geq_zero = np.asarray(np.mean(data, axis=0)).flatten() > 0
+        self._mean = np.mean(data, axis=0)
+        self._ave_geq_zero = np.asarray(self.mean).flatten() > 0
         self._var_geq_zero = np.logical_or(
             np.asarray(np.var(x0, axis=0)).flatten() > 0,
             np.asarray(np.var(x1, axis=0)).flatten() > 0
@@ -606,6 +641,7 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
 
         x0, x1 = _split_X(data, grouping)
 
+        self._mean = np.mean(data, axis=0)
         self._pval = stats.wilcoxon_test(x0=x0.data, x1=x1.data)
         self._logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
         q = self.qval
@@ -694,6 +730,7 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
             - pval: the minimum per-gene p-value of all tests
             - qval: the minimum per-gene q-value of all tests
             - log2fc: the maximal/minimal (depending on which one is higher) log2 fold change of the genes
+            - mean: the mean expression of the gene across all groups
         """
         assert self.gene_ids is not None
 
@@ -714,7 +751,46 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
             # return minimal qval by gene:
             "qval": np.min(self.qval.reshape(-1, self.qval.shape[-1]), axis=0),
             # return maximal logFC by gene:
-            "log2fc": np.asarray(logfc)
+            "log2fc": np.asarray(logfc),
+            # return mean expression across all groups by gene:
+            "mean": np.asarray(self.mean)
+        })
+
+        return res
+
+    def summary_pair(self, group1, group2, **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+
+        :return: pandas.DataFrame with the following columns:
+
+            - gene: the gene id's
+            - pval: the minimum per-gene p-value of all tests
+            - qval: the minimum per-gene q-value of all tests
+            - log2fc: the maximal/minimal (depending on which one is higher) log2 fold change of the genes
+        """
+        assert self.gene_ids is not None
+
+        # calculate maximum logFC of lower triangular fold change matrix
+        raw_logfc = self.log2_fold_change()
+
+        # first flatten all dimensions up to the last 'gene' dimension
+        flat_logfc = raw_logfc.reshape(-1, raw_logfc.shape[-1])
+        # next, get argmax of flattened logfc and unravel the true indices from it
+        r, c = np.unravel_index(flat_logfc.argmax(0), raw_logfc.shape[:2])
+        # if logfc is maximal in the lower triangular matrix, multiply it with -1
+        logfc = raw_logfc[r, c, np.arange(raw_logfc.shape[-1])] * np.where(r <= c, 1, -1)
+
+        res = pd.DataFrame({
+            "gene": self.gene_ids,
+            # return minimal pval by gene:
+            "pval": np.min(self.pval.reshape(-1, self.pval.shape[-1]), axis=0),
+            # return minimal qval by gene:
+            "qval": np.min(self.qval.reshape(-1, self.qval.shape[-1]), axis=0),
+            # return maximal logFC by gene:
+            "log2fc": np.asarray(logfc),
+            # return mean expression across all groups by gene:
+            "mean": np.asarray(self.mean)
         })
 
         return res
@@ -725,11 +801,12 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
     Pairwise unit_test between more than 2 groups per gene.
     """
 
-    def __init__(self, gene_ids, pval, logfc, tests, correction_type: str):
+    def __init__(self, gene_ids, pval, logfc, ave, tests, correction_type: str):
         super().__init__(correction_type=correction_type)
         self._gene_ids = np.asarray(gene_ids)
         self._logfc = logfc
         self._pval = pval
+        self._mean = ave
         self._tests = tests
 
         q = self.qval
@@ -814,6 +891,15 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
     def model_gradient(self):
         return self.model_estim.gradient
 
+    def _ave(self):
+        """
+        Returns a xr.DataArray containing the mean expression by gene
+
+        :return: xr.DataArray
+        """
+
+        return np.mean(self.model_estim.X, axis=0)
+
     def log_fold_change(self, base=np.e, **kwargs):
         """
         Returns matrix of fold changes per gene
@@ -847,11 +933,12 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
     Tests between between each group and the rest for more than 2 groups per gene.
     """
 
-    def __init__(self, gene_ids, pval, logfc, tests, correction_type: str):
+    def __init__(self, gene_ids, pval, logfc, ave, tests, correction_type: str):
         super().__init__(correction_type=correction_type)
         self._gene_ids = np.asarray(gene_ids)
         self._pval = pval
         self._logfc = logfc
+        self._mean = ave
         self._tests = tests
 
         q = self.qval
@@ -1644,6 +1731,7 @@ def pairwise(
         de_test = DifferentialExpressionTestPairwise(gene_ids=gene_names,
                                                      pval=pvals,
                                                      logfc=logfc,
+                                                     ave=np.mean(X, axis=0),
                                                      tests=tests,
                                                      correction_type=pval_correction)
 
