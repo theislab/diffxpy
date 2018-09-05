@@ -758,57 +758,21 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
 
         return res
 
-    def summary_pair(self, group1, group2, **kwargs) -> pd.DataFrame:
-        """
-        Summarize differential expression results into an output table.
-
-        :return: pandas.DataFrame with the following columns:
-
-            - gene: the gene id's
-            - pval: the minimum per-gene p-value of all tests
-            - qval: the minimum per-gene q-value of all tests
-            - log2fc: the maximal/minimal (depending on which one is higher) log2 fold change of the genes
-        """
-        assert self.gene_ids is not None
-
-        # calculate maximum logFC of lower triangular fold change matrix
-        raw_logfc = self.log2_fold_change()
-
-        # first flatten all dimensions up to the last 'gene' dimension
-        flat_logfc = raw_logfc.reshape(-1, raw_logfc.shape[-1])
-        # next, get argmax of flattened logfc and unravel the true indices from it
-        r, c = np.unravel_index(flat_logfc.argmax(0), raw_logfc.shape[:2])
-        # if logfc is maximal in the lower triangular matrix, multiply it with -1
-        logfc = raw_logfc[r, c, np.arange(raw_logfc.shape[-1])] * np.where(r <= c, 1, -1)
-
-        res = pd.DataFrame({
-            "gene": self.gene_ids,
-            # return minimal pval by gene:
-            "pval": np.min(self.pval.reshape(-1, self.pval.shape[-1]), axis=0),
-            # return minimal qval by gene:
-            "qval": np.min(self.qval.reshape(-1, self.qval.shape[-1]), axis=0),
-            # return maximal logFC by gene:
-            "log2fc": np.asarray(logfc),
-            # return mean expression across all groups by gene:
-            "mean": np.asarray(self.mean)
-        })
-
-        return res
-
 
 class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
     """
     Pairwise unit_test between more than 2 groups per gene.
     """
 
-    def __init__(self, gene_ids, pval, logfc, ave, tests, correction_type: str):
+    def __init__(self, gene_ids, pval, logfc, ave, groups, tests, correction_type: str):
         super().__init__(correction_type=correction_type)
         self._gene_ids = np.asarray(gene_ids)
         self._logfc = logfc
         self._pval = pval
         self._mean = ave
+        self.groups = list(np.asarray(groups))
         self._tests = tests
-
+        
         q = self.qval
 
     @property
@@ -834,6 +798,54 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         else:
             return self._logfc / np.log(base)
 
+    def _check_groups(self, group1, group2):
+        if group1 not in self.groups:
+            raise ValueError('group1 not recognized')
+        if group2 not in self.groups:
+            raise ValueError('group2 not recognized')
+
+    def pval_pair(self, group1, group2):
+        assert self._pval is not None
+
+        self._check_groups(group1, group2)
+        return self._pval[self.groups.index(group1),self.groups.index(group2),:]
+
+    def qval_pair(self, group1, group2):
+        assert self._qval is not None
+
+        self._check_groups(group1, group2)
+        return self._qval[self.groups.index(group1),self.groups.index(group2),:]
+
+    def log_fold_change_pair(self, group1, group2, base=np.e):
+        assert self._logfc is not None
+
+        self._check_groups(group1, group2)
+        return self.log_fold_change(base=base)[self.groups.index(group1),self.groups.index(group2),:]
+
+    def summary_pair(self, group1, group2, **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+
+        :return: pandas.DataFrame with the following columns:
+
+            - gene: the gene id's
+            - pval: the per-gene p-value of the selected test
+            - qval: the per-gene q-value of the selected test
+            - log2fc: the per-gene log2 fold change of the selected test
+            - mean: the mean expression of the gene across all groups
+        """
+        assert self.gene_ids is not None
+
+        res = pd.DataFrame({
+            "gene": self.gene_ids,
+            "pval": self.pval_pair(group1=group1, group2=group2),
+            "qval": self.qval_pair(group1=group1, group2=group2),
+            "log2fc": self.log_fold_change_pair(group1=group1, group2=group2, base=2),
+            "mean": np.asarray(self.mean)
+        })
+
+        return res
+
 
 class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
     """
@@ -844,10 +856,11 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
     theta_mle: np.ndarray
     theta_sd: np.ndarray
 
-    def __init__(self, model_estim: _Estimation, grouping, correction_type: str):
+    def __init__(self, model_estim: _Estimation, grouping, groups, correction_type: str):
         super().__init__(correction_type=correction_type)
         self.model_estim = model_estim
         self.grouping = grouping
+        self.groups = list(np.asarray(groups))
 
         # values of parameter estimates: coefficients x genes array with one coefficient per group
         self._theta_mle = model_estim.par_link_loc
@@ -856,11 +869,12 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         self._theta_sd = np.sqrt(np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1)).T
         self._logfc = None
 
+        # Call tests in constructor.
         p = self.pval
         q = self.qval
 
     def _test(self, **kwargs):
-        groups = np.unique(self.grouping)
+        groups = self.groups
         num_features = self.model_estim.X.shape[1]
 
         pvals = np.tile(np.NaN, [len(groups), len(groups), num_features])
@@ -905,7 +919,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         Returns matrix of fold changes per gene
         """
         if self._logfc is None:
-            groups = np.unique(self.grouping)
+            groups = self.groups
             num_features = self.model_estim.X.shape[1]
 
             logfc = np.tile(np.NaN, [len(groups), len(groups), num_features])
@@ -927,18 +941,61 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         else:
             return self._logfc / np.log(base)
 
+    def _check_groups(self, group1, group2):
+        if group1 not in self.groups:
+            raise ValueError('group1 not recognized')
+        if group2 not in self.groups:
+            raise ValueError('group2 not recognized')
+
+    def pval_pair(self, group1, group2):
+        self._check_groups(group1, group2)
+        return self.pval[self.groups.index(group1),self.groups.index(group2),:]
+
+    def qval_pair(self, group1, group2):
+        self._check_groups(group1, group2)
+        return self.qval[self.groups.index(group1),self.groups.index(group2),:]
+
+    def log_fold_change_pair(self, group1, group2, base=np.e):
+        self._check_groups(group1, group2)
+        return self.log_fold_change(base=base)[self.groups.index(group1),self.groups.index(group2),:]
+
+    def summary_pair(self, group1, group2, **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+
+        :return: pandas.DataFrame with the following columns:
+
+            - gene: the gene id's
+            - pval: the per-gene p-value of the selected test
+            - qval: the per-gene q-value of the selected test
+            - log2fc: the per-gene log2 fold change of the selected test
+            - mean: the mean expression of the gene across all groups
+        """
+        assert self.gene_ids is not None
+
+        res = pd.DataFrame({
+            "gene": self.gene_ids,
+            "pval": self.pval_pair(group1=group1, group2=group2),
+            "qval": self.qval_pair(group1=group1, group2=group2),
+            "log2fc": self.log_fold_change_pair(group1=group1, group2=group2, base=2),
+            "mean": np.asarray(self.mean)
+        })
+
+        return res
+
 
 class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
     """
     Tests between between each group and the rest for more than 2 groups per gene.
     """
 
-    def __init__(self, gene_ids, pval, logfc, ave, tests, correction_type: str):
+    def __init__(self, gene_ids, pval, logfc, ave, groups, tests, correction_type: str):
         super().__init__(correction_type=correction_type)
         self._gene_ids = np.asarray(gene_ids)
         self._pval = pval
         self._logfc = logfc
         self._mean = ave
+        self._groups = list(np.asarray(groups))
         self._tests = tests
 
         q = self.qval
@@ -962,6 +1019,46 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
             return self._logfc
         else:
             return self._logfc / np.log(base)
+
+    def _check_group(self, group):
+        if group not in self.groups:
+            raise ValueError('group not recognized')
+
+    def pval_group(self, group):
+        self._check_group(group)
+        return self.pval[self.groups.index(group),:]
+
+    def qval_group(self, group):
+        self._check_group(group)
+        return self.qval[self.groups.index(group),:]
+
+    def log_fold_change_group(self, group, base=np.e):
+        self._check_groups(group)
+        return self.log_fold_change(base=base)[self.groups.index(group),:]
+
+    def summary_group(self, group, **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+
+        :return: pandas.DataFrame with the following columns:
+
+            - gene: the gene id's
+            - pval: the per-gene p-value of the selected test
+            - qval: the per-gene q-value of the selected test
+            - log2fc: the per-gene log2 fold change of the selected test
+            - mean: the mean expression of the gene across all groups
+        """
+        assert self.gene_ids is not None
+
+        res = pd.DataFrame({
+            "gene": self.gene_ids,
+            "pval": self.pval_group(group=group),
+            "qval": self.qval_group(group=group),
+            "log2fc": self.log_fold_change_group(group=group, base=2),
+            "mean": np.asarray(self.mean)
+        })
+
+        return res
 
 
 def _parse_gene_names(data, gene_names):
@@ -1690,6 +1787,7 @@ def pairwise(
         de_test = DifferentialExpressionTestZTest(
             model_estim=model,
             grouping=grouping,
+            groups=np.unique(grouping),
             correction_type=pval_correction
         )
     else:
@@ -1732,6 +1830,7 @@ def pairwise(
                                                      pval=pvals,
                                                      logfc=logfc,
                                                      ave=np.mean(X, axis=0),
+                                                     groups=groups,
                                                      tests=tests,
                                                      correction_type=pval_correction)
 
@@ -1870,6 +1969,7 @@ def versus_rest(
     de_test = DifferentialExpressionTestVsRest(gene_ids=gene_names,
                                                pval=pvals,
                                                logfc=logfc,
+                                               groups=groups,
                                                tests=tests,
                                                correction_type=pval_correction)
 
