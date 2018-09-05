@@ -16,6 +16,9 @@ Diffxpy supports workflows related to differential expression analysis. The func
 
 The aforementioned workflows can be concatenated in pipelines and results can be shared via diffxpy data structures as explained in the individual functions and in the examples.
 
+# Multiple tests per gene
+diffxpy provides infrastructure to perform multiple tests per gene as pairwise comparisons across more than two groups (`de.test.pairwise`, e.g. clusters of cells against each other), tests of each group against the rest (`de.test.versus_test`, e.g. clusters of cells against the rest) and by mapping a given differential test across each partition of a data set (`de.test.partition`, e.g. performing differential tests for treatment effects by a second experimental covariate or by cluster of cells).
+
 # Examples
 We provide usage example cases (vignettes) in the `examples/` directory. The diffxpy API distinguishes two cases: Single-tests and Mult-tests. Single-test wrappers perform a single tests per gene, such as a difference between two groups via a Wald test, a log-likelihood ratio test, a t-test or a Wilcoxon rank sum test or a log-likelihood ratio test for a more complex question. A multi-test wrapper performs multiple tests per gene: pairwise or 1-versus-rest tests. Both are a series of two-sample tests for each gene which can for example be used to explore the differences between louvain groups on the level of each gene. Pairwise tests perform one test for the difference between each pair of groups of cells for each gene (which can be significantly sped up if the test mode 'z-test' is used). 1-versus-rest tests test for the difference between each group and the other groups together for each gene. Examples for additional workflows like gene set enrichment analysis are also provided.
 
