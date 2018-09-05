@@ -1710,7 +1710,7 @@ def two_sample(
     elif test.lower() == 't-test' or test.lower() == "t_test" or test.lower() == "ttest":
         de_test = t_test(
             data=X,
-            gene_ids=gene_names,
+            gene_names=gene_names,
             grouping=grouping,
         )
     elif test.lower() == 'wilcoxon':
