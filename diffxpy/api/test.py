@@ -5,3 +5,4 @@ from ..testing.base import t_test
 from ..testing.base import versus_rest
 from ..testing.base import wald
 from ..testing.base import wilcoxon
+from ..testing.base import partition

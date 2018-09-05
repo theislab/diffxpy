@@ -123,6 +123,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     def __init__(self):
         self._pval = None
         self._qval = None
+        self._mean = None
 
     @property
     @abc.abstractmethod
@@ -157,6 +158,20 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
         """
         return correction.correct(pvals=self.pval, method=method)
+
+    def _ave(self):
+        """
+        Returns a xr.DataArray containing the mean expression by gene
+
+        :return: xr.DataArray
+        """
+        pass
+
+    @property
+    def mean(self):
+        if self._mean is None:
+            self._mean = self._ave()
+        return self._mean
 
     @property
     def pval(self):
@@ -226,7 +241,8 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
             "gene": self.gene_ids,
             "pval": self.pval,
             "qval": self.qval,
-            "log2fc": self.log2_fold_change()
+            "log2fc": self.log2_fold_change(),
+            "mean": self.mean
         })
 
         return res
@@ -283,6 +299,15 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
             df_full=self.full_estim.design_loc.shape[-1] + self.full_estim.design_scale.shape[-1],
             df_reduced=self.reduced_estim.design_loc.shape[-1] + self.reduced_estim.design_scale.shape[-1],
         )
+
+    def _ave(self):
+        """
+        Returns a xr.DataArray containing the mean expression by gene
+
+        :return: xr.DataArray
+        """
+
+        return np.mean(self.full_estim.X, axis=0)
 
     def _log_fold_change(self, factors: Union[Dict, Tuple, Set, List], base=np.e):
         """
@@ -471,6 +496,15 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     def model_gradient(self):
         return self.model_estim.gradient
 
+    def _ave(self):
+        """
+        Returns a xr.DataArray containing the mean expression by gene
+
+        :return: xr.DataArray
+        """
+
+        return np.mean(self.model_estim.X, axis=0)
+
     def log_fold_change(self, base=np.e, **kwargs):
         """
         Returns one fold change per gene
@@ -552,7 +586,8 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         x0, x1 = _split_X(data, grouping)
 
         # Only compute p-values for genes with non-zero observations and non-zero group-wise variance.
-        self._ave_geq_zero = np.asarray(np.mean(data, axis=0)).flatten() > 0
+        self._mean = np.mean(data, axis=0)
+        self._ave_geq_zero = np.asarray(self.mean).flatten() > 0
         self._var_geq_zero = np.logical_or(
             np.asarray(np.var(x0, axis=0)).flatten() > 0,
             np.asarray(np.var(x1, axis=0)).flatten() > 0
@@ -606,6 +641,7 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
 
         x0, x1 = _split_X(data, grouping)
 
+        self._mean = np.mean(data, axis=0)
         self._pval = stats.wilcoxon_test(x0=x0.data, x1=x1.data)
         self._logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
         q = self.qval
@@ -694,6 +730,7 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
             - pval: the minimum per-gene p-value of all tests
             - qval: the minimum per-gene q-value of all tests
             - log2fc: the maximal/minimal (depending on which one is higher) log2 fold change of the genes
+            - mean: the mean expression of the gene across all groups
         """
         assert self.gene_ids is not None
 
@@ -714,7 +751,9 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
             # return minimal qval by gene:
             "qval": np.min(self.qval.reshape(-1, self.qval.shape[-1]), axis=0),
             # return maximal logFC by gene:
-            "log2fc": np.asarray(logfc)
+            "log2fc": np.asarray(logfc),
+            # return mean expression across all groups by gene:
+            "mean": np.asarray(self.mean)
         })
 
         return res
@@ -725,13 +764,15 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
     Pairwise unit_test between more than 2 groups per gene.
     """
 
-    def __init__(self, gene_ids, pval, logfc, tests, correction_type: str):
+    def __init__(self, gene_ids, pval, logfc, ave, groups, tests, correction_type: str):
         super().__init__(correction_type=correction_type)
         self._gene_ids = np.asarray(gene_ids)
         self._logfc = logfc
         self._pval = pval
+        self._mean = ave
+        self.groups = list(np.asarray(groups))
         self._tests = tests
-
+        
         q = self.qval
 
     @property
@@ -757,6 +798,54 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         else:
             return self._logfc / np.log(base)
 
+    def _check_groups(self, group1, group2):
+        if group1 not in self.groups:
+            raise ValueError('group1 not recognized')
+        if group2 not in self.groups:
+            raise ValueError('group2 not recognized')
+
+    def pval_pair(self, group1, group2):
+        assert self._pval is not None
+
+        self._check_groups(group1, group2)
+        return self._pval[self.groups.index(group1),self.groups.index(group2),:]
+
+    def qval_pair(self, group1, group2):
+        assert self._qval is not None
+
+        self._check_groups(group1, group2)
+        return self._qval[self.groups.index(group1),self.groups.index(group2),:]
+
+    def log_fold_change_pair(self, group1, group2, base=np.e):
+        assert self._logfc is not None
+
+        self._check_groups(group1, group2)
+        return self.log_fold_change(base=base)[self.groups.index(group1),self.groups.index(group2),:]
+
+    def summary_pair(self, group1, group2, **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+
+        :return: pandas.DataFrame with the following columns:
+
+            - gene: the gene id's
+            - pval: the per-gene p-value of the selected test
+            - qval: the per-gene q-value of the selected test
+            - log2fc: the per-gene log2 fold change of the selected test
+            - mean: the mean expression of the gene across all groups
+        """
+        assert self.gene_ids is not None
+
+        res = pd.DataFrame({
+            "gene": self.gene_ids,
+            "pval": self.pval_pair(group1=group1, group2=group2),
+            "qval": self.qval_pair(group1=group1, group2=group2),
+            "log2fc": self.log_fold_change_pair(group1=group1, group2=group2, base=2),
+            "mean": np.asarray(self.mean)
+        })
+
+        return res
+
 
 class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
     """
@@ -767,10 +856,11 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
     theta_mle: np.ndarray
     theta_sd: np.ndarray
 
-    def __init__(self, model_estim: _Estimation, grouping, correction_type: str):
+    def __init__(self, model_estim: _Estimation, grouping, groups, correction_type: str):
         super().__init__(correction_type=correction_type)
         self.model_estim = model_estim
         self.grouping = grouping
+        self.groups = list(np.asarray(groups))
 
         # values of parameter estimates: coefficients x genes array with one coefficient per group
         self._theta_mle = model_estim.par_link_loc
@@ -779,11 +869,12 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         self._theta_sd = np.sqrt(np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1)).T
         self._logfc = None
 
+        # Call tests in constructor.
         p = self.pval
         q = self.qval
 
     def _test(self, **kwargs):
-        groups = np.unique(self.grouping)
+        groups = self.groups
         num_features = self.model_estim.X.shape[1]
 
         pvals = np.tile(np.NaN, [len(groups), len(groups), num_features])
@@ -814,12 +905,21 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
     def model_gradient(self):
         return self.model_estim.gradient
 
+    def _ave(self):
+        """
+        Returns a xr.DataArray containing the mean expression by gene
+
+        :return: xr.DataArray
+        """
+
+        return np.mean(self.model_estim.X, axis=0)
+
     def log_fold_change(self, base=np.e, **kwargs):
         """
         Returns matrix of fold changes per gene
         """
         if self._logfc is None:
-            groups = np.unique(self.grouping)
+            groups = self.groups
             num_features = self.model_estim.X.shape[1]
 
             logfc = np.tile(np.NaN, [len(groups), len(groups), num_features])
@@ -841,17 +941,61 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         else:
             return self._logfc / np.log(base)
 
+    def _check_groups(self, group1, group2):
+        if group1 not in self.groups:
+            raise ValueError('group1 not recognized')
+        if group2 not in self.groups:
+            raise ValueError('group2 not recognized')
+
+    def pval_pair(self, group1, group2):
+        self._check_groups(group1, group2)
+        return self.pval[self.groups.index(group1),self.groups.index(group2),:]
+
+    def qval_pair(self, group1, group2):
+        self._check_groups(group1, group2)
+        return self.qval[self.groups.index(group1),self.groups.index(group2),:]
+
+    def log_fold_change_pair(self, group1, group2, base=np.e):
+        self._check_groups(group1, group2)
+        return self.log_fold_change(base=base)[self.groups.index(group1),self.groups.index(group2),:]
+
+    def summary_pair(self, group1, group2, **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+
+        :return: pandas.DataFrame with the following columns:
+
+            - gene: the gene id's
+            - pval: the per-gene p-value of the selected test
+            - qval: the per-gene q-value of the selected test
+            - log2fc: the per-gene log2 fold change of the selected test
+            - mean: the mean expression of the gene across all groups
+        """
+        assert self.gene_ids is not None
+
+        res = pd.DataFrame({
+            "gene": self.gene_ids,
+            "pval": self.pval_pair(group1=group1, group2=group2),
+            "qval": self.qval_pair(group1=group1, group2=group2),
+            "log2fc": self.log_fold_change_pair(group1=group1, group2=group2, base=2),
+            "mean": np.asarray(self.mean)
+        })
+
+        return res
+
 
 class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
     """
     Tests between between each group and the rest for more than 2 groups per gene.
     """
 
-    def __init__(self, gene_ids, pval, logfc, tests, correction_type: str):
+    def __init__(self, gene_ids, pval, logfc, ave, groups, tests, correction_type: str):
         super().__init__(correction_type=correction_type)
         self._gene_ids = np.asarray(gene_ids)
         self._pval = pval
         self._logfc = logfc
+        self._mean = ave
+        self.groups = list(np.asarray(groups))
         self._tests = tests
 
         q = self.qval
@@ -875,6 +1019,92 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
             return self._logfc
         else:
             return self._logfc / np.log(base)
+
+    def _check_group(self, group):
+        if group not in self.groups:
+            raise ValueError('group not recognized')
+
+    def pval_group(self, group):
+        self._check_group(group)
+        return self.pval[0,self.groups.index(group),:]
+
+    def qval_group(self, group):
+        self._check_group(group)
+        return self.qval[0,self.groups.index(group),:]
+
+    def log_fold_change_group(self, group, base=np.e):
+        self._check_group(group)
+        return self.log_fold_change(base=base)[0,self.groups.index(group),:]
+
+    def summary_group(self, group, **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+
+        :return: pandas.DataFrame with the following columns:
+
+            - gene: the gene id's
+            - pval: the per-gene p-value of the selected test
+            - qval: the per-gene q-value of the selected test
+            - log2fc: the per-gene log2 fold change of the selected test
+            - mean: the mean expression of the gene across all groups
+        """
+        assert self.gene_ids is not None
+
+        res = pd.DataFrame({
+            "gene": self.gene_ids,
+            "pval": self.pval_group(group=group),
+            "qval": self.qval_group(group=group),
+            "log2fc": self.log_fold_change_group(group=group, base=2),
+            "mean": np.asarray(self.mean)
+        })
+
+        return res
+
+class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
+    """
+    Stores a particular test performed within each partition of the data set.
+    """
+
+    def __init__(self, partitions, tests, ave, correction_type: str = "by_test"):
+        super().__init__(correction_type=correction_type)
+        self.partitions = list(np.asarray(partitions))
+        self._tests = tests
+        self._gene_ids = tests[0].gene_ids
+        self._pval = np.expand_dims(np.vstack([x.pval for x in tests]), axis=0)
+        self._logfc = np.expand_dims(np.vstack([x.log_fold_change() for x in tests]), axis=0)
+        self._mean = ave
+
+        q = self.qval
+
+    @property
+    def gene_ids(self) -> np.ndarray:
+        return self._gene_ids
+
+    def log_fold_change(self, base=np.e, **kwargs):
+        if base == np.e:
+            return self._logfc
+        else:
+            return self._logfc / np.log(base)
+
+    def _check_partition(self, partition):
+        if partition not in self.partitions:
+            raise ValueError('partition not recognized')
+
+    @property
+    def tests(self, partition=None):
+        """
+        If `keep_full_test_objs` was set to `True`, this will return a matrix of differential expression tests.
+
+        :param partition: The partition for which to return the test. Returns full list if None.
+        """
+        if self._tests is None:
+            raise ValueError("Individual tests were not kept!")
+
+        if partition is None:
+            return self._tests
+        else:
+            self._check_partition(partition)
+            return self._tests[self.partitions.index(partition)]
 
 
 def _parse_gene_names(data, gene_names):
@@ -1279,7 +1509,7 @@ def _split_X(data, grouping):
 def t_test(
         data,
         grouping,
-        gene_ids=None,
+        gene_names=None,
         sample_description=None
 ):
     """
@@ -1294,14 +1524,14 @@ def t_test(
     :param gene_ids: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
-    gene_ids = _parse_gene_names(data, gene_ids)
-    X = _parse_data(data, gene_ids)
-    grouping = _parse_grouping(X, sample_description, grouping)
+    gene_ids = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
+    grouping = _parse_grouping(data, sample_description, grouping)
 
     de_test = DifferentialExpressionTestTT(
         data=X,
         grouping=grouping,
-        gene_ids=gene_ids,
+        gene_ids=gene_names,
     )
 
     return de_test
@@ -1635,6 +1865,7 @@ def pairwise(
         de_test = DifferentialExpressionTestZTest(
             model_estim=model,
             grouping=grouping,
+            groups=np.unique(grouping),
             correction_type=pval_correction
         )
     else:
@@ -1677,6 +1908,8 @@ def pairwise(
         de_test = DifferentialExpressionTestPairwise(gene_ids=gene_names,
                                                      pval=pvals,
                                                      logfc=logfc,
+                                                     ave=np.mean(X, axis=0),
+                                                     groups=groups,
                                                      tests=tests,
                                                      correction_type=pval_correction)
 
@@ -1820,7 +2053,339 @@ def versus_rest(
     de_test = DifferentialExpressionTestVsRest(gene_ids=gene_names,
                                                pval=pvals,
                                                logfc=logfc,
+                                               ave=np.mean(X, axis=0),
+                                               groups=groups,
                                                tests=tests,
                                                correction_type=pval_correction)
 
     return de_test
+
+def partition(
+    data,
+    partition: Union[str, np.ndarray, list],
+    gene_names: str = None,
+    sample_description: pd.DataFrame = None):
+    """
+    Perform differential expression test for each group. This class handles 
+    the partitioning of the data set, the differential test callls and
+    the sumamry of the individual tests into one 
+    DifferentialExpressionTestMulti object. All functions the yield
+    DifferentialExpressionTestSingle objects can be performed on each 
+    partition.
+
+    Wraps _Partition so that doc strings are nice.
+
+    :param data: input data
+    :param grouping: str, array
+    
+        - column in data.obs/sample_description which contains the split of observations into the two groups.
+        - array of length `num_observations` containing group labels
+    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param sample_description: optional pandas.DataFrame containing sample annotations
+    """
+    return(_Partition(
+        data=data,
+        partition=partition,
+        gene_names=gene_names,
+        sample_description=sample_description))
+
+class _Partition():
+    """
+    Perform differential expression test for each group. This class handles 
+    the partitioning of the data set, the differential test callls and
+    the sumamry of the individual tests into one 
+    DifferentialExpressionTestMulti object. All functions the yield
+    DifferentialExpressionTestSingle objects can be performed on each 
+    partition.
+    """
+
+    def __init__(
+        self,
+        data,
+        partition: Union[str, np.ndarray, list],
+        gene_names: str = None,
+        sample_description: pd.DataFrame = None):
+        """
+        :param data: input data
+        :param partition: str, array
+        
+            - column in data.obs/sample_description which contains the split of observations into the two groups.
+            - array of length `num_observations` containing group labels
+        :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+        :param sample_description: optional pandas.DataFrame containing sample annotations
+        """
+        self.X = _parse_data(data, gene_names)
+        self.gene_names = _parse_gene_names(data, gene_names)
+        self.sample_description = _parse_sample_description(data, sample_description)
+        self.partition = _parse_grouping(data, sample_description, partition)
+        self.partitions = np.unique(self.partition)
+        self.partition_idx = [np.where(self.partition==x)[0] for x in self.partitions]    
+
+    def two_sample(
+        self,
+        grouping: Union[str],
+        test=None,
+        noise_model: str = None,
+        batch_size: int = None,
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        **kwargs
+    ) -> _DifferentialExpressionTestSingle:
+        """
+        See annotation of de.test.two_sample()
+            
+        :param grouping: str
+        
+            - column in data.obs/sample_description which contains the split of observations into the two groups.
+        :param test: str, statistical test to use. Possible options:
+        
+            - 'wald': default
+            - 'lrt'
+            - 't-test'
+            - 'wilcoxon'
+        :param noise_model: str, noise model to use in model-based unit_test. Possible options:
+            
+            - 'nb': default
+        :param batch_size: the batch size to use for the estimator
+        :param training_strategy: {str, function, list} training strategy to use. Can be:
+
+            - str: will use Estimator.TrainingStrategy[training_strategy] to train
+            - function: Can be used to implement custom training function will be called as
+              `training_strategy(estimator)`.
+            - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
+              method arguments.
+              
+              Example:
+              
+              .. code-block:: python
+              
+                  [
+                    {"learning_rate": 0.5, },
+                    {"learning_rate": 0.05, },
+                  ]
+
+              This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+        :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
+        """
+        DETestsSingle = []
+        for i,idx in enumerate(self.partition_idx):
+            DETestsSingle.append(two_sample(
+                data=self.X[idx,:],
+                grouping=grouping,
+                test=test,
+                gene_names=self.gene_names,
+                sample_description=self.sample_description.iloc[idx,:],
+                noise_model = noise_model,
+                batch_size = batch_size,
+                training_strategy=training_strategy,
+                **kwargs
+            ))
+        return DifferentialExpressionTestByPartition(
+            partitions=self.partitions, 
+            tests=DETestsSingle, 
+            ave=np.mean(self.X, axis=0),
+            correction_type="by_test")
+
+    def t_test(
+        self,
+        grouping: Union[str]
+    ):
+        """
+        See annotation of de.test.t_test()
+        
+        :param grouping: str
+        
+            - column in data.obs/sample_description which contains the split of observations into the two groups.
+        """
+        DETestsSingle = []
+        for i,idx in enumerate(self.partition_idx):
+            DETestsSingle.append(t_test(
+                data=self.X[idx,:],
+                grouping=grouping,
+                gene_names=self.gene_names,
+                sample_description=self.sample_description.iloc[idx,:]
+            ))
+        return DifferentialExpressionTestByPartition(
+            partitions=self.partitions, 
+            tests=DETestsSingle, 
+            ave=np.mean(self.X, axis=0),
+            correction_type="by_test")
+
+    def wilcoxon(
+        self,
+        grouping: Union[str],
+    ):
+        """
+        See annotation of de.test.wilcoxon()
+        
+        :param grouping: str, array
+        
+            - column in data.obs/sample_description which contains the split of observations into the two groups.
+            - array of length `num_observations` containing group labels
+        """
+        DETestsSingle = []
+        for i,idx in enumerate(self.partition_idx):
+            DETestsSingle.append(wilcoxon(
+                data=self.X[idx,:],
+                grouping=grouping,
+                gene_names=self.gene_names,
+                sample_description=self.sample_description.iloc[idx,:]
+            ))
+        return DifferentialExpressionTestByPartition(
+            partitions=self.partitions, 
+            tests=DETestsSingle, 
+            ave=np.mean(self.X, axis=0),
+            correction_type="by_test")
+
+    def lrt(
+        self,
+        reduced_formula: str = None,
+        full_formula: str = None,
+        reduced_formula_loc: str = None,
+        full_formula_loc: str = None,
+        reduced_formula_scale: str = None,
+        full_formula_scale: str = None,
+        noise_model="nb",
+        batch_size: int = None,
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        **kwargs
+    ):
+        """
+        See annotation of de.test.lrt()
+            
+        :param reduced_formula: formula
+            Reduced model formula for location and scale parameter models.
+        :param full_formula: formula
+            Full model formula for location and scale parameter models.
+        :param reduced_formula_loc: formula
+            Reduced model formula for location and scale parameter models.
+            If not specified, `reduced_formula` will be used instead.
+        :param full_formula_loc: formula
+            Full model formula for location parameter model.
+            If not specified, `full_formula` will be used instead.
+        :param reduced_formula_scale: formula
+            Reduced model formula for scale parameter model.
+            If not specified, `reduced_formula` will be used instead.
+        :param full_formula_scale: formula
+            Full model formula for scale parameter model.
+            If not specified, `reduced_formula_scale` will be used instead.
+        :param noise_model: str, noise model to use in model-based unit_test. Possible options:
+            
+            - 'nb': default
+        :param batch_size: the batch size to use for the estimator
+        :param training_strategy: {str, function, list} training strategy to use. Can be:
+
+            - str: will use Estimator.TrainingStrategy[training_strategy] to train
+            - function: Can be used to implement custom training function will be called as
+              `training_strategy(estimator)`.
+            - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
+              method arguments.
+              
+              Example:
+              
+              .. code-block:: python
+              
+                  [
+                    {"learning_rate": 0.5, },
+                    {"learning_rate": 0.05, },
+                  ]
+
+              This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+        :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
+        """
+        DETestsSingle = []
+        for i,idx in enumerate(self.partition_idx):
+            DETestsSingle.append(lrt(
+                data=self.X[idx,:],
+                reduced_formula=reduced_formula,
+                full_formula=full_formula,
+                reduced_formula_loc=reduced_formula_loc,
+                full_formula_loc=full_formula_loc,
+                reduced_formula_scale=reduced_formula_scale,
+                full_formula_scale=full_formula_scale,
+                gene_names=self.gene_names,
+                sample_description=self.sample_description.iloc[idx,:],
+                noise_model=noise_model,
+                batch_size=batch_size,
+                training_strategy=training_strategy,
+                **kwargs
+            ))
+        return DifferentialExpressionTestByPartition(
+            partitions=self.partitions, 
+            tests=DETestsSingle, 
+            ave=np.mean(self.X, axis=0),
+            correction_type="by_test")
+
+    def wald(
+        self,
+        factor_loc_totest: str,
+        coef_to_test: object = None,  # e.g. coef_to_test="B"
+        formula: str = None,
+        formula_loc: str = None,
+        formula_scale: str = None,
+        noise_model: str = "nb",
+        batch_size: int = None,
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        **kwargs
+    ):
+        """
+        This function performs a wald test within each partition of a data set.
+        See annotation of de.test.wald()
+            
+        :param formula: formula
+            model formula for location and scale parameter models.
+        :param formula_loc: formula
+            model formula for location and scale parameter models.
+            If not specified, `formula` will be used instead.
+        :param formula_scale: formula
+            model formula for scale parameter model.
+            If not specified, `formula` will be used instead.
+        :param factor_loc_totest: str
+            Factor of formula to test with Wald test.
+            E.g. "condition" if formula_loc would be "~ 1 + batch + condition"
+        :param coef_to_test: If there are more than two groups specified by `factor_loc_totest`,
+            this parameter allows to specify the group which should be tested
+        :param noise_model: str, noise model to use in model-based unit_test. Possible options:
+            
+            - 'nb': default
+        :param batch_size: the batch size to use for the estimator
+        :param training_strategy: {str, function, list} training strategy to use. Can be:
+
+            - str: will use Estimator.TrainingStrategy[training_strategy] to train
+            - function: Can be used to implement custom training function will be called as
+              `training_strategy(estimator)`.
+            - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
+              method arguments.
+              
+              Example:
+              
+              .. code-block:: python
+              
+                  [
+                    {"learning_rate": 0.5, },
+                    {"learning_rate": 0.05, },
+                  ]
+
+              This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+        :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
+        """
+        DETestsSingle = []
+        for i,idx in enumerate(self.partition_idx):
+            DETestsSingle.append(wald(
+                data=self.X[idx,:],
+                factor_loc_totest=factor_loc_totest,
+                coef_to_test=coef_to_test,  # e.g. coef_to_test="B"
+                formula=formula,
+                formula_loc=formula_loc,
+                formula_scale=formula_scale,
+                gene_names=self.gene_names,
+                sample_description=self.sample_description.iloc[idx,:],
+                noise_model=noise_model,
+                batch_size=batch_size,
+                training_strategy=training_strategy,
+                **kwargs
+            ))
+        return DifferentialExpressionTestByPartition(
+            partitions=self.partitions, 
+            tests=DETestsSingle, 
+            ave=np.mean(self.X, axis=0),
+            correction_type="by_test")

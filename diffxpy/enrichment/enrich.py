@@ -48,6 +48,7 @@ class RefSets():
             self._genes = np.array([])
         self._ids = [x.id for x in self.sets]
         self._set_lens = np.array([x.len for x in self.sets])
+        self.genes_discarded = None
 
     ## Input functions.
 
@@ -118,8 +119,11 @@ class RefSets():
         Only keep gene ids that are contained within a full 
         reference set of ids.
         """
+        gene_ids_before = set(self._genes)
         for x in self.sets:
             x.clean(ids)
+        gene_ids_after = set(self._genes)
+        self.genes_discarded = np.asarray(list(gene_ids_before.difference(gene_ids_after)))
 
     def subset(self, idx: np.array):
         """ 
