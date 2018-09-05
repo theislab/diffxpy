@@ -1060,6 +1060,52 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
 
         return res
 
+class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
+    """
+    Stores a particular test performed within each partition of the data set.
+    """
+
+    def __init__(self, partitions, tests, ave, correction_type: str = "by_test"):
+        super().__init__(correction_type=correction_type)
+        self.partitions = list(np.asarray(partitions))
+        self._tests = tests
+        self._gene_ids = tests[0].gene_ids
+        self._pval = np.expand_dims(np.vstack([x.pval for x in tests]), axis=0)
+        self._logfc = np.expand_dims(np.vstack([x.log_fold_change() for x in tests]), axis=0)
+        self._mean = ave
+
+        q = self.qval
+
+    @property
+    def gene_ids(self) -> np.ndarray:
+        return self._gene_ids
+
+    def log_fold_change(self, base=np.e, **kwargs):
+        if base == np.e:
+            return self._logfc
+        else:
+            return self._logfc / np.log(base)
+
+    def _check_partition(self, partition):
+        if partition not in self.partitions:
+            raise ValueError('partition not recognized')
+
+    @property
+    def tests(self, partition=None):
+        """
+        If `keep_full_test_objs` was set to `True`, this will return a matrix of differential expression tests.
+
+        :param partition: The partition for which to return the test. Returns full list if None.
+        """
+        if self._tests is None:
+            raise ValueError("Individual tests were not kept!")
+
+        if partition is None:
+            return self._tests
+        else:
+            self._check_partition(partition)
+            return self._tests[self.partitions.index(partition)]
+
 
 def _parse_gene_names(data, gene_names):
     if gene_names is None:
@@ -1442,7 +1488,7 @@ def _split_X(data, grouping):
 def t_test(
         data,
         grouping,
-        gene_ids=None,
+        gene_names=None,
         sample_description=None
 ):
     """
@@ -1457,14 +1503,14 @@ def t_test(
     :param gene_ids: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
-    gene_ids = _parse_gene_names(data, gene_ids)
-    X = _parse_data(data, gene_ids)
+    gene_ids = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
     grouping = _parse_grouping(data, sample_description, grouping)
 
     de_test = DifferentialExpressionTestTT(
         data=X,
         grouping=grouping,
-        gene_ids=gene_ids,
+        gene_ids=gene_names,
     )
 
     return de_test
@@ -1975,3 +2021,333 @@ def versus_rest(
                                                correction_type=pval_correction)
 
     return de_test
+
+def partition(
+    data,
+    partition: Union[str, np.ndarray, list],
+    gene_names: str = None,
+    sample_description: pd.DataFrame = None):
+    """
+    Perform differential expression test for each group. This class handles 
+    the partitioning of the data set, the differential test callls and
+    the sumamry of the individual tests into one 
+    DifferentialExpressionTestMulti object. All functions the yield
+    DifferentialExpressionTestSingle objects can be performed on each 
+    partition.
+
+    Wraps _Partition so that doc strings are nice.
+
+    :param data: input data
+    :param grouping: str, array
+    
+        - column in data.obs/sample_description which contains the split of observations into the two groups.
+        - array of length `num_observations` containing group labels
+    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param sample_description: optional pandas.DataFrame containing sample annotations
+    """
+    return(_Partition(
+        data=data,
+        partition=partition,
+        gene_names=gene_names,
+        sample_description=sample_description))
+
+class _Partition():
+    """
+    Perform differential expression test for each group. This class handles 
+    the partitioning of the data set, the differential test callls and
+    the sumamry of the individual tests into one 
+    DifferentialExpressionTestMulti object. All functions the yield
+    DifferentialExpressionTestSingle objects can be performed on each 
+    partition.
+    """
+
+    def __init__(
+        self,
+        data,
+        partition: Union[str, np.ndarray, list],
+        gene_names: str = None,
+        sample_description: pd.DataFrame = None):
+        """
+        :param data: input data
+        :param partition: str, array
+        
+            - column in data.obs/sample_description which contains the split of observations into the two groups.
+            - array of length `num_observations` containing group labels
+        :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+        :param sample_description: optional pandas.DataFrame containing sample annotations
+        """
+        self.X = _parse_data(data, gene_names)
+        self.gene_names = _parse_gene_names(data, gene_names)
+        self.sample_description = _parse_sample_description(data, sample_description)
+        self.partition = _parse_grouping(data, sample_description, partition)
+        self.partitions = np.unique(self.partition)
+        self.partition_idx = [np.where(self.partition==x)[0] for x in self.partitions]    
+
+    def two_sample(
+        self,
+        grouping: Union[str],
+        test=None,
+        noise_model: str = None,
+        batch_size: int = None,
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        **kwargs
+    ) -> _DifferentialExpressionTestSingle:
+        """
+        See annotation of de.test.two_sample()
+            
+        :param grouping: str
+        
+            - column in data.obs/sample_description which contains the split of observations into the two groups.
+        :param test: str, statistical test to use. Possible options:
+        
+            - 'wald': default
+            - 'lrt'
+            - 't-test'
+            - 'wilcoxon'
+        :param noise_model: str, noise model to use in model-based unit_test. Possible options:
+            
+            - 'nb': default
+        :param batch_size: the batch size to use for the estimator
+        :param training_strategy: {str, function, list} training strategy to use. Can be:
+
+            - str: will use Estimator.TrainingStrategy[training_strategy] to train
+            - function: Can be used to implement custom training function will be called as
+              `training_strategy(estimator)`.
+            - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
+              method arguments.
+              
+              Example:
+              
+              .. code-block:: python
+              
+                  [
+                    {"learning_rate": 0.5, },
+                    {"learning_rate": 0.05, },
+                  ]
+
+              This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+        :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
+        """
+        DETestsSingle = []
+        for i,idx in enumerate(self.partition_idx):
+            DETestsSingle.append(two_sample(
+                data=self.X[idx,:],
+                grouping=grouping,
+                test=test,
+                gene_names=self.gene_names,
+                sample_description=self.sample_description.iloc[idx,:],
+                noise_model = noise_model,
+                batch_size = batch_size,
+                training_strategy=training_strategy,
+                **kwargs
+            ))
+        return DifferentialExpressionTestByPartition(
+            partitions=self.partitions, 
+            tests=DETestsSingle, 
+            ave=np.mean(self.X, axis=0),
+            correction_type="by_test")
+
+    def t_test(
+        self,
+        grouping: Union[str]
+    ):
+        """
+        See annotation of de.test.t_test()
+        
+        :param grouping: str
+        
+            - column in data.obs/sample_description which contains the split of observations into the two groups.
+        """
+        DETestsSingle = []
+        for i,idx in enumerate(self.partition_idx):
+            DETestsSingle.append(t_test(
+                data=self.X[idx,:],
+                grouping=grouping,
+                gene_names=self.gene_names,
+                sample_description=self.sample_description.iloc[idx,:]
+            ))
+        return DifferentialExpressionTestByPartition(
+            partitions=self.partitions, 
+            tests=DETestsSingle, 
+            ave=np.mean(self.X, axis=0),
+            correction_type="by_test")
+
+    def wilcoxon(
+        self,
+        grouping: Union[str],
+    ):
+        """
+        See annotation of de.test.wilcoxon()
+        
+        :param grouping: str, array
+        
+            - column in data.obs/sample_description which contains the split of observations into the two groups.
+            - array of length `num_observations` containing group labels
+        """
+        DETestsSingle = []
+        for i,idx in enumerate(self.partition_idx):
+            DETestsSingle.append(wilcoxon(
+                data=self.X[idx,:],
+                grouping=grouping,
+                gene_names=self.gene_names,
+                sample_description=self.sample_description.iloc[idx,:]
+            ))
+        return DifferentialExpressionTestByPartition(
+            partitions=self.partitions, 
+            tests=DETestsSingle, 
+            ave=np.mean(self.X, axis=0),
+            correction_type="by_test")
+
+    def lrt(
+        self,
+        reduced_formula: str = None,
+        full_formula: str = None,
+        reduced_formula_loc: str = None,
+        full_formula_loc: str = None,
+        reduced_formula_scale: str = None,
+        full_formula_scale: str = None,
+        noise_model="nb",
+        batch_size: int = None,
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        **kwargs
+    ):
+        """
+        See annotation of de.test.lrt()
+            
+        :param reduced_formula: formula
+            Reduced model formula for location and scale parameter models.
+        :param full_formula: formula
+            Full model formula for location and scale parameter models.
+        :param reduced_formula_loc: formula
+            Reduced model formula for location and scale parameter models.
+            If not specified, `reduced_formula` will be used instead.
+        :param full_formula_loc: formula
+            Full model formula for location parameter model.
+            If not specified, `full_formula` will be used instead.
+        :param reduced_formula_scale: formula
+            Reduced model formula for scale parameter model.
+            If not specified, `reduced_formula` will be used instead.
+        :param full_formula_scale: formula
+            Full model formula for scale parameter model.
+            If not specified, `reduced_formula_scale` will be used instead.
+        :param noise_model: str, noise model to use in model-based unit_test. Possible options:
+            
+            - 'nb': default
+        :param batch_size: the batch size to use for the estimator
+        :param training_strategy: {str, function, list} training strategy to use. Can be:
+
+            - str: will use Estimator.TrainingStrategy[training_strategy] to train
+            - function: Can be used to implement custom training function will be called as
+              `training_strategy(estimator)`.
+            - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
+              method arguments.
+              
+              Example:
+              
+              .. code-block:: python
+              
+                  [
+                    {"learning_rate": 0.5, },
+                    {"learning_rate": 0.05, },
+                  ]
+
+              This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+        :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
+        """
+        DETestsSingle = []
+        for i,idx in enumerate(self.partition_idx):
+            DETestsSingle.append(lrt(
+                data=self.X[idx,:],
+                reduced_formula=reduced_formula,
+                full_formula=full_formula,
+                reduced_formula_loc=reduced_formula_loc,
+                full_formula_loc=full_formula_loc,
+                reduced_formula_scale=reduced_formula_scale,
+                full_formula_scale=full_formula_scale,
+                gene_names=self.gene_names,
+                sample_description=self.sample_description.iloc[idx,:],
+                noise_model=noise_model,
+                batch_size=batch_size,
+                training_strategy=training_strategy,
+                **kwargs
+            ))
+        return DifferentialExpressionTestByPartition(
+            partitions=self.partitions, 
+            tests=DETestsSingle, 
+            ave=np.mean(self.X, axis=0),
+            correction_type="by_test")
+
+    def wald(
+        self,
+        factor_loc_totest: str,
+        coef_to_test: object = None,  # e.g. coef_to_test="B"
+        formula: str = None,
+        formula_loc: str = None,
+        formula_scale: str = None,
+        noise_model: str = "nb",
+        batch_size: int = None,
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        **kwargs
+    ):
+        """
+        This function performs a wald test within each partition of a data set.
+        See annotation of de.test.wald()
+            
+        :param formula: formula
+            model formula for location and scale parameter models.
+        :param formula_loc: formula
+            model formula for location and scale parameter models.
+            If not specified, `formula` will be used instead.
+        :param formula_scale: formula
+            model formula for scale parameter model.
+            If not specified, `formula` will be used instead.
+        :param factor_loc_totest: str
+            Factor of formula to test with Wald test.
+            E.g. "condition" if formula_loc would be "~ 1 + batch + condition"
+        :param coef_to_test: If there are more than two groups specified by `factor_loc_totest`,
+            this parameter allows to specify the group which should be tested
+        :param noise_model: str, noise model to use in model-based unit_test. Possible options:
+            
+            - 'nb': default
+        :param batch_size: the batch size to use for the estimator
+        :param training_strategy: {str, function, list} training strategy to use. Can be:
+
+            - str: will use Estimator.TrainingStrategy[training_strategy] to train
+            - function: Can be used to implement custom training function will be called as
+              `training_strategy(estimator)`.
+            - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
+              method arguments.
+              
+              Example:
+              
+              .. code-block:: python
+              
+                  [
+                    {"learning_rate": 0.5, },
+                    {"learning_rate": 0.05, },
+                  ]
+
+              This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+        :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
+        """
+        DETestsSingle = []
+        for i,idx in enumerate(self.partition_idx):
+            DETestsSingle.append(wald(
+                data=self.X[idx,:],
+                factor_loc_totest=factor_loc_totest,
+                coef_to_test=coef_to_test,  # e.g. coef_to_test="B"
+                formula=formula,
+                formula_loc=formula_loc,
+                formula_scale=formula_scale,
+                gene_names=gene_names,
+                sample_description=self.sample_description.iloc[idx,:],
+                noise_model=noise_model,
+                batch_size=batch_size,
+                training_strategy=training_strategy,
+                **kwargs
+            ))
+        return DifferentialExpressionTestByPartition(
+            partitions=self.partitions, 
+            tests=DETestsSingle, 
+            ave=np.mean(self.X, axis=0),
+            correction_type="by_test")
