@@ -1157,6 +1157,7 @@ def _fit(
         gene_names=None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        quick_scale: bool = None,
         close_session=True
 ):
     """
@@ -1182,6 +1183,9 @@ def _fit(
               ]
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
+
+        Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
     :param close_session: If True, will finalize the estimator. Otherwise, return the estimator itself.
     """
     if training_strategy.lower() == 'bfgs':
@@ -1202,13 +1206,19 @@ def _fit(
                 data=data,
                 design_loc=design_loc,
                 design_scale=design_scale,
-                feature_names=gene_names
+                feature_names=gene_names,
             )
 
             constructor_args = {}
             if batch_size is not None:
                 constructor_args["batch_size"] = batch_size
-            estim = test_model.Estimator(input_data=input_data, init_model=init_model, **constructor_args)
+            if quick_scale is not None:
+                constructor_args["quick_scale"] = quick_scale,
+            estim = test_model.Estimator(
+                input_data=input_data,
+                init_model=init_model,
+                **constructor_args
+            )
 
             estim.initialize()
 
@@ -1244,6 +1254,7 @@ def lrt(
         noise_model="nb",
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        quick_scale: bool = None,
         **kwargs
 ):
     """
@@ -1295,6 +1306,9 @@ def lrt(
               ]
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
+
+        Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
@@ -1333,6 +1347,7 @@ def lrt(
         gene_names=gene_names,
         batch_size=batch_size,
         training_strategy=training_strategy,
+        quick_scale=quick_scale,
         **kwargs,
     )
     full_model = _fit(
@@ -1344,6 +1359,7 @@ def lrt(
         init_model=reduced_model,
         batch_size=X.shape[0],  # workaround: batch_size=num_observations
         training_strategy=training_strategy,
+        quick_scale=quick_scale,
         **kwargs,
     )
 
@@ -1370,6 +1386,7 @@ def wald(
         noise_model: str = "nb",
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        quick_scale: bool = None,
         **kwargs
 ):
     """
@@ -1418,6 +1435,9 @@ def wald(
               ]
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
+
+        Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
@@ -1463,6 +1483,7 @@ def wald(
         gene_names=gene_names,
         batch_size=batch_size,
         training_strategy=training_strategy,
+        quick_scale=quick_scale,
         **kwargs,
     )
 
@@ -1555,6 +1576,7 @@ def two_sample(
         noise_model: str = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        quick_scale: bool = None,
         **kwargs
 ) -> _DifferentialExpressionTestSingle:
     """
@@ -1621,6 +1643,9 @@ def two_sample(
               ]
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
+
+        Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if test in ['t-test', 'wilcoxon'] and noise_model is not None:
@@ -1658,6 +1683,7 @@ def two_sample(
             noise_model=noise_model,
             batch_size=batch_size,
             training_strategy=training_strategy,
+            quick_scale=quick_scale,
             **kwargs
         )
     elif test.lower() == 'lrt':
@@ -1678,6 +1704,7 @@ def two_sample(
             noise_model=noise_model,
             batch_size=batch_size,
             training_strategy=training_strategy,
+            quick_scale=quick_scale,
             **kwargs
         )
     elif test.lower() == 't-test' or test.lower() == "t_test" or test.lower() == "ttest":
@@ -1708,6 +1735,7 @@ def pairwise(
         pval_correction: str = "global",
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        quick_scale: bool = None,
         keep_full_test_objs: bool = False,
         **kwargs
 ):
@@ -1786,6 +1814,9 @@ def pairwise(
               ]
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
+
+        Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
     :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test"
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
@@ -1811,6 +1842,7 @@ def pairwise(
             gene_names=gene_names,
             batch_size=batch_size,
             training_strategy=training_strategy,
+            quick_scale=quick_scale,
             **kwargs
         )
 
@@ -1862,6 +1894,7 @@ def pairwise(
                     noise_model=noise_model,
                     batch_size=batch_size,
                     training_strategy=training_strategy,
+                    quick_scale=quick_scale,
                     **kwargs
                 )
                 pvals[i, j] = de_test_temp.pval
@@ -1893,6 +1926,7 @@ def versus_rest(
         pval_correction: str = "global",
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        quick_scale: bool = None,
         keep_full_test_objs: bool = False,
         **kwargs
 ):
@@ -1971,6 +2005,9 @@ def versus_rest(
               ]
 
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
+
+        Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
     :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test"
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
@@ -2005,6 +2042,7 @@ def versus_rest(
             noise_model=noise_model,
             batch_size=batch_size,
             training_strategy=training_strategy,
+            quick_scale=quick_scale,
             **kwargs
         )
         pvals[0, i] = de_test_temp.pval
