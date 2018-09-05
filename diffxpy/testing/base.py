@@ -995,7 +995,7 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
         self._pval = pval
         self._logfc = logfc
         self._mean = ave
-        self._groups = list(np.asarray(groups))
+        self.groups = list(np.asarray(groups))
         self._tests = tests
 
         q = self.qval
@@ -1026,15 +1026,15 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
 
     def pval_group(self, group):
         self._check_group(group)
-        return self.pval[self.groups.index(group),:]
+        return self.pval[0,self.groups.index(group),:]
 
     def qval_group(self, group):
         self._check_group(group)
-        return self.qval[self.groups.index(group),:]
+        return self.qval[0,self.groups.index(group),:]
 
     def log_fold_change_group(self, group, base=np.e):
-        self._check_groups(group)
-        return self.log_fold_change(base=base)[self.groups.index(group),:]
+        self._check_group(group)
+        return self.log_fold_change(base=base)[0,self.groups.index(group),:]
 
     def summary_group(self, group, **kwargs) -> pd.DataFrame:
         """
@@ -1969,6 +1969,7 @@ def versus_rest(
     de_test = DifferentialExpressionTestVsRest(gene_ids=gene_names,
                                                pval=pvals,
                                                logfc=logfc,
+                                               ave=np.mean(X, axis=0),
                                                groups=groups,
                                                tests=tests,
                                                correction_type=pval_correction)
