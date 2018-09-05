@@ -2339,7 +2339,7 @@ class _Partition():
                 formula=formula,
                 formula_loc=formula_loc,
                 formula_scale=formula_scale,
-                gene_names=gene_names,
+                gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx,:],
                 noise_model=noise_model,
                 batch_size=batch_size,
