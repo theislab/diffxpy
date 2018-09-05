@@ -667,7 +667,7 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
         ttest = t_test(
             data=self.data,
             grouping=grouping,
-            gene_ids=self.gene_ids,
+            gene_names=self.gene_ids,
         )
         ttest_pvals = ttest.pval
 
