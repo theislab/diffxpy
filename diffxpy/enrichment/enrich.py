@@ -190,7 +190,8 @@ def test(
     gene_ids: list = None,
     de_threshold=0.05,
     all_ids = None,
-    clean_ref = True
+    clean_ref = True,
+    upper = False
     ):
     """ Perform gene set enrichment.
 
@@ -219,6 +220,8 @@ def test(
     :param clean_ref:
         Whether or not to only retain gene identifiers in RefSets that occur in 
         the background set of identifiers supplied here through all_ids.
+    :param upper:
+        Make all gene IDs captial.
     """
     return Enrich(
         RefSets = RefSets,
@@ -227,7 +230,8 @@ def test(
         gene_ids = gene_ids,
         de_threshold = de_threshold,
         all_ids = all_ids,
-        clean_ref = clean_ref)
+        clean_ref = clean_ref,
+        upper = upper)
 
 class Enrich():
     """
@@ -241,7 +245,8 @@ class Enrich():
         gene_ids: list = None,
         de_threshold=0.05,
         all_ids = None,
-        clean_ref = True
+        clean_ref = True,
+        upper = False
         ):
         self._n_overlaps = None
         self._pval_enrich = None
@@ -272,6 +277,10 @@ class Enrich():
         else:
             self._all_ids = set(self._gene_ids)
 
+        if upper==True:
+            self._gene_ids = [x.upper() for x in self._gene_ids]
+            self._all_ids = set([x.upper() for x in self._all_ids])
+
         # Generate diagnostic statistic of number of possible overlaps in total.
         print(str(len(set(self._all_ids).intersection(set(RefSets._genes))))+
             ' overlaps found between refset ('+str(len(RefSets._genes))+
@@ -285,9 +294,9 @@ class Enrich():
         idx_nonempty = np.where([len(x.genes)>0 for x in self.RefSets.sets])[0]
         if len(self.RefSets.sets)-len(idx_nonempty) > 0:
             print('Found '+str(len(self.RefSets.sets)-len(idx_nonempty))+
-                ' empty sets after cleaning, removing those.')
+                ' empty sets, removing those.')
             self.RefSets = self.RefSets.subset(idx=idx_nonempty)
-        else:
+        elif len(idx_nonempty)==0:
             raise ValueError('all RefSets were empty')
 
     @property
