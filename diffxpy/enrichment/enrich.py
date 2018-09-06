@@ -273,20 +273,22 @@ class Enrich():
             self._all_ids = set(self._gene_ids)
 
         # Generate diagnostic statistic of number of possible overlaps in total.
-        print(str(len(set(self._gene_ids).intersection(set(RefSets._genes))))+
+        print(str(len(set(self._all_ids).intersection(set(RefSets._genes))))+
             ' overlaps found between refset ('+str(len(RefSets._genes))+
-            ') and provided gene list ('+str(len(self._gene_ids))+').')
+            ') and provided gene list ('+str(len(self._all_ids))+').')
         # Clean reference set to only contains ids that were observed in
         # current study if required.
         self.RefSets = RefSets
         if clean_ref==True:
             self.RefSets.clean(self._all_ids)
         # Print if there are empty sets.
-        idx_empty = np.where([len(x.genes)>0 for x in self.RefSets.sets])[0]
-        if len(self.RefSets.sets)-len(idx_empty) > 0:
-            print('Found '+str(len(self.RefSets.sets)-len(idx_empty))+
+        idx_nonempty = np.where([len(x.genes)>0 for x in self.RefSets.sets])[0]
+        if len(self.RefSets.sets)-len(idx_nonempty) > 0:
+            print('Found '+str(len(self.RefSets.sets)-len(idx_nonempty))+
                 ' empty sets after cleaning, removing those.')
-            self.RefSets = self.RefSets.subset(idx=idx_empty)
+            self.RefSets = self.RefSets.subset(idx=idx_nonempty)
+        else:
+            raise ValueError('all RefSets were empty')
 
     @property
     def n_overlaps(self):
