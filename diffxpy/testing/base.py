@@ -2052,7 +2052,7 @@ def pairwise(
         logfc[np.eye(logfc.shape[0]).astype(bool)] = 0
 
         if keep_full_test_objs:
-            tests = np.tile([None], [X.shape[1], len(groups), len(groups)])
+            tests = np.tile([None], [len(groups), len(groups)])
         else:
             tests = None
 
@@ -2203,7 +2203,7 @@ def versus_rest(
     logfc = np.zeros([1, len(groups), X.shape[1]])
 
     if keep_full_test_objs:
-        tests = np.tile([None], [1, len(groups), X.shape[1]])
+        tests = np.tile([None], [1, len(groups)])
     else:
         tests = None
 
