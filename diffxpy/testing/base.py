@@ -232,21 +232,21 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
     """
 
     def _threshold_summary(self, res, qval_thres=None, 
-        log2fc_upper_thres=None, log2fc_lower_thres=None, mean_thres=None) -> pd.DataFrame:
+        fc_upper_thres=None, fc_lower_thres=None, mean_thres=None) -> pd.DataFrame:
         """
         Reduce differential expression results into an output table with desired thresholds.
         """
         if qval_thres is not None:
             res = res.iloc[res['qval'].values <= qval_thres,:]
 
-        if log2fc_upper_thres is not None and log2fc_lower_thres is None:
-            res = res.iloc[res['log2fc'].values >= log2fc_upper_thres,:]
-        elif log2fc_upper_thres is None and log2fc_lower_thres is not None:
-            res = res.iloc[res['log2fc'].values <= log2fc_lower_thres,:]
-        elif log2fc_upper_thres is not None and log2fc_lower_thres is not None:
+        if fc_upper_thres is not None and fc_lower_thres is None:
+            res = res.iloc[res['log2fc'].values >= np.log(fc_upper_thres)/np.log(2),:]
+        elif fc_upper_thres is None and fc_lower_thres is not None:
+            res = res.iloc[res['log2fc'].values <= np.log(fc_lower_thres)/np.log(2),:]
+        elif fc_upper_thres is not None and fc_lower_thres is not None:
             res = res.iloc[np.logical_or(
-                res['log2fc'].values <= log2fc_lower_thres,
-                res['log2fc'].values >= log2fc_upper_thres),:]
+                res['log2fc'].values <= np.log(fc_lower_thres)/np.log(2),
+                res['log2fc'].values >= np.log(fc_upper_thres)/np.log(2)),:]
 
         if mean_thres is not None:
             res = res.iloc[res['mean'].values >= mean_thres,:]
@@ -254,7 +254,7 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
         return res
 
     def summary(self, qval_thres=None, 
-        log2fc_upper_thres=None, log2fc_lower_thres=None, mean_thres=None, **kwargs) -> pd.DataFrame:
+        fc_upper_thres=None, fc_lower_thres=None, mean_thres=None, **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
@@ -467,8 +467,8 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
         return retval
 
-    def summary(self, qval_thres=None, log2fc_upper_thres=None, 
-        log2fc_lower_thres=None, mean_thres=None, 
+    def summary(self, qval_thres=None, fc_upper_thres=None, 
+        fc_lower_thres=None, mean_thres=None, 
         **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
@@ -480,8 +480,8 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         res = self._threshold_summary(
             res=res, 
             qval_thres=qval_thres, 
-            log2fc_upper_thres=log2fc_upper_thres, 
-            log2fc_lower_thres=log2fc_lower_thres, 
+            fc_upper_thres=fc_upper_thres, 
+            fc_lower_thres=fc_lower_thres, 
             mean_thres=mean_thres
             )
 
@@ -558,8 +558,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         return stats.wald_test(theta_mle=self.theta_mle, theta_sd=self.theta_sd, theta0=0)
 
-    def summary(self, qval_thres=None, log2fc_upper_thres=None, 
-        log2fc_lower_thres=None, mean_thres=None, 
+    def summary(self, qval_thres=None, fc_upper_thres=None, 
+        fc_lower_thres=None, mean_thres=None, 
         **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
@@ -579,8 +579,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         res = self._threshold_summary(
             res=res, 
             qval_thres=qval_thres, 
-            log2fc_upper_thres=log2fc_upper_thres, 
-            log2fc_lower_thres=log2fc_lower_thres, 
+            fc_upper_thres=fc_upper_thres, 
+            fc_lower_thres=fc_lower_thres, 
             mean_thres=mean_thres
             )
 
@@ -660,8 +660,8 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         else:
             return self._logfc / np.log(base)
 
-    def summary(self, qval_thres=None, log2fc_upper_thres=None, 
-        log2fc_lower_thres=None, mean_thres=None, 
+    def summary(self, qval_thres=None, fc_upper_thres=None, 
+        fc_lower_thres=None, mean_thres=None, 
         **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
@@ -673,8 +673,8 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         res = self._threshold_summary(
             res=res, 
             qval_thres=qval_thres, 
-            log2fc_upper_thres=log2fc_upper_thres, 
-            log2fc_lower_thres=log2fc_lower_thres, 
+            fc_upper_thres=fc_upper_thres, 
+            fc_lower_thres=fc_lower_thres, 
             mean_thres=mean_thres
             )
 
@@ -712,8 +712,8 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
         else:
             return self._logfc / np.log(base)
 
-    def summary(self, qval_thres=None, log2fc_upper_thres=None, 
-        log2fc_lower_thres=None, mean_thres=None, 
+    def summary(self, qval_thres=None, fc_upper_thres=None, 
+        fc_lower_thres=None, mean_thres=None, 
         **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
@@ -723,8 +723,8 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
         res = self._threshold_summary(
             res=res, 
             qval_thres=qval_thres, 
-            log2fc_upper_thres=log2fc_upper_thres, 
-            log2fc_lower_thres=log2fc_lower_thres, 
+            fc_upper_thres=fc_upper_thres, 
+            fc_lower_thres=fc_lower_thres, 
             mean_thres=mean_thres
             )
 
