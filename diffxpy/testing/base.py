@@ -1592,10 +1592,10 @@ def t_test(
     
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
-    :param gene_ids: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
-    gene_ids = _parse_gene_names(data, gene_names)
+    gene_names = _parse_gene_names(data, gene_names)
     X = _parse_data(data, gene_names)
     grouping = _parse_grouping(data, sample_description, grouping)
 
