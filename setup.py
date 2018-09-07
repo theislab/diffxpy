@@ -5,7 +5,7 @@ author = 'Florian R. Hölzlwimmer, David S. Fischer'
 setup(
     name='diffxpy',
     author=author,
-    author_email='florian.hoelzlwimmer@helmholtz-muenchen.de',
+    author_email='david.fischer@helmholtz-muenchen.de',
     packages=find_packages(),
     install_requires=[
         'numpy',
