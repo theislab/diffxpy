@@ -1,7 +1,5 @@
-.. batchglm documentation master file, created by
-    sphinx-quickstart on Mon Jul 30 15:55:16 2018.
-    You can adapt this file completely to your liking, but it should at least
-    contain the root `toctree` directive.
+.. You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
 
 
 
@@ -13,7 +11,7 @@ Welcome to diffxpy's documentation!
    :caption: Contents:
 
    api/index
-..   examples
+   examples
 ..   basic_usage
 ..   installation
 ..   references

@@ -1,7 +1,7 @@
 .. automodule:: diffxpy.api
 
-API
-===
+Examples
+========
 
 Import diffxpy's high-level API as::
 
@@ -18,38 +18,36 @@ Single tests per gene
 .. autosummary::
    :toctree: .
 
-   test.two_sample
-   test.wald
-   test.lrt
-   test.t_test
-   test.wilcoxon
-
+   single/likelihood_ratio_test.ipynb
+   single/run_by_partition.ipynb
+   single/t_test.ipynb
+   single/test_chisq_distribution.ipynb
+   single/wald_test.ipynb
+   single/wilcoxon_test.ipynb
+   
 Multiple tests per gene
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autosummary::
    :toctree: .
 
-   test.pairwise
-   test.versus_rest
-   test.partition
+   versus_rest.ipynb
+   pairwise.ipynb
 
 
 Gene set enrichment: enrich
 ---------------------------
 
-Reference gene sets
-~~~~~~~~~~~~~~~~~~~
+.. autosummary::
+   :toctree: .
+
+   enrich.ipynb
+
+
+Integration with other packages
+-------------------------------
 
 .. autosummary::
    :toctree: .
 
-   enrich.RefSets
-
-Enrichment tests
-~~~~~~~~~~~~~~~~
-
-.. autosummary::
-   :toctree: .
-
-   enrich.test
+   scanpy_integration.ipynb
