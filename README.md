@@ -2,7 +2,7 @@
 diffxpy covers a wide range of differential expression analysis scenarios encountered in single-cell RNA-seq scenarios. The core ideas of diffxpy is to speed up the model fitting time, which is the run-time bottle-neck of differential expression analysis on models that require maximum likelihood estimators and that do not have closed form solutions thereof. This model fitting is performed in a separate package, batchglm. diffxpy exposes wrapper funtions to the user which perform the model fitting and the differential expression test. Advanced users can chose the between various hypothesis tests and can vary the model fitting hyperparameters. Fitting can be performed both on CPUs and on GPUs and can be parallelized.
 
 # Installation
-Please refer to the documentation
+Please refer to the documentation.
 
 # Worklows and API
 Diffxpy supports workflows related to differential expression analysis. The functionalities of the workflows are structured in the API. To access these workflows, import diffxpy as follows `import diffxpy.api as de`. Currently, the following analytic strategies are implemented:
