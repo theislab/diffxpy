@@ -1755,14 +1755,13 @@ def two_sample(
         quick_scale: bool = None,
         **kwargs
 ) -> _DifferentialExpressionTestSingle:
-    """
+    r"""
     Perform differential expression test between two groups on adata object
     for each gene.
 
     This function wraps the selected statistical test for the scenario of
     a two sample comparison. All unit_test offered in this wrapper
     test for the difference of the mean parameter of both samples.
-
     The exact unit_test are as follows (assuming the group labels
     are saved in a column named "group"):
     - lrt(log-likelihood ratio test):
