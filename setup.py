@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+import versioneer
 
 author = 'Florian R. Hölzlwimmer, David S. Fischer'
 
@@ -12,7 +13,7 @@ setup(
         'scipy',
         'pandas',
         'patsy',
-        'batchglm',
+        'batchglm>=0.2.0',
         'xarray',
         'statsmodels',
     ],
@@ -35,6 +36,7 @@ setup(
             'jinja2',
             'docutils',
         ],
-    }
-
+    },
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
 )
