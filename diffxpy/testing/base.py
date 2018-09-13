@@ -190,25 +190,25 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     def summary(self, **kwargs) -> pd.DataFrame:
         pass
 
-    def _threshold_summary(self, res, qval_thres=None, 
-        fc_upper_thres=None, fc_lower_thres=None, mean_thres=None) -> pd.DataFrame:
+    def _threshold_summary(self, res, qval_thres=None,
+                           fc_upper_thres=None, fc_lower_thres=None, mean_thres=None) -> pd.DataFrame:
         """
         Reduce differential expression results into an output table with desired thresholds.
         """
         if qval_thres is not None:
-            res = res.iloc[res['qval'].values <= qval_thres,:]
+            res = res.iloc[res['qval'].values <= qval_thres, :]
 
         if fc_upper_thres is not None and fc_lower_thres is None:
-            res = res.iloc[res['log2fc'].values >= np.log(fc_upper_thres)/np.log(2),:]
+            res = res.iloc[res['log2fc'].values >= np.log(fc_upper_thres) / np.log(2), :]
         elif fc_upper_thres is None and fc_lower_thres is not None:
-            res = res.iloc[res['log2fc'].values <= np.log(fc_lower_thres)/np.log(2),:]
+            res = res.iloc[res['log2fc'].values <= np.log(fc_lower_thres) / np.log(2), :]
         elif fc_upper_thres is not None and fc_lower_thres is not None:
             res = res.iloc[np.logical_or(
-                res['log2fc'].values <= np.log(fc_lower_thres)/np.log(2),
-                res['log2fc'].values >= np.log(fc_upper_thres)/np.log(2)),:]
+                res['log2fc'].values <= np.log(fc_lower_thres) / np.log(2),
+                res['log2fc'].values >= np.log(fc_upper_thres) / np.log(2)), :]
 
         if mean_thres is not None:
-            res = res.iloc[res['mean'].values >= mean_thres,:]
+            res = res.iloc[res['mean'].values >= mean_thres, :]
 
         return res
 
@@ -253,8 +253,8 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
     All implementations of this class should return one p-value and one fold change per gene.
     """
 
-    def summary(self, qval_thres=None, 
-        fc_upper_thres=None, fc_lower_thres=None, mean_thres=None, **kwargs) -> pd.DataFrame:
+    def summary(self, qval_thres=None,
+                fc_upper_thres=None, fc_lower_thres=None, mean_thres=None, **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
@@ -467,9 +467,9 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
         return retval
 
-    def summary(self, qval_thres=None, fc_upper_thres=None, 
-        fc_lower_thres=None, mean_thres=None, 
-        **kwargs) -> pd.DataFrame:
+    def summary(self, qval_thres=None, fc_upper_thres=None,
+                fc_lower_thres=None, mean_thres=None,
+                **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
@@ -478,12 +478,12 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         res["grad_red"] = self.reduced_model_gradient.data
 
         res = self._threshold_summary(
-            res=res, 
-            qval_thres=qval_thres, 
-            fc_upper_thres=fc_upper_thres, 
-            fc_lower_thres=fc_lower_thres, 
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
             mean_thres=mean_thres
-            )
+        )
 
         return res
 
@@ -558,9 +558,9 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         return stats.wald_test(theta_mle=self.theta_mle, theta_sd=self.theta_sd, theta0=0)
 
-    def summary(self, qval_thres=None, fc_upper_thres=None, 
-        fc_lower_thres=None, mean_thres=None, 
-        **kwargs) -> pd.DataFrame:
+    def summary(self, qval_thres=None, fc_upper_thres=None,
+                fc_lower_thres=None, mean_thres=None,
+                **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
@@ -577,12 +577,12 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             res["niter"] = self._niter
 
         res = self._threshold_summary(
-            res=res, 
-            qval_thres=qval_thres, 
-            fc_upper_thres=fc_upper_thres, 
-            fc_lower_thres=fc_lower_thres, 
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
             mean_thres=mean_thres
-            )
+        )
 
         return res
 
@@ -660,9 +660,9 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         else:
             return self._logfc / np.log(base)
 
-    def summary(self, qval_thres=None, fc_upper_thres=None, 
-        fc_lower_thres=None, mean_thres=None, 
-        **kwargs) -> pd.DataFrame:
+    def summary(self, qval_thres=None, fc_upper_thres=None,
+                fc_lower_thres=None, mean_thres=None,
+                **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
@@ -671,12 +671,12 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         res["zero_variance"] = self._var_geq_zero == False
 
         res = self._threshold_summary(
-            res=res, 
-            qval_thres=qval_thres, 
-            fc_upper_thres=fc_upper_thres, 
-            fc_lower_thres=fc_lower_thres, 
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
             mean_thres=mean_thres
-            )
+        )
 
         return res
 
@@ -712,21 +712,21 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
         else:
             return self._logfc / np.log(base)
 
-    def summary(self, qval_thres=None, fc_upper_thres=None, 
-        fc_lower_thres=None, mean_thres=None, 
-        **kwargs) -> pd.DataFrame:
+    def summary(self, qval_thres=None, fc_upper_thres=None,
+                fc_lower_thres=None, mean_thres=None,
+                **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
         res = super().summary(**kwargs)
-        
+
         res = self._threshold_summary(
-            res=res, 
-            qval_thres=qval_thres, 
-            fc_upper_thres=fc_upper_thres, 
-            fc_lower_thres=fc_lower_thres, 
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
             mean_thres=mean_thres
-            )
+        )
 
         return res
 
@@ -843,7 +843,7 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         self._mean = ave
         self.groups = list(np.asarray(groups))
         self._tests = tests
-        
+
         q = self.qval
 
     @property
@@ -879,42 +879,42 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         assert self._pval is not None
 
         self._check_groups(group1, group2)
-        return self._pval[self.groups.index(group1),self.groups.index(group2),:]
+        return self._pval[self.groups.index(group1), self.groups.index(group2), :]
 
     def qval_pair(self, group1, group2):
         assert self._qval is not None
 
         self._check_groups(group1, group2)
-        return self._qval[self.groups.index(group1),self.groups.index(group2),:]
+        return self._qval[self.groups.index(group1), self.groups.index(group2), :]
 
     def log_fold_change_pair(self, group1, group2, base=np.e):
         assert self._logfc is not None
 
         self._check_groups(group1, group2)
-        return self.log_fold_change(base=base)[self.groups.index(group1),self.groups.index(group2),:]
+        return self.log_fold_change(base=base)[self.groups.index(group1), self.groups.index(group2), :]
 
-    def summary(self, qval_thres=None, fc_upper_thres=None, 
-        fc_lower_thres=None, mean_thres=None, 
-        **kwargs) -> pd.DataFrame:
+    def summary(self, qval_thres=None, fc_upper_thres=None,
+                fc_lower_thres=None, mean_thres=None,
+                **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
         res = super().summary(**kwargs)
-        
+
         res = self._threshold_summary(
-            res=res, 
-            qval_thres=qval_thres, 
-            fc_upper_thres=fc_upper_thres, 
-            fc_lower_thres=fc_lower_thres, 
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
             mean_thres=mean_thres
-            )
+        )
 
         return res
 
-    def summary_pair(self, group1, group2, 
-        qval_thres=None, fc_upper_thres=None, 
-        fc_lower_thres=None, mean_thres=None, 
-        **kwargs) -> pd.DataFrame:
+    def summary_pair(self, group1, group2,
+                     qval_thres=None, fc_upper_thres=None,
+                     fc_lower_thres=None, mean_thres=None,
+                     **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
 
@@ -937,12 +937,12 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         })
 
         res = self._threshold_summary(
-            res=res, 
-            qval_thres=qval_thres, 
-            fc_upper_thres=fc_upper_thres, 
-            fc_lower_thres=fc_lower_thres, 
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
             mean_thres=mean_thres
-            )
+        )
 
         return res
 
@@ -1049,38 +1049,38 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
 
     def pval_pair(self, group1, group2):
         self._check_groups(group1, group2)
-        return self.pval[self.groups.index(group1),self.groups.index(group2),:]
+        return self.pval[self.groups.index(group1), self.groups.index(group2), :]
 
     def qval_pair(self, group1, group2):
         self._check_groups(group1, group2)
-        return self.qval[self.groups.index(group1),self.groups.index(group2),:]
+        return self.qval[self.groups.index(group1), self.groups.index(group2), :]
 
     def log_fold_change_pair(self, group1, group2, base=np.e):
         self._check_groups(group1, group2)
-        return self.log_fold_change(base=base)[self.groups.index(group1),self.groups.index(group2),:]
+        return self.log_fold_change(base=base)[self.groups.index(group1), self.groups.index(group2), :]
 
-    def summary(self, qval_thres=None, fc_upper_thres=None, 
-        fc_lower_thres=None, mean_thres=None, 
-        **kwargs) -> pd.DataFrame:
+    def summary(self, qval_thres=None, fc_upper_thres=None,
+                fc_lower_thres=None, mean_thres=None,
+                **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
         res = super().summary(**kwargs)
-        
+
         res = self._threshold_summary(
-            res=res, 
-            qval_thres=qval_thres, 
-            fc_upper_thres=fc_upper_thres, 
-            fc_lower_thres=fc_lower_thres, 
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
             mean_thres=mean_thres
-            )
+        )
 
         return res
 
-    def summary_pair(self, group1, group2, 
-        qval_thres=None, fc_upper_thres=None, 
-        fc_lower_thres=None, mean_thres=None, 
-        **kwargs) -> pd.DataFrame:
+    def summary_pair(self, group1, group2,
+                     qval_thres=None, fc_upper_thres=None,
+                     fc_lower_thres=None, mean_thres=None,
+                     **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
 
@@ -1103,12 +1103,12 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         })
 
         res = self._threshold_summary(
-            res=res, 
-            qval_thres=qval_thres, 
-            fc_upper_thres=fc_upper_thres, 
-            fc_lower_thres=fc_lower_thres, 
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
             mean_thres=mean_thres
-            )
+        )
 
         return res
 
@@ -1155,38 +1155,38 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
 
     def pval_group(self, group):
         self._check_group(group)
-        return self.pval[0,self.groups.index(group),:]
+        return self.pval[0, self.groups.index(group), :]
 
     def qval_group(self, group):
         self._check_group(group)
-        return self.qval[0,self.groups.index(group),:]
+        return self.qval[0, self.groups.index(group), :]
 
     def log_fold_change_group(self, group, base=np.e):
         self._check_group(group)
-        return self.log_fold_change(base=base)[0,self.groups.index(group),:]
+        return self.log_fold_change(base=base)[0, self.groups.index(group), :]
 
-    def summary(self, qval_thres=None, fc_upper_thres=None, 
-        fc_lower_thres=None, mean_thres=None, 
-        **kwargs) -> pd.DataFrame:
+    def summary(self, qval_thres=None, fc_upper_thres=None,
+                fc_lower_thres=None, mean_thres=None,
+                **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
         res = super().summary(**kwargs)
-        
+
         res = self._threshold_summary(
-            res=res, 
-            qval_thres=qval_thres, 
-            fc_upper_thres=fc_upper_thres, 
-            fc_lower_thres=fc_lower_thres, 
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
             mean_thres=mean_thres
-            )
+        )
 
         return res
 
-    def summary_group(self, group, 
-        qval_thres=None, fc_upper_thres=None, 
-        fc_lower_thres=None, mean_thres=None, 
-        **kwargs) -> pd.DataFrame:
+    def summary_group(self, group,
+                      qval_thres=None, fc_upper_thres=None,
+                      fc_lower_thres=None, mean_thres=None,
+                      **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
 
@@ -1209,14 +1209,15 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
         })
 
         res = self._threshold_summary(
-            res=res, 
-            qval_thres=qval_thres, 
-            fc_upper_thres=fc_upper_thres, 
-            fc_lower_thres=fc_lower_thres, 
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
             mean_thres=mean_thres
-            )
+        )
 
         return res
+
 
 class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
     """
@@ -1264,21 +1265,21 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
             self._check_partition(partition)
             return self._tests[self.partitions.index(partition)]
 
-    def summary(self, qval_thres=None, fc_upper_thres=None, 
-        fc_lower_thres=None, mean_thres=None, 
-        **kwargs) -> pd.DataFrame:
+    def summary(self, qval_thres=None, fc_upper_thres=None,
+                fc_lower_thres=None, mean_thres=None,
+                **kwargs) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
         res = super().summary(**kwargs)
-        
+
         res = self._threshold_summary(
-            res=res, 
-            qval_thres=qval_thres, 
-            fc_upper_thres=fc_upper_thres, 
-            fc_lower_thres=fc_lower_thres, 
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
             mean_thres=mean_thres
-            )
+        )
 
         return res
 
@@ -1334,7 +1335,8 @@ def _fit(
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
-        close_session=True
+        close_session=True,
+        dtype="float32"
 ):
     """
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
@@ -1362,9 +1364,12 @@ def _fit(
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
+    :param dtype: Allows specifying the precision which should be used to fit data.
+
+        Should be "float32" for single precision or "float64" for double precision.
     :param close_session: If True, will finalize the estimator. Otherwise, return the estimator itself.
     """
-    if training_strategy.lower() == 'bfgs':
+    if isinstance(training_strategy, str) and training_strategy.lower() == 'bfgs':
         lib_size = np.zeros(data.shape[0])
         if noise_model == "nb" or noise_model == "negative_binomial":
             estim = Estim_BFGS(X=data, design_loc=design_loc, design_scale=design_scale,
@@ -1393,6 +1398,7 @@ def _fit(
             estim = test_model.Estimator(
                 input_data=input_data,
                 init_model=init_model,
+                dtype=dtype,
                 **constructor_args
             )
 
@@ -1431,6 +1437,7 @@ def lrt(
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
+        dtype="float32",
         **kwargs
 ):
     """
@@ -1485,6 +1492,9 @@ def lrt(
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
+    :param dtype: Allows specifying the precision which should be used to fit data.
+
+        Should be "float32" for single precision or "float64" for double precision.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
@@ -1524,7 +1534,8 @@ def lrt(
         batch_size=batch_size,
         training_strategy=training_strategy,
         quick_scale=quick_scale,
-        **kwargs,
+        dtype=dtype,
+        **kwargs
     )
     full_model = _fit(
         noise_model=noise_model,
@@ -1533,10 +1544,12 @@ def lrt(
         design_scale=full_design_scale,
         gene_names=gene_names,
         init_model=reduced_model,
-        batch_size=X.shape[0],  # workaround: batch_size=num_observations
+        batch_size=batch_size,
+        # batch_size=X.shape[0],  # workaround: batch_size=num_observations
         training_strategy=training_strategy,
         quick_scale=quick_scale,
-        **kwargs,
+        dtype=dtype,
+        **kwargs
     )
 
     de_test = DifferentialExpressionTestLRT(
@@ -1563,6 +1576,7 @@ def wald(
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
+        dtype="float32",
         **kwargs
 ):
     """
@@ -1614,6 +1628,9 @@ def wald(
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
+    :param dtype: Allows specifying the precision which should be used to fit data.
+
+        Should be "float32" for single precision or "float64" for double precision.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
@@ -1660,6 +1677,7 @@ def wald(
         batch_size=batch_size,
         training_strategy=training_strategy,
         quick_scale=quick_scale,
+        dtype=dtype,
         **kwargs,
     )
 
@@ -1753,6 +1771,7 @@ def two_sample(
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
+        dtype="float32",
         **kwargs
 ) -> _DifferentialExpressionTestSingle:
     r"""
@@ -1821,6 +1840,9 @@ def two_sample(
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
+    :param dtype: Allows specifying the precision which should be used to fit data.
+
+        Should be "float32" for single precision or "float64" for double precision.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if test in ['t-test', 'wilcoxon'] and noise_model is not None:
@@ -1859,6 +1881,7 @@ def two_sample(
             batch_size=batch_size,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
+            dtype=dtype,
             **kwargs
         )
     elif test.lower() == 'lrt':
@@ -1880,6 +1903,7 @@ def two_sample(
             batch_size=batch_size,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
+            dtype=dtype,
             **kwargs
         )
     elif test.lower() == 't-test' or test.lower() == "t_test" or test.lower() == "ttest":
@@ -1911,6 +1935,7 @@ def pairwise(
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
+        dtype="float32",
         keep_full_test_objs: bool = False,
         **kwargs
 ):
@@ -1992,6 +2017,9 @@ def pairwise(
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
+    :param dtype: Allows specifying the precision which should be used to fit data.
+
+        Should be "float32" for single precision or "float64" for double precision.
     :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test"
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
@@ -2018,6 +2046,7 @@ def pairwise(
             batch_size=batch_size,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
+            dtype=dtype,
             **kwargs
         )
 
@@ -2070,6 +2099,7 @@ def pairwise(
                     batch_size=batch_size,
                     training_strategy=training_strategy,
                     quick_scale=quick_scale,
+                    dtype=dtype,
                     **kwargs
                 )
                 pvals[i, j] = de_test_temp.pval
@@ -2102,6 +2132,7 @@ def versus_rest(
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
+        dtype="float32",
         keep_full_test_objs: bool = False,
         **kwargs
 ):
@@ -2182,7 +2213,10 @@ def versus_rest(
           This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
-        Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
+        Useful in scenarios where fitting the exact `scale` is not
+    :param dtype: Allows specifying the precision which should be used to fit data.
+
+        Should be "float32" for single precision or "float64" for double precision.
     :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test"
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
@@ -2218,6 +2252,7 @@ def versus_rest(
             batch_size=batch_size,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
+            dtype=dtype,
             **kwargs
         )
         pvals[0, i] = de_test_temp.pval
@@ -2235,11 +2270,12 @@ def versus_rest(
 
     return de_test
 
+
 def partition(
-    data,
-    partition: Union[str, np.ndarray, list],
-    gene_names: str = None,
-    sample_description: pd.DataFrame = None):
+        data,
+        partition: Union[str, np.ndarray, list],
+        gene_names: str = None,
+        sample_description: pd.DataFrame = None):
     """
     Perform differential expression test for each group. This class handles 
     the partitioning of the data set, the differential test callls and
@@ -2258,11 +2294,12 @@ def partition(
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
-    return(_Partition(
+    return (_Partition(
         data=data,
         partition=partition,
         gene_names=gene_names,
         sample_description=sample_description))
+
 
 class _Partition():
     """
@@ -2275,11 +2312,11 @@ class _Partition():
     """
 
     def __init__(
-        self,
-        data,
-        partition: Union[str, np.ndarray, list],
-        gene_names: str = None,
-        sample_description: pd.DataFrame = None):
+            self,
+            data,
+            partition: Union[str, np.ndarray, list],
+            gene_names: str = None,
+            sample_description: pd.DataFrame = None):
         """
         :param data: input data
         :param partition: str, array
@@ -2294,16 +2331,16 @@ class _Partition():
         self.sample_description = _parse_sample_description(data, sample_description)
         self.partition = _parse_grouping(data, sample_description, partition)
         self.partitions = np.unique(self.partition)
-        self.partition_idx = [np.where(self.partition==x)[0] for x in self.partitions]    
+        self.partition_idx = [np.where(self.partition == x)[0] for x in self.partitions]
 
     def two_sample(
-        self,
-        grouping: Union[str],
-        test=None,
-        noise_model: str = None,
-        batch_size: int = None,
-        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
-        **kwargs
+            self,
+            grouping: Union[str],
+            test=None,
+            noise_model: str = None,
+            batch_size: int = None,
+            training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+            **kwargs
     ) -> _DifferentialExpressionTestSingle:
         """
         See annotation of de.test.two_sample()
@@ -2342,27 +2379,27 @@ class _Partition():
         :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
         """
         DETestsSingle = []
-        for i,idx in enumerate(self.partition_idx):
+        for i, idx in enumerate(self.partition_idx):
             DETestsSingle.append(two_sample(
-                data=self.X[idx,:],
+                data=self.X[idx, :],
                 grouping=grouping,
                 test=test,
                 gene_names=self.gene_names,
-                sample_description=self.sample_description.iloc[idx,:],
-                noise_model = noise_model,
-                batch_size = batch_size,
+                sample_description=self.sample_description.iloc[idx, :],
+                noise_model=noise_model,
+                batch_size=batch_size,
                 training_strategy=training_strategy,
                 **kwargs
             ))
         return DifferentialExpressionTestByPartition(
-            partitions=self.partitions, 
-            tests=DETestsSingle, 
+            partitions=self.partitions,
+            tests=DETestsSingle,
             ave=np.mean(self.X, axis=0),
             correction_type="by_test")
 
     def t_test(
-        self,
-        grouping: Union[str]
+            self,
+            grouping: Union[str]
     ):
         """
         See annotation of de.test.t_test()
@@ -2372,22 +2409,22 @@ class _Partition():
             - column in data.obs/sample_description which contains the split of observations into the two groups.
         """
         DETestsSingle = []
-        for i,idx in enumerate(self.partition_idx):
+        for i, idx in enumerate(self.partition_idx):
             DETestsSingle.append(t_test(
-                data=self.X[idx,:],
+                data=self.X[idx, :],
                 grouping=grouping,
                 gene_names=self.gene_names,
-                sample_description=self.sample_description.iloc[idx,:]
+                sample_description=self.sample_description.iloc[idx, :]
             ))
         return DifferentialExpressionTestByPartition(
-            partitions=self.partitions, 
-            tests=DETestsSingle, 
+            partitions=self.partitions,
+            tests=DETestsSingle,
             ave=np.mean(self.X, axis=0),
             correction_type="by_test")
 
     def wilcoxon(
-        self,
-        grouping: Union[str],
+            self,
+            grouping: Union[str],
     ):
         """
         See annotation of de.test.wilcoxon()
@@ -2398,31 +2435,31 @@ class _Partition():
             - array of length `num_observations` containing group labels
         """
         DETestsSingle = []
-        for i,idx in enumerate(self.partition_idx):
+        for i, idx in enumerate(self.partition_idx):
             DETestsSingle.append(wilcoxon(
-                data=self.X[idx,:],
+                data=self.X[idx, :],
                 grouping=grouping,
                 gene_names=self.gene_names,
-                sample_description=self.sample_description.iloc[idx,:]
+                sample_description=self.sample_description.iloc[idx, :]
             ))
         return DifferentialExpressionTestByPartition(
-            partitions=self.partitions, 
-            tests=DETestsSingle, 
+            partitions=self.partitions,
+            tests=DETestsSingle,
             ave=np.mean(self.X, axis=0),
             correction_type="by_test")
 
     def lrt(
-        self,
-        reduced_formula: str = None,
-        full_formula: str = None,
-        reduced_formula_loc: str = None,
-        full_formula_loc: str = None,
-        reduced_formula_scale: str = None,
-        full_formula_scale: str = None,
-        noise_model="nb",
-        batch_size: int = None,
-        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
-        **kwargs
+            self,
+            reduced_formula: str = None,
+            full_formula: str = None,
+            reduced_formula_loc: str = None,
+            full_formula_loc: str = None,
+            reduced_formula_scale: str = None,
+            full_formula_scale: str = None,
+            noise_model="nb",
+            batch_size: int = None,
+            training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+            **kwargs
     ):
         """
         See annotation of de.test.lrt()
@@ -2468,9 +2505,9 @@ class _Partition():
         :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
         """
         DETestsSingle = []
-        for i,idx in enumerate(self.partition_idx):
+        for i, idx in enumerate(self.partition_idx):
             DETestsSingle.append(lrt(
-                data=self.X[idx,:],
+                data=self.X[idx, :],
                 reduced_formula=reduced_formula,
                 full_formula=full_formula,
                 reduced_formula_loc=reduced_formula_loc,
@@ -2478,29 +2515,29 @@ class _Partition():
                 reduced_formula_scale=reduced_formula_scale,
                 full_formula_scale=full_formula_scale,
                 gene_names=self.gene_names,
-                sample_description=self.sample_description.iloc[idx,:],
+                sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
                 batch_size=batch_size,
                 training_strategy=training_strategy,
                 **kwargs
             ))
         return DifferentialExpressionTestByPartition(
-            partitions=self.partitions, 
-            tests=DETestsSingle, 
+            partitions=self.partitions,
+            tests=DETestsSingle,
             ave=np.mean(self.X, axis=0),
             correction_type="by_test")
 
     def wald(
-        self,
-        factor_loc_totest: str,
-        coef_to_test: object = None,  # e.g. coef_to_test="B"
-        formula: str = None,
-        formula_loc: str = None,
-        formula_scale: str = None,
-        noise_model: str = "nb",
-        batch_size: int = None,
-        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
-        **kwargs
+            self,
+            factor_loc_totest: str,
+            coef_to_test: object = None,  # e.g. coef_to_test="B"
+            formula: str = None,
+            formula_loc: str = None,
+            formula_scale: str = None,
+            noise_model: str = "nb",
+            batch_size: int = None,
+            training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+            **kwargs
     ):
         """
         This function performs a wald test within each partition of a data set.
@@ -2544,23 +2581,23 @@ class _Partition():
         :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
         """
         DETestsSingle = []
-        for i,idx in enumerate(self.partition_idx):
+        for i, idx in enumerate(self.partition_idx):
             DETestsSingle.append(wald(
-                data=self.X[idx,:],
+                data=self.X[idx, :],
                 factor_loc_totest=factor_loc_totest,
                 coef_to_test=coef_to_test,  # e.g. coef_to_test="B"
                 formula=formula,
                 formula_loc=formula_loc,
                 formula_scale=formula_scale,
                 gene_names=self.gene_names,
-                sample_description=self.sample_description.iloc[idx,:],
+                sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
                 batch_size=batch_size,
                 training_strategy=training_strategy,
                 **kwargs
             ))
         return DifferentialExpressionTestByPartition(
-            partitions=self.partitions, 
-            tests=DETestsSingle, 
+            partitions=self.partitions,
+            tests=DETestsSingle,
             ave=np.mean(self.X, axis=0),
             correction_type="by_test")
