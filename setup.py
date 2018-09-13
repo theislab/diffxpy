@@ -13,7 +13,7 @@ setup(
         'scipy',
         'pandas',
         'patsy',
-        'batchglm>=0.2.0',
+        'batchglm>=0.3.0',
         'xarray',
         'statsmodels',
     ],
