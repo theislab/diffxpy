@@ -397,7 +397,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         :param base: the log base to use; default is the natural logarithm
         :param return_type: Choose the return type.
             Possible values are:
-            
+
             - "dataframe":
               return a pandas.DataFrame with columns `gene`, `minuend_<group>`, `subtrahend_<group>` and `logFC`.
             - "xarray":
@@ -1340,7 +1340,7 @@ def _fit(
 ):
     """
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
-        
+
         - 'nb': default
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -1350,11 +1350,11 @@ def _fit(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-          
+
           Example:
-          
+
           .. code-block:: python
-          
+
               [
                 {"learning_rate": 0.5, },
                 {"learning_rate": 0.05, },
@@ -1441,13 +1441,13 @@ def lrt(
         **kwargs
 ):
     """
-    Perform log-likelihood ratio test for differential expression 
+    Perform log-likelihood ratio test for differential expression
     between two groups on adata object for each gene.
 
     This function wraps the selected statistical test for the scenario of
     a two sample comparison. All unit_test offered in this wrapper
     test for the difference of the mean parameter of both samples.
-        
+
     :param data: input data
     :param reduced_formula: formula
         Reduced model formula for location and scale parameter models.
@@ -1468,7 +1468,7 @@ def lrt(
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
-        
+
         - 'nb': default
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -1478,11 +1478,11 @@ def lrt(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-          
+
           Example:
-          
+
           .. code-block:: python
-          
+
               [
                 {"learning_rate": 0.5, },
                 {"learning_rate": 0.05, },
@@ -1499,9 +1499,6 @@ def lrt(
     """
     if len(kwargs) != 0:
         logger.info("additional kwargs: %s", str(kwargs))
-
-    # TODO: remove this warning when lrt is working
-    logger.warning("lrt is not ready for usage yet!")
 
     if full_formula_loc is None:
         full_formula_loc = full_formula
@@ -1586,7 +1583,7 @@ def wald(
     This function wraps the selected statistical test for the scenario of
     a two sample comparison. All unit_test offered in this wrapper
     test for the difference of the mean parameter of both samples.
-    
+
     :param data: input data
     :param formula: formula
         model formula for location and scale parameter models.
@@ -1604,7 +1601,7 @@ def wald(
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
-        
+
         - 'nb': default
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -1614,11 +1611,11 @@ def wald(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-          
+
           Example:
-          
+
           .. code-block:: python
-          
+
               [
                 {"learning_rate": 0.5, },
                 {"learning_rate": 0.05, },
@@ -1707,12 +1704,12 @@ def t_test(
         sample_description=None
 ):
     """
-    Perform Welch's t-test for differential expression 
+    Perform Welch's t-test for differential expression
     between two groups on adata object for each gene.
 
     :param data: input data
     :param grouping: str, array
-    
+
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
@@ -1738,12 +1735,12 @@ def wilcoxon(
         sample_description=None
 ):
     """
-    Perform Wilcoxon rank sum test for differential expression 
+    Perform Wilcoxon rank sum test for differential expression
     between two groups on adata object for each gene.
 
     :param data: input data
     :param grouping: str, array
-    
+
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
@@ -1785,7 +1782,7 @@ def two_sample(
     are saved in a column named "group"):
     - lrt(log-likelihood ratio test):
         Requires the fitting of 2 generalized linear models (full and reduced).
-        
+
         * full model location parameter: ~ 1 + group
         * full model scale parameter: ~ 1 + group
         * reduced model location parameter: ~ 1
@@ -1801,14 +1798,14 @@ def two_sample(
     - wilcoxon:
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
-        
+
     :param data: input data
     :param grouping: str, array
-    
+
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
     :param test: str, statistical test to use. Possible options:
-    
+
         - 'wald': default
         - 'lrt'
         - 't-test'
@@ -1816,7 +1813,7 @@ def two_sample(
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
-        
+
         - 'nb': default
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -1826,11 +1823,11 @@ def two_sample(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-          
+
           Example:
-          
+
           .. code-block:: python
-          
+
               [
                 {"learning_rate": 0.5, },
                 {"learning_rate": 0.05, },
@@ -1953,10 +1950,10 @@ def pairwise(
     are saved in a column named "group"), each test is executed
     on the subset of the data that only contains observations of a given
     pair of groups:
-    
+
     - lrt(log-likelihood ratio test):
         Requires the fitting of 2 generalized linear models (full and reduced).
-        
+
         * full model location parameter: ~ 1 + group
         * full model scale parameter: ~ 1 + group
         * reduced model location parameter: ~ 1
@@ -1972,14 +1969,14 @@ def pairwise(
     - wilcoxon:
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
-        
+
     :param data: input data
     :param grouping: str, array
-    
+
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
     :param test: str, statistical test to use. Possible options:
-    
+
         - 'z-test': default
         - 'wald'
         - 'lrt'
@@ -1988,7 +1985,7 @@ def pairwise(
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
-        
+
         - 'nb': default
     :param pval_correction: Choose between global and test-wise correction.
         Can be:
@@ -2003,11 +2000,11 @@ def pairwise(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-          
+
           Example:
-          
+
           .. code-block:: python
-          
+
               [
                 {"learning_rate": 0.5, },
                 {"learning_rate": 0.05, },
@@ -2151,10 +2148,10 @@ def versus_rest(
     on the entire data and the labels are modified so that the target group
     is one group and the remaining groups are allocated to the second reference
     group):
-    
+
     - lrt(log-likelihood ratio test):
         Requires the fitting of 2 generalized linear models (full and reduced).
-        
+
         * full model location parameter: ~ 1 + group
         * full model scale parameter: ~ 1 + group
         * reduced model location parameter: ~ 1
@@ -2170,14 +2167,14 @@ def versus_rest(
     - wilcoxon:
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
-        
+
     :param data: input data
     :param grouping: str, array
-    
+
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
     :param test: str, statistical test to use. Possible options:
-    
+
         - 'wald'
         - 'lrt'
         - 't-test'
@@ -2185,7 +2182,7 @@ def versus_rest(
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
-        
+
         - 'nb': default
     :param pval_correction: Choose between global and test-wise correction.
         Can be:
@@ -2200,11 +2197,11 @@ def versus_rest(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-          
+
           Example:
-          
+
           .. code-block:: python
-          
+
               [
                 {"learning_rate": 0.5, },
                 {"learning_rate": 0.05, },
@@ -2277,18 +2274,18 @@ def partition(
         gene_names: str = None,
         sample_description: pd.DataFrame = None):
     """
-    Perform differential expression test for each group. This class handles 
+    Perform differential expression test for each group. This class handles
     the partitioning of the data set, the differential test callls and
-    the sumamry of the individual tests into one 
+    the sumamry of the individual tests into one
     DifferentialExpressionTestMulti object. All functions the yield
-    DifferentialExpressionTestSingle objects can be performed on each 
+    DifferentialExpressionTestSingle objects can be performed on each
     partition.
 
     Wraps _Partition so that doc strings are nice.
 
     :param data: input data
     :param grouping: str, array
-    
+
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
@@ -2303,11 +2300,11 @@ def partition(
 
 class _Partition():
     """
-    Perform differential expression test for each group. This class handles 
+    Perform differential expression test for each group. This class handles
     the partitioning of the data set, the differential test callls and
-    the sumamry of the individual tests into one 
+    the sumamry of the individual tests into one
     DifferentialExpressionTestMulti object. All functions the yield
-    DifferentialExpressionTestSingle objects can be performed on each 
+    DifferentialExpressionTestSingle objects can be performed on each
     partition.
     """
 
@@ -2320,7 +2317,7 @@ class _Partition():
         """
         :param data: input data
         :param partition: str, array
-        
+
             - column in data.obs/sample_description which contains the split of observations into the two groups.
             - array of length `num_observations` containing group labels
         :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
@@ -2344,18 +2341,18 @@ class _Partition():
     ) -> _DifferentialExpressionTestSingle:
         """
         See annotation of de.test.two_sample()
-            
+
         :param grouping: str
-        
+
             - column in data.obs/sample_description which contains the split of observations into the two groups.
         :param test: str, statistical test to use. Possible options:
-        
+
             - 'wald': default
             - 'lrt'
             - 't-test'
             - 'wilcoxon'
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
-            
+
             - 'nb': default
         :param batch_size: the batch size to use for the estimator
         :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -2365,11 +2362,11 @@ class _Partition():
               `training_strategy(estimator)`.
             - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
               method arguments.
-              
+
               Example:
-              
+
               .. code-block:: python
-              
+
                   [
                     {"learning_rate": 0.5, },
                     {"learning_rate": 0.05, },
@@ -2403,9 +2400,9 @@ class _Partition():
     ):
         """
         See annotation of de.test.t_test()
-        
+
         :param grouping: str
-        
+
             - column in data.obs/sample_description which contains the split of observations into the two groups.
         """
         DETestsSingle = []
@@ -2428,9 +2425,9 @@ class _Partition():
     ):
         """
         See annotation of de.test.wilcoxon()
-        
+
         :param grouping: str, array
-        
+
             - column in data.obs/sample_description which contains the split of observations into the two groups.
             - array of length `num_observations` containing group labels
         """
@@ -2463,7 +2460,7 @@ class _Partition():
     ):
         """
         See annotation of de.test.lrt()
-            
+
         :param reduced_formula: formula
             Reduced model formula for location and scale parameter models.
         :param full_formula: formula
@@ -2481,7 +2478,7 @@ class _Partition():
             Full model formula for scale parameter model.
             If not specified, `reduced_formula_scale` will be used instead.
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
-            
+
             - 'nb': default
         :param batch_size: the batch size to use for the estimator
         :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -2491,11 +2488,11 @@ class _Partition():
               `training_strategy(estimator)`.
             - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
               method arguments.
-              
+
               Example:
-              
+
               .. code-block:: python
-              
+
                   [
                     {"learning_rate": 0.5, },
                     {"learning_rate": 0.05, },
@@ -2542,7 +2539,7 @@ class _Partition():
         """
         This function performs a wald test within each partition of a data set.
         See annotation of de.test.wald()
-            
+
         :param formula: formula
             model formula for location and scale parameter models.
         :param formula_loc: formula
@@ -2557,7 +2554,7 @@ class _Partition():
         :param coef_to_test: If there are more than two groups specified by `factor_loc_totest`,
             this parameter allows to specify the group which should be tested
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
-            
+
             - 'nb': default
         :param batch_size: the batch size to use for the estimator
         :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -2567,11 +2564,11 @@ class _Partition():
               `training_strategy(estimator)`.
             - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
               method arguments.
-              
+
               Example:
-              
+
               .. code-block:: python
-              
+
                   [
                     {"learning_rate": 0.5, },
                     {"learning_rate": 0.05, },
