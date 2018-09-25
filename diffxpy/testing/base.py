@@ -574,7 +574,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         if self._error_codes is not None:
             res["err"] = self._error_codes
         if self._niter is not None:
-            res["niter"] = self._niterf
+            res["niter"] = self._niter
 
         res = self._threshold_summary(
             res=res,
