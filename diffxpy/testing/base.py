@@ -1750,16 +1750,16 @@ def wald(
         assert col_slices.size > 0, "Could not find any matching columns!"
         if coef_to_test is not None:
             samples = sample_description[factor_loc_totest].astype(type(coef_to_test)) == coef_to_test
-            one_cols = np.where(design_loc[samples][:, col_slice][0] == 1)
+            one_cols = np.where(design_loc[samples][:, col_slices][0] == 1)
             if one_cols.size == 0:
                 # there is no such column; modify design matrix to create one
-                col_indices = col_slice[0]
+                col_indices = col_slices[0]
                 design_loc[:, col_index] = np.where(samples, 1, 0)
             else:
                 # use the one_column as col_index
                 col_indices = one_cols[0]
         else:
-            col_indices = col_slice[0]
+            col_indices = col_slices[0]
     elif coef_to_test is not None:
         # Directly select coefficients to test from design matrix (xarray):
         col_slices = np.asarray([list(np.asarray(design_loc.coords['design_params'])).index(x) for x in coef_to_test])
