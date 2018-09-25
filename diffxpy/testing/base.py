@@ -574,7 +574,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         if self._error_codes is not None:
             res["err"] = self._error_codes
         if self._niter is not None:
-            res["niter"] = self._niter
+            res["niter"] = self._niterf
 
         res = self._threshold_summary(
             res=res,
@@ -1324,11 +1324,12 @@ def _parse_sample_description(data, sample_description=None) -> pd.DataFrame:
             )
     return sample_description
 
-def design_matrix(    
-    data = None,
-    sample_description: pd.DataFrame = None,
-    formula: str = None,
-    dmat: pd.DataFrame = None
+
+def design_matrix(
+        data=None,
+        sample_description: pd.DataFrame = None,
+        formula: str = None,
+        dmat: pd.DataFrame = None
 ) -> Union[patsy.design_info.DesignMatrix, xr.Dataset]:
     """ Build design matrix for fit of generalized linear model.
 
@@ -1722,7 +1723,7 @@ def wald(
     if dmat_scale is None and formula_scale is None:
         raise ValueError("Supply either dmat_loc or formula_loc or formula.")
 
-    ## Parse input data formats:
+    # # Parse input data formats:
     # Count data:
     X = _parse_data(data, gene_names)
     # Gene IDs:
