@@ -1763,7 +1763,7 @@ def wald(
             col_indices = col_slices[0]
     elif coef_to_test is not None:
         # Directly select coefficients to test from design matrix (xarray):
-        col_slices = np.asarray([list(np.asarray(design_loc.coords['design_params'])).index(x) for x in coef_to_test])
+        col_indices = np.asarray([list(np.asarray(design_loc.coords['design_params'])).index(x) for x in coef_to_test])
 
     ## Fit GLM:
     model = _fit(
