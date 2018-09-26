@@ -1332,6 +1332,7 @@ def _fit(
         design_scale,
         init_model=None,
         gene_names=None,
+        size_factors=None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
@@ -1342,6 +1343,8 @@ def _fit(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
+    :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+        same order as in data
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
@@ -1387,6 +1390,7 @@ def _fit(
                 data=data,
                 design_loc=design_loc,
                 design_scale=design_scale,
+                size_factors=size_factors,
                 feature_names=gene_names,
             )
 
@@ -1434,6 +1438,7 @@ def lrt(
         gene_names=None,
         sample_description: pd.DataFrame = None,
         noise_model="nb",
+        size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
@@ -1470,6 +1475,8 @@ def lrt(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
+    :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+        same order as in data
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
@@ -1528,6 +1535,7 @@ def lrt(
         design_loc=reduced_design_loc,
         design_scale=reduced_design_scale,
         gene_names=gene_names,
+        size_factors=size_factors,
         batch_size=batch_size,
         training_strategy=training_strategy,
         quick_scale=quick_scale,
@@ -1541,6 +1549,7 @@ def lrt(
         design_scale=full_design_scale,
         gene_names=gene_names,
         init_model=reduced_model,
+        size_factors=size_factors,
         batch_size=batch_size,
         # batch_size=X.shape[0],  # workaround: batch_size=num_observations
         training_strategy=training_strategy,
@@ -1570,6 +1579,7 @@ def wald(
         gene_names: Union[str, np.ndarray] = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = "nb",
+        size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
@@ -1600,6 +1610,8 @@ def wald(
         this parameter allows to specify the group which should be tested
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+        same order as in data
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
@@ -1671,6 +1683,7 @@ def wald(
         design_loc=design_loc,
         design_scale=design_scale,
         gene_names=gene_names,
+        size_factors=size_factors,
         batch_size=batch_size,
         training_strategy=training_strategy,
         quick_scale=quick_scale,
@@ -1765,6 +1778,7 @@ def two_sample(
         gene_names=None,
         sample_description=None,
         noise_model: str = None,
+        size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
@@ -1815,6 +1829,8 @@ def two_sample(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
+    :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+        same order as in data
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
@@ -1875,6 +1891,7 @@ def two_sample(
             gene_names=gene_names,
             sample_description=sample_description,
             noise_model=noise_model,
+            size_factors=size_factors,
             batch_size=batch_size,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
@@ -1897,6 +1914,7 @@ def two_sample(
             gene_names=gene_names,
             sample_description=sample_description,
             noise_model=noise_model,
+            size_factors=size_factors,
             batch_size=batch_size,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
@@ -1929,6 +1947,7 @@ def pairwise(
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
         pval_correction: str = "global",
+        size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
@@ -1992,6 +2011,8 @@ def pairwise(
 
         - "global": correct all p-values in one operation
         - "by_test": correct the p-values of each test individually
+    :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+        same order as in data
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
@@ -2040,6 +2061,7 @@ def pairwise(
             design_loc=dmat,
             design_scale=dmat,
             gene_names=gene_names,
+            size_factors=size_factors,
             batch_size=batch_size,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
@@ -2093,6 +2115,7 @@ def pairwise(
                     gene_names=gene_names,
                     sample_description=sample_description.iloc[sel],
                     noise_model=noise_model,
+                    size_factors=size_factors[sel],
                     batch_size=batch_size,
                     training_strategy=training_strategy,
                     quick_scale=quick_scale,
@@ -2107,13 +2130,15 @@ def pairwise(
                     tests[i, j] = de_test_temp
                     tests[j, i] = de_test_temp
 
-        de_test = DifferentialExpressionTestPairwise(gene_ids=gene_names,
-                                                     pval=pvals,
-                                                     logfc=logfc,
-                                                     ave=np.mean(X, axis=0),
-                                                     groups=groups,
-                                                     tests=tests,
-                                                     correction_type=pval_correction)
+        de_test = DifferentialExpressionTestPairwise(
+            gene_ids=gene_names,
+            pval=pvals,
+            logfc=logfc,
+            ave=np.mean(X, axis=0),
+            groups=groups,
+            tests=tests,
+            correction_type=pval_correction
+        )
 
     return de_test
 
@@ -2126,6 +2151,7 @@ def versus_rest(
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
         pval_correction: str = "global",
+        size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
@@ -2189,6 +2215,8 @@ def versus_rest(
 
         - "global": correct all p-values in one operation
         - "by_test": correct the p-values of each test individually
+    :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+        same order as in data
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
@@ -2257,13 +2285,15 @@ def versus_rest(
         if keep_full_test_objs:
             tests[0, i] = de_test_temp
 
-    de_test = DifferentialExpressionTestVsRest(gene_ids=gene_names,
-                                               pval=pvals,
-                                               logfc=logfc,
-                                               ave=np.mean(X, axis=0),
-                                               groups=groups,
-                                               tests=tests,
-                                               correction_type=pval_correction)
+    de_test = DifferentialExpressionTestVsRest(
+        gene_ids=gene_names,
+        pval=pvals,
+        logfc=logfc,
+        ave=np.mean(X, axis=0),
+        groups=groups,
+        tests=tests,
+        correction_type=pval_correction
+    )
 
     return de_test
 
@@ -2335,6 +2365,7 @@ class _Partition():
             grouping: Union[str],
             test=None,
             noise_model: str = None,
+            size_factors: np.ndarray = None,
             batch_size: int = None,
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             **kwargs
@@ -2384,6 +2415,7 @@ class _Partition():
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
+                size_factors=size_factors[idx],
                 batch_size=batch_size,
                 training_strategy=training_strategy,
                 **kwargs
@@ -2454,6 +2486,7 @@ class _Partition():
             reduced_formula_scale: str = None,
             full_formula_scale: str = None,
             noise_model="nb",
+            size_factors: np.ndarray = None,
             batch_size: int = None,
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             **kwargs
@@ -2480,6 +2513,8 @@ class _Partition():
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
+        :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+            same order as in data
         :param batch_size: the batch size to use for the estimator
         :param training_strategy: {str, function, list} training strategy to use. Can be:
 
@@ -2514,6 +2549,7 @@ class _Partition():
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
+                size_factors=size_factors[idx],
                 batch_size=batch_size,
                 training_strategy=training_strategy,
                 **kwargs
@@ -2532,6 +2568,7 @@ class _Partition():
             formula_loc: str = None,
             formula_scale: str = None,
             noise_model: str = "nb",
+            size_factors: np.ndarray = None,
             batch_size: int = None,
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             **kwargs
@@ -2556,6 +2593,8 @@ class _Partition():
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
+        :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+            same order as in data
         :param batch_size: the batch size to use for the estimator
         :param training_strategy: {str, function, list} training strategy to use. Can be:
 
@@ -2589,6 +2628,7 @@ class _Partition():
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
+                size_factors=size_factors[idx],
                 batch_size=batch_size,
                 training_strategy=training_strategy,
                 **kwargs
