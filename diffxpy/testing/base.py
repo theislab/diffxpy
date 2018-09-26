@@ -1343,7 +1343,7 @@ def _fit(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
-    :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+    :param size_factors: 1D array of transformed library size factors for each cell in the 
         same order as in data
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -1475,7 +1475,7 @@ def lrt(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
-    :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+    :param size_factors: 1D array of transformed library size factors for each cell in the 
         same order as in data
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -1610,7 +1610,7 @@ def wald(
         this parameter allows to specify the group which should be tested
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
-    :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+    :param size_factors: 1D array of transformed library size factors for each cell in the 
         same order as in data
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
@@ -1829,7 +1829,7 @@ def two_sample(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
-    :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+    :param size_factors: 1D array of transformed library size factors for each cell in the 
         same order as in data
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -2011,7 +2011,7 @@ def pairwise(
 
         - "global": correct all p-values in one operation
         - "by_test": correct the p-values of each test individually
-    :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+    :param size_factors: 1D array of transformed library size factors for each cell in the 
         same order as in data
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -2215,7 +2215,7 @@ def versus_rest(
 
         - "global": correct all p-values in one operation
         - "by_test": correct the p-values of each test individually
-    :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+    :param size_factors: 1D array of transformed library size factors for each cell in the 
         same order as in data
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -2513,7 +2513,7 @@ class _Partition():
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
-        :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+        :param size_factors: 1D array of transformed library size factors for each cell in the 
             same order as in data
         :param batch_size: the batch size to use for the estimator
         :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -2593,7 +2593,7 @@ class _Partition():
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
-        :param size_factors: 1D array of log-transformed library size factors for each cell in the 
+        :param size_factors: 1D array of transformed library size factors for each cell in the 
             same order as in data
         :param batch_size: the batch size to use for the estimator
         :param training_strategy: {str, function, list} training strategy to use. Can be:
