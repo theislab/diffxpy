@@ -551,12 +551,21 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         return self.model_estim.par_link_loc[self.coef_loc_totest]
 
     def _test(self):
-        self.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
-        # standard deviation of estimates: coefficients x genes array with one coefficient per group
-        # theta_sd = sqrt(diagonal(fisher_inv))
-        self.theta_sd = np.sqrt(np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1)).T[self.coef_loc_totest]
-
-        return stats.wald_test(theta_mle=self.theta_mle, theta_sd=self.theta_sd, theta0=0)
+        # Check whether single- or multiple parameters are tested.
+        # For a single parameter, the wald statistic distribution is approximated
+        # with a normal distribution, for multiple parameters, a chi-square distribution is used.
+        standardelf.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
+        if len(self.coef_loc_totest)==1:
+            # standard deviation of estimates: coefficients x genes array with one coefficient per group
+            # theta_sd = sqrt(diagonal(fisher_inv))
+            self.theta_sd = np.sqrt(np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1)).T[self.coef_loc_totest]
+            return stats.wald_test(theta_mle=self.theta_mle, theta_sd=self.theta_sd, theta0=0)
+        else:
+            self.theta_sd = np.nan
+            return stats.wald_test_multi(
+                theta_mle=self.theta_mle, 
+                theta_invcovar=self.model_estim.fisher_inv[self.coef_loc_totest, self.coef_loc_totest, :], 
+                theta0=0)
 
     def summary(self, qval_thres=None, fc_upper_thres=None,
                 fc_lower_thres=None, mean_thres=None,
