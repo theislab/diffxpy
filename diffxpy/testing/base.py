@@ -1322,8 +1322,15 @@ def _parse_sample_description(data, sample_description=None) -> pd.DataFrame:
                 "Please specify `sample_description` or provide `data` as xarray.Dataset or anndata.AnnData " +
                 "with corresponding sample annotations"
             )
+    assert data.shape[0]==sample_description.shape[0], "data matrix and sample description must contain same number of cells"
     return sample_description
 
+def _parse_size_factors(size_factors, data):
+    if size_factors is not None:
+        if isinstance(size_factors, pd.core.series.Series):
+            size_factors = size_factors.values
+        assert size_factors.shape[0]==data.shape[0], "data matrix and size factors must contain same number of cells"
+    return size_factors
 
 def design_matrix(
         data=None,
@@ -1575,6 +1582,7 @@ def lrt(
     X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
+    size_factors = _parse_size_factors(size_factors=size_factors, data=X)
 
     full_design_loc = data_utils.design_matrix(
         sample_description=sample_description, formula=full_formula_loc)
@@ -1736,13 +1744,11 @@ def wald(
         raise ValueError("Supply either dmat_loc or formula_loc or formula.")
 
     # # Parse input data formats:
-    # Count data:
     X = _parse_data(data, gene_names)
-    # Gene IDs:
     gene_names = _parse_gene_names(data, gene_names)
-    # Sample description and design matrices:
     if dmat_loc is None and dmat_scale is None:
         sample_description = _parse_sample_description(data, sample_description)
+    size_factors = _parse_size_factors(size_factors=size_factors, data=X)
 
     if dmat_loc is None:
         design_loc = data_utils.design_matrix(
