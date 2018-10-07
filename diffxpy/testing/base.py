@@ -1451,7 +1451,8 @@ def _fit(
         if noise_model == "nb" or noise_model == "negative_binomial":
             import batchglm.api.models.nb_glm as test_model
 
-            logger.info("Estimating model...")
+            logger.info("Fitting model...")
+            logger.debug(" * Assembling input data...")
             input_data = test_model.InputData.new(
                 data=data,
                 design_loc=design_loc,
@@ -1462,6 +1463,7 @@ def _fit(
                 feature_names=gene_names,
             )
 
+            logger.debug(" * Set up Estimator...")
             constructor_args = {}
             if batch_size is not None:
                 constructor_args["batch_size"] = batch_size
@@ -1474,8 +1476,10 @@ def _fit(
                 **constructor_args
             )
 
+            logger.debug(" * Initializing Estimator...")
             estim.initialize()
 
+            logger.debug(" * Train model...")
             # training:
             if callable(training_strategy):
                 # call training_strategy if it is a function
@@ -1484,6 +1488,7 @@ def _fit(
                 estim.train_sequence(training_strategy)
 
             if close_session:
+                logger.debug(" * Finalize estimation...")
                 model = estim.finalize()
             else:
                 model = estim
