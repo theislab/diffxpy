@@ -12,10 +12,7 @@ We propagated direct control of tensorflow multi-threading into batchglm which c
     TF_CONFIG_PROTO.inter_op_parallelism_threads = 1
     TF_CONFIG_PROTO.intra_op_parallelism_threads = 1
 
-Note that tensorflow distinguishes intra- and inter-operation parallelism which refers to how tasks are distributed across threads. To avoid this strict allocation you can also set the following environmental variable that is used by tensorflow for the entire pool of threads: call::
-
-    import os
-    os.environ.setdefault("TF_NUM_THREADS", "1")
+Note that tensorflow distinguishes intra- and inter-operation parallelism which refers to how tasks are distributed across threads.
 
 numpy/scipy
 -----------
