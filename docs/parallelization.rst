@@ -1,5 +1,5 @@
-Parallization
-=============
+Parallelization
+===============
 
 Most of the heavy computation within diffxpy functions is carried out by batchglm. batchglm uses numpy and tensorflow for the run-time limiting linear algebra operations. Both tensorflow and numpy may show different parallelization behaviour depending on the operating system. Here, we describe how one can limit the number of cores used by diffxpy by controlling its dependencies, numpy and tensorflow. Note that these limits may not be necessary on all platforms. Secondly, also note that such limits lead to suboptimal performance given the total resources of your machine.
 

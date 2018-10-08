@@ -1468,7 +1468,7 @@ def _fit(
             if batch_size is not None:
                 constructor_args["batch_size"] = batch_size
             if quick_scale is not None:
-                constructor_args["quick_scale"] = quick_scale,
+                constructor_args["quick_scale"] = quick_scale
             estim = test_model.Estimator(
                 input_data=input_data,
                 init_model=init_model,
