@@ -113,8 +113,8 @@ class Estim_BFGS():
             logger.warning("Using BFGS with batching is currently not supported!")
 
         self.X = X
-        self.design_loc = np.asmatrix(design_loc)
-        self.design_scale = np.asmatrix(design_scale)
+        self.design_loc = np.asarray(design_loc)
+        self.design_scale = np.asarray(design_scale)
         self.lib_size = lib_size
         self.batch_size = batch_size
         self.feature_names = feature_names
