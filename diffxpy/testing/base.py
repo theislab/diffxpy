@@ -259,6 +259,7 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
         Summarize differential expression results into an output table.
         """
         assert self.gene_ids is not None
+        logger.debug("Performing differential expression test...")
 
         res = pd.DataFrame({
             "gene": self.gene_ids,
@@ -1479,7 +1480,7 @@ def _fit(
             logger.debug(" * Initializing Estimator...")
             estim.initialize()
 
-            logger.debug(" * Train model...")
+            logger.debug(" * Run estimation...")
             # training:
             if callable(training_strategy):
                 # call training_strategy if it is a function
@@ -1492,7 +1493,7 @@ def _fit(
                 model = estim.finalize()
             else:
                 model = estim
-            logger.info("Estimating model ready")
+            logger.debug(" * Model fitting done.")
 
         else:
             raise ValueError('base.test(): `noise_model` not recognized.')
