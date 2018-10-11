@@ -14,7 +14,7 @@ The aforementioned workflows can be concatenated in pipelines and results can be
 Refer to the documentation for details of the individual submodules.
 
 # Tutorials
-We provide usage example cases (vignettes) in the `tutorials/` directory. These examples are described in the documentation.
+We provide usage example cases (vignettes) in the separate repository [diffxpy_tutorials](https://github.com/theislab/diffxpy_tutorials). These examples are summarized in the documentation of diffxpy.
 
 # Building the documentation
 The documentation is maintained in the `docs/` directory.
