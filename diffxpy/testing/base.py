@@ -495,14 +495,35 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     """
 
     model_estim: _Estimation
+    sd_loc_totest: int
     coef_loc_totest: int
+    indep_coefs: np.ndarray
     theta_mle: np.ndarray
     theta_sd: np.ndarray
 
-    def __init__(self, model_estim: _Estimation, col_index):
+    def __init__(
+        self, 
+        model_estim: _Estimation, 
+        col_index: int, 
+        indep_coefs: np.ndarray = None
+    ):
+        """
+        :param model_estim:
+        :param cold_index: indices of indep_coefs to test
+        :param indep_coefs: indices of independent coefficients in coefficient vector
+        """
         super().__init__()
         self.model_estim = model_estim
-        self.coef_loc_totest = col_index
+        self.coef_loc_totest = col_index 
+        # Note that self.indep_coefs are relevant if constraints are given
+        # and hessian is computed across independent coefficients only 
+        # whereas point estimators are given for all coefficients.
+        if indep_coefs is not None: 
+            self.indep_coefs = indep_coefs
+            self.sd_loc_totest = np.where(self.indep_coefs == col_index)[0]
+            self.sd_loc_totest = self.sd_loc_totest[0]
+        else:
+            self.sd_loc_totest = self.coef_loc_totest
         # p = self.pval
         # q = self.qval
 
@@ -555,7 +576,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         self.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
         # standard deviation of estimates: coefficients x genes array with one coefficient per group
         # theta_sd = sqrt(diagonal(fisher_inv))
-        self.theta_sd = np.sqrt(np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1)).T[self.coef_loc_totest]
+        self.theta_sd = np.sqrt(np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1)).T[self.sd_loc_totest]
 
         return stats.wald_test(theta_mle=self.theta_mle, theta_sd=self.theta_sd, theta0=0)
 
@@ -1769,6 +1790,7 @@ def wald(
         design_scale = dmat_scale
 
     # Coefficients to test:
+    indep_coef_indices = None
     if factor_loc_totest is not None:
         # Select coefficients to test via formula model:
         col_slices = np.arange(design_loc.shape[-1])[design_loc.design_info.slice(factor_loc_totest)]
@@ -1787,7 +1809,16 @@ def wald(
             col_indices = col_slices[0]
     elif coef_to_test is not None:
         # Directly select coefficients to test from design matrix (xarray):
-        col_indices = np.asarray([list(np.asarray(design_loc.coords['design_params'])).index(x) for x in coef_to_test])[0]
+        # Check that coefficients to test are not dependent parameters if constraints are given:
+        col_slices = np.asarray([
+            list(np.asarray(design_loc.coords['design_params'])).index(x) 
+            for x in coef_to_test
+        ])
+        if constraints_loc is not None:
+            dep_coef_indices = np.where(np.any(constraints_loc==-1, axis=0)==True)[0]
+            assert np.all([x not in dep_coef_indices for x in col_slices]), "cannot test dependent coefficient"
+            indep_coef_indices = np.where(np.any(constraints_loc==-1, axis=0)==False)[0]
+        col_indices = col_slices[0]
 
     ## Fit GLM:
     model = _fit(
@@ -1807,7 +1838,11 @@ def wald(
     )
 
     ## Perform DE test:
-    de_test = DifferentialExpressionTestWald(model, col_index=col_indices)
+    de_test = DifferentialExpressionTestWald(
+        model, 
+        col_index=col_indices, 
+        indep_coefs=indep_coef_indices
+    )
 
     return de_test
 
