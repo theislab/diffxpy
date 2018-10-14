@@ -504,7 +504,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     def __init__(
         self, 
         model_estim: _Estimation, 
-        col_index: int, 
+        col_indices: np.ndarray, 
         indep_coefs: np.ndarray = None
     ):
         """
@@ -514,14 +514,13 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         """
         super().__init__()
         self.model_estim = model_estim
-        self.coef_loc_totest = col_index 
+        self.coef_loc_totest = col_indices 
         # Note that self.indep_coefs are relevant if constraints are given
         # and hessian is computed across independent coefficients only 
         # whereas point estimators are given for all coefficients.
         if indep_coefs is not None: 
             self.indep_coefs = indep_coefs
-            self.sd_loc_totest = np.where(self.indep_coefs == col_index)[0]
-            self.sd_loc_totest = self.sd_loc_totest[0]
+            self.sd_loc_totest = np.where(self.indep_coefs == col_indices)[0]
         else:
             self.sd_loc_totest = self.coef_loc_totest
         # p = self.pval
@@ -563,6 +562,9 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     def log_fold_change(self, base=np.e, **kwargs):
         """
         Returns one fold change per gene
+
+        Returns coefficient if only one coefficient is testeed.
+        Returns maximum coefficient if multiple coefficients are tested.
         """
         # design = np.unique(self.model_estim.design_loc, axis=0)
         # dmat = np.zeros_like(design)
@@ -570,24 +572,40 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         # loc = dmat @ self.model_estim.par_link_loc[self.coef_loc_totest]
         # return loc[1] - loc[0]
-        return self.model_estim.par_link_loc[self.coef_loc_totest]
+        if len(self.coef_loc_totest)==1: 
+            return self.model_estim.par_link_loc[self.coef_loc_totest]
+        else:
+            idx_max = np.argmax(np.abs(self.model_estim.par_link_loc[self.coef_loc_totest]), axis=0)
+            return self.model_estim.par_link_loc[self.coef_loc_totest][idx_max, np.arange(self.model_estim.par_link_loc.shape[1])]
 
     def _test(self):
         # Check whether single- or multiple parameters are tested.
         # For a single parameter, the wald statistic distribution is approximated
         # with a normal distribution, for multiple parameters, a chi-square distribution is used.
-        standardelf.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
+        self.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
         if len(self.coef_loc_totest)==1:
             # standard deviation of estimates: coefficients x genes array with one coefficient per group
             # theta_sd = sqrt(diagonal(fisher_inv))
-            self.theta_sd = np.sqrt(np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1)).T[self.sd_loc_totest]
-            return stats.wald_test(theta_mle=self.theta_mle, theta_sd=self.theta_sd, theta0=0)
-        else:
-            self.theta_sd = np.nan
-            return stats.wald_test_multi(
+            self.theta_sd = np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1).T[self.sd_loc_totest]
+            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, where= self.theta_sd < np.nextafter(0, np.inf))
+            self.theta_sd = np.sqrt(self.theta_sd)
+            return stats.wald_test(
                 theta_mle=self.theta_mle, 
-                theta_invcovar=self.model_estim.fisher_inv[self.sd_loc_totest, self.sd_loc_totest, :],
-                theta0=0)
+                theta_sd=self.theta_sd, 
+                theta0=0
+                )
+        else:
+            self.theta_sd = np.vstack([
+                np.diagonal(self.model_estim.fisher_inv[i, self.sd_loc_totest, self.sd_loc_totest])
+                for i in range(self.model_estim.fisher_inv.shape[0])
+            ])
+            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, where= self.theta_sd < np.nextafter(0, np.inf))
+            self.theta_sd = np.sqrt(self.theta_sd)
+            return stats.wald_test_chisq(
+                theta_mle=self.theta_mle, 
+                theta_invcovar=self.model_estim.fisher_inv[:, self.sd_loc_totest, self.sd_loc_totest].T,
+                theta0=0
+                )
 
 
     def summary(self, qval_thres=None, fc_upper_thres=None,
@@ -598,8 +616,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         """
         res = super().summary(**kwargs)
         res["grad"] = self.model_gradient.data
-        res["coef_mle"] = self.theta_mle
-        res["coef_sd"] = self.theta_sd
+        if len(self.theta_mle.shape)==1:
+            res["coef_mle"] = self.theta_mle
+        if len(self.theta_sd.shape)==1:
+            res["coef_sd"] = self.theta_sd
         # add in info from bfgs
         if self.log_probs is not None:
             res["ll"] = self.log_probs
@@ -1672,8 +1692,8 @@ def lrt(
 
 def wald(
         data,
-        factor_loc_totest: str = None,
-        coef_to_test: object = None,  # e.g. coef_to_test="B"
+        factor_loc_totest: list = None,
+        coef_to_test: list = None,  # e.g. coef_to_test="B"
         formula: str = None,
         formula_loc: str = None,
         formula_scale: str = None,
@@ -1695,11 +1715,14 @@ def wald(
     Perform Wald test for differential expression for each gene.
 
     :param data: input data
-    :param factor_loc_totest: str
-        Factor of formula to test with Wald test.
-        E.g. "condition" if formula_loc would be "~ 1 + batch + condition"
-    :param coef_to_test: If there are more than two groups specified by `factor_loc_totest`,
-        this parameter allows to specify the group which should be tested
+    :param factor_loc_totest: list
+        List of factor of formula to test with Wald test.
+        E.g. ["condition"] if formula_loc would be "~ 1 + batch + condition"
+    :param coef_to_test: list
+        If there are more than two groups specified by `factor_loc_totest`,
+        this parameter allows to specify the group which should be tested.
+        Alternatively, if factor_loc_totest is not given, this list sets
+        the exact coefficients which are to be tested.
     :param formula: formula
         model formula for location and scale parameter models.
     :param formula_loc: formula
@@ -1779,7 +1802,13 @@ def wald(
         raise ValueError("Supply either dmat_loc or formula_loc or formula.")
     if dmat_scale is None and formula_scale is None:
         raise ValueError("Supply either dmat_loc or formula_loc or formula.")
-
+    # Check that factor_loc_totest and coef_to_test are lists and not single strings:
+    if isinstance(factor_loc_totest, str):
+        factor_loc_totest = [factor_loc_totest]
+    # Check that factor_loc_totest is a list and not a single string:
+    if isinstance(coef_to_test, str):
+        coef_to_test = [coef_to_test]
+        
     # # Parse input data formats:
     X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
@@ -1803,32 +1832,30 @@ def wald(
     indep_coef_indices = None
     if factor_loc_totest is not None:
         # Select coefficients to test via formula model:
-        col_slices = np.arange(design_loc.shape[-1])[design_loc.design_info.slice(factor_loc_totest)]
-        assert col_slices.size > 0, "Could not find any matching columns!"
+        col_indices = np.concatenate([
+            np.arange(design_loc.shape[-1])[design_loc.design_info.slice(x)]
+            for x in factor_loc_totest
+            ])
+        assert col_indices.size > 0, "Could not find any matching columns!"
         if coef_to_test is not None:
+            if len(factor_loc_totest)>1:
+                raise ValueError("do not set coef_to_test if more than one factor_loc_totest is given")
             samples = sample_description[factor_loc_totest].astype(type(coef_to_test)) == coef_to_test
             one_cols = np.where(design_loc[samples][:, col_slices][0] == 1)
             if one_cols.size == 0:
                 # there is no such column; modify design matrix to create one
-                col_indices = col_slices[0]
-                design_loc[:, col_index] = np.where(samples, 1, 0)
-            else:
-                # use the one_column as col_index
-                col_indices = one_cols[0]
-        else:
-            col_indices = col_slices[0]
+                design_loc[:, col_indices] = np.where(samples, 1, 0)
     elif coef_to_test is not None:
         # Directly select coefficients to test from design matrix (xarray):
         # Check that coefficients to test are not dependent parameters if constraints are given:
-        col_slices = np.asarray([
+        col_indices = np.asarray([
             list(np.asarray(design_loc.coords['design_params'])).index(x) 
             for x in coef_to_test
         ])
         if constraints_loc is not None:
             dep_coef_indices = np.where(np.any(constraints_loc==-1, axis=0)==True)[0]
-            assert np.all([x not in dep_coef_indices for x in col_slices]), "cannot test dependent coefficient"
+            assert np.all([x not in dep_coef_indices for x in col_indices]), "cannot test dependent coefficient"
             indep_coef_indices = np.where(np.any(constraints_loc==-1, axis=0)==False)[0]
-        col_indices = col_slices[0]
 
     ## Fit GLM:
     model = _fit(
@@ -1850,7 +1877,7 @@ def wald(
     ## Perform DE test:
     de_test = DifferentialExpressionTestWald(
         model, 
-        col_index=col_indices, 
+        col_indices=col_indices, 
         indep_coefs=indep_coef_indices
     )
 
