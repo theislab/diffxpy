@@ -259,6 +259,7 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
         Summarize differential expression results into an output table.
         """
         assert self.gene_ids is not None
+        logger.debug("Performing differential expression test...")
 
         res = pd.DataFrame({
             "gene": self.gene_ids,
@@ -494,14 +495,35 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     """
 
     model_estim: _Estimation
+    sd_loc_totest: int
     coef_loc_totest: int
+    indep_coefs: np.ndarray
     theta_mle: np.ndarray
     theta_sd: np.ndarray
 
-    def __init__(self, model_estim: _Estimation, col_index):
+    def __init__(
+        self, 
+        model_estim: _Estimation, 
+        col_index: int, 
+        indep_coefs: np.ndarray = None
+    ):
+        """
+        :param model_estim:
+        :param cold_index: indices of indep_coefs to test
+        :param indep_coefs: indices of independent coefficients in coefficient vector
+        """
         super().__init__()
         self.model_estim = model_estim
-        self.coef_loc_totest = col_index
+        self.coef_loc_totest = col_index 
+        # Note that self.indep_coefs are relevant if constraints are given
+        # and hessian is computed across independent coefficients only 
+        # whereas point estimators are given for all coefficients.
+        if indep_coefs is not None: 
+            self.indep_coefs = indep_coefs
+            self.sd_loc_totest = np.where(self.indep_coefs == col_index)[0]
+            self.sd_loc_totest = self.sd_loc_totest[0]
+        else:
+            self.sd_loc_totest = self.coef_loc_totest
         # p = self.pval
         # q = self.qval
 
@@ -558,14 +580,15 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         if len(self.coef_loc_totest)==1:
             # standard deviation of estimates: coefficients x genes array with one coefficient per group
             # theta_sd = sqrt(diagonal(fisher_inv))
-            self.theta_sd = np.sqrt(np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1)).T[self.coef_loc_totest]
+            self.theta_sd = np.sqrt(np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1)).T[self.sd_loc_totest]
             return stats.wald_test(theta_mle=self.theta_mle, theta_sd=self.theta_sd, theta0=0)
         else:
             self.theta_sd = np.nan
             return stats.wald_test_multi(
                 theta_mle=self.theta_mle, 
-                theta_invcovar=self.model_estim.fisher_inv[self.coef_loc_totest, self.coef_loc_totest, :], 
+                theta_invcovar=self.model_estim.fisher_inv[self.sd_loc_totest, self.sd_loc_totest, :],
                 theta0=0)
+
 
     def summary(self, qval_thres=None, fc_upper_thres=None,
                 fc_lower_thres=None, mean_thres=None,
@@ -1331,7 +1354,51 @@ def _parse_sample_description(data, sample_description=None) -> pd.DataFrame:
                 "Please specify `sample_description` or provide `data` as xarray.Dataset or anndata.AnnData " +
                 "with corresponding sample annotations"
             )
+    assert data.shape[0]==sample_description.shape[0], "data matrix and sample description must contain same number of cells"
     return sample_description
+
+def _parse_size_factors(size_factors, data):
+    if size_factors is not None:
+        if isinstance(size_factors, pd.core.series.Series):
+            size_factors = size_factors.values
+        assert size_factors.shape[0]==data.shape[0], "data matrix and size factors must contain same number of cells"
+    return size_factors
+
+def design_matrix(
+        data=None,
+        sample_description: pd.DataFrame = None,
+        formula: str = None,
+        dmat: pd.DataFrame = None
+) -> Union[patsy.design_info.DesignMatrix, xr.Dataset]:
+    """ Build design matrix for fit of generalized linear model.
+
+    This is necessary for wald tests and likelihood ratio tests.
+    This function only carries through formatting if dmat is directly supplied.
+
+    :param data: input data
+    :param formula: model formula.
+    :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param dmat: model design matrix
+    """
+    if data is None and sample_description is None and dmat is None:
+        raise ValueError("Supply either data or sample_description or dmat.")
+    if dmat is None and formula is None:
+        raise ValueError("Supply either dmat or formula.")
+
+    if dmat is None:
+        sample_description = _parse_sample_description(data, sample_description)
+        dmat = data_utils.design_matrix(sample_description=sample_description, formula=formula)
+
+        return dmat
+    else:
+        ar = xr.DataArray(dmat, dims=("observations", "design_params"))
+        ar.coords["design_params"] = dmat.columns
+
+        ds = xr.Dataset({
+            "design": ar,
+        })
+
+        return ds
 
 
 def _fit(
@@ -1339,6 +1406,8 @@ def _fit(
         data,
         design_loc,
         design_scale,
+        constraints_loc: np.ndarray = None,
+        constraints_scale: np.ndarray = None,
         init_model=None,
         gene_names=None,
         size_factors=None,
@@ -1352,6 +1421,26 @@ def _fit(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
+    :param design_loc: Design matrix of location model.
+    :param design_loc: Design matrix of scale model.
+    :param constraints_loc: : Constraints for location model.
+        Array with constraints in rows and model parameters in columns.
+        Each constraint contains non-zero entries for the a of parameters that 
+        has to sum to zero. This constraint is enforced by binding one parameter
+        to the negative sum of the other parameters, effectively representing that
+        parameter as a function of the other parameters. This dependent
+        parameter is indicated by a -1 in this array, the independent parameters
+        of that constraint (which may be dependent at an earlier constraint)
+        are indicated by a 1.
+    :param constraints_scale: : Constraints for scale model.
+        Array with constraints in rows and model parameters in columns.
+        Each constraint contains non-zero entries for the a of parameters that 
+        has to sum to zero. This constraint is enforced by binding one parameter
+        to the negative sum of the other parameters, effectively representing that
+        parameter as a function of the other parameters. This dependent
+        parameter is indicated by a -1 in this array, the independent parameters
+        of that constraint (which may be dependent at an earlier constraint)
+        are indicated by a 1.
     :param size_factors: 1D array of transformed library size factors for each cell in the 
         same order as in data
     :param batch_size: the batch size to use for the estimator
@@ -1394,20 +1483,24 @@ def _fit(
         if noise_model == "nb" or noise_model == "negative_binomial":
             import batchglm.api.models.nb_glm as test_model
 
-            logger.info("Estimating model...")
+            logger.info("Fitting model...")
+            logger.debug(" * Assembling input data...")
             input_data = test_model.InputData.new(
                 data=data,
                 design_loc=design_loc,
                 design_scale=design_scale,
+                constraints_loc=constraints_loc,
+                constraints_scale=constraints_scale,
                 size_factors=size_factors,
                 feature_names=gene_names,
             )
 
+            logger.debug(" * Set up Estimator...")
             constructor_args = {}
             if batch_size is not None:
                 constructor_args["batch_size"] = batch_size
             if quick_scale is not None:
-                constructor_args["quick_scale"] = quick_scale,
+                constructor_args["quick_scale"] = quick_scale
             estim = test_model.Estimator(
                 input_data=input_data,
                 init_model=init_model,
@@ -1415,8 +1508,10 @@ def _fit(
                 **constructor_args
             )
 
+            logger.debug(" * Initializing Estimator...")
             estim.initialize()
 
+            logger.debug(" * Run estimation...")
             # training:
             if callable(training_strategy):
                 # call training_strategy if it is a function
@@ -1425,10 +1520,11 @@ def _fit(
                 estim.train_sequence(training_strategy)
 
             if close_session:
+                logger.debug(" * Finalize estimation...")
                 model = estim.finalize()
             else:
                 model = estim
-            logger.info("Estimating model ready")
+            logger.debug(" * Model fitting done.")
 
         else:
             raise ValueError('base.test(): `noise_model` not recognized.')
@@ -1451,16 +1547,11 @@ def lrt(
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
-        dtype="float32",
+        dtype="float64",
         **kwargs
 ):
     """
-    Perform log-likelihood ratio test for differential expression
-    between two groups on adata object for each gene.
-
-    This function wraps the selected statistical test for the scenario of
-    a two sample comparison. All unit_test offered in this wrapper
-    test for the difference of the mean parameter of both samples.
+    Perform log-likelihood ratio test for differential expressionfor each gene.
 
     :param data: input data
     :param reduced_formula: formula
@@ -1528,6 +1619,7 @@ def lrt(
     X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
+    size_factors = _parse_size_factors(size_factors=size_factors, data=X)
 
     full_design_loc = data_utils.design_matrix(
         sample_description=sample_description, formula=full_formula_loc)
@@ -1580,30 +1672,34 @@ def lrt(
 
 def wald(
         data,
-        factor_loc_totest: str,
+        factor_loc_totest: str = None,
         coef_to_test: object = None,  # e.g. coef_to_test="B"
         formula: str = None,
         formula_loc: str = None,
         formula_scale: str = None,
         gene_names: Union[str, np.ndarray] = None,
         sample_description: pd.DataFrame = None,
+        dmat_loc: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
+        dmat_scale: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
+        constraints_loc: np.ndarray = None,
+        constraints_scale: np.ndarray = None,
         noise_model: str = "nb",
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
-        dtype="float32",
+        dtype="float64",
         **kwargs
 ):
     """
-    Perform log-likelihood ratio test for differential expression
-    between two groups on adata object for each gene.
-
-    This function wraps the selected statistical test for the scenario of
-    a two sample comparison. All unit_test offered in this wrapper
-    test for the difference of the mean parameter of both samples.
+    Perform Wald test for differential expression for each gene.
 
     :param data: input data
+    :param factor_loc_totest: str
+        Factor of formula to test with Wald test.
+        E.g. "condition" if formula_loc would be "~ 1 + batch + condition"
+    :param coef_to_test: If there are more than two groups specified by `factor_loc_totest`,
+        this parameter allows to specify the group which should be tested
     :param formula: formula
         model formula for location and scale parameter models.
     :param formula_loc: formula
@@ -1612,13 +1708,34 @@ def wald(
     :param formula_scale: formula
         model formula for scale parameter model.
         If not specified, `formula` will be used instead.
-    :param factor_loc_totest: str
-        Factor of formula to test with Wald test.
-        E.g. "condition" if formula_loc would be "~ 1 + batch + condition"
-    :param coef_to_test: If there are more than two groups specified by `factor_loc_totest`,
-        this parameter allows to specify the group which should be tested
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param dmat_loc: Pre-built location model design matrix. 
+        This over-rides formula_loc and sample description information given in
+        data or sample_description. 
+    :param dmat_scale: Pre-built scale model design matrix.
+        This over-rides formula_scale and sample description information given in
+        data or sample_description.
+    :param constraints_loc: : Constraints for location model.
+        Array with constraints in rows and model parameters in columns.
+        Each constraint contains non-zero entries for the a of parameters that 
+        has to sum to zero. This constraint is enforced by binding one parameter
+        to the negative sum of the other parameters, effectively representing that
+        parameter as a function of the other parameters. This dependent
+        parameter is indicated by a -1 in this array, the independent parameters
+        of that constraint (which may be dependent at an earlier constraint)
+        are indicated by a 1. It is highly recommended to only use this option
+        together with prebuilt design matrix for the location model, dmat_loc.
+    :param constraints_scale: : Constraints for scale model.
+        Array with constraints in rows and model parameters in columns.
+        Each constraint contains non-zero entries for the a of parameters that 
+        has to sum to zero. This constraint is enforced by binding one parameter
+        to the negative sum of the other parameters, effectively representing that
+        parameter as a function of the other parameters. This dependent
+        parameter is indicated by a -1 in this array, the independent parameters
+        of that constraint (which may be dependent at an earlier constraint)
+        are indicated by a 1. It is highly recommended to only use this option
+        together with prebuilt design matrix for the scale model, dmat_scale.
     :param size_factors: 1D array of transformed library size factors for each cell in the 
         same order as in data
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
@@ -1658,39 +1775,69 @@ def wald(
         formula_loc = formula
     if formula_scale is None:
         formula_scale = formula
-    assert formula_scale is not None and formula_loc is not None, "Missing formula!"
+    if dmat_loc is None and formula_loc is None:
+        raise ValueError("Supply either dmat_loc or formula_loc or formula.")
+    if dmat_scale is None and formula_scale is None:
+        raise ValueError("Supply either dmat_loc or formula_loc or formula.")
 
+    # # Parse input data formats:
     X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
-    sample_description = _parse_sample_description(data, sample_description)
+    if dmat_loc is None and dmat_scale is None:
+        sample_description = _parse_sample_description(data, sample_description)
+    size_factors = _parse_size_factors(size_factors=size_factors, data=X)
 
-    design_loc = data_utils.design_matrix(
-        sample_description=sample_description, formula=formula_loc)
-    design_scale = data_utils.design_matrix(
-        sample_description=sample_description, formula=formula_scale)
-
-    col_slice = np.arange(design_loc.shape[-1])[design_loc.design_info.slice(factor_loc_totest)]
-    assert col_slice.size > 0, "Could not find any matching columns!"
-
-    if col_slice.size == 1:
-        # only one column possible
-        col_index = col_slice[0]
+    if dmat_loc is None:
+        design_loc = data_utils.design_matrix(
+            sample_description=sample_description, formula=formula_loc)
     else:
-        samples = sample_description[factor_loc_totest].astype(type(coef_to_test)) == coef_to_test
-        one_cols = np.where(design_loc[samples][:, col_slice][0] == 1)
-        if one_cols.size == 0:
-            # there is no such column; modify design matrix to create one
-            col_index = col_slice[0]
-            design_loc[:, col_index] = np.where(samples, 1, 0)
-        else:
-            # use the one_column as col_index
-            col_index = one_cols[0]
+        design_loc = dmat_loc
 
+    if dmat_scale is None:
+        design_scale = data_utils.design_matrix(
+            sample_description=sample_description, formula=formula_scale)
+    else:
+        design_scale = dmat_scale
+
+    # Coefficients to test:
+    indep_coef_indices = None
+    if factor_loc_totest is not None:
+        # Select coefficients to test via formula model:
+        col_slices = np.arange(design_loc.shape[-1])[design_loc.design_info.slice(factor_loc_totest)]
+        assert col_slices.size > 0, "Could not find any matching columns!"
+        if coef_to_test is not None:
+            samples = sample_description[factor_loc_totest].astype(type(coef_to_test)) == coef_to_test
+            one_cols = np.where(design_loc[samples][:, col_slices][0] == 1)
+            if one_cols.size == 0:
+                # there is no such column; modify design matrix to create one
+                col_indices = col_slices[0]
+                design_loc[:, col_index] = np.where(samples, 1, 0)
+            else:
+                # use the one_column as col_index
+                col_indices = one_cols[0]
+        else:
+            col_indices = col_slices[0]
+    elif coef_to_test is not None:
+        # Directly select coefficients to test from design matrix (xarray):
+        # Check that coefficients to test are not dependent parameters if constraints are given:
+        col_slices = np.asarray([
+            list(np.asarray(design_loc.coords['design_params'])).index(x) 
+            for x in coef_to_test
+        ])
+        if constraints_loc is not None:
+            dep_coef_indices = np.where(np.any(constraints_loc==-1, axis=0)==True)[0]
+            assert np.all([x not in dep_coef_indices for x in col_slices]), "cannot test dependent coefficient"
+            indep_coef_indices = np.where(np.any(constraints_loc==-1, axis=0)==False)[0]
+        col_indices = col_slices[0]
+
+    ## Fit GLM:
     model = _fit(
         noise_model=noise_model,
         data=X,
         design_loc=design_loc,
         design_scale=design_scale,
+        constraints_loc=constraints_loc,
+        constraints_scale=constraints_scale,
         gene_names=gene_names,
         size_factors=size_factors,
         batch_size=batch_size,
@@ -1700,7 +1847,12 @@ def wald(
         **kwargs,
     )
 
-    de_test = DifferentialExpressionTestWald(model, col_index=col_index)
+    ## Perform DE test:
+    de_test = DifferentialExpressionTestWald(
+        model, 
+        col_index=col_indices, 
+        indep_coefs=indep_coef_indices
+    )
 
     return de_test
 
