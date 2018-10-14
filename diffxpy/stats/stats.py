@@ -240,9 +240,9 @@ def wald_test_chisq(
 
     theta_diff = theta_mle - theta0
     wald_statistic = np.array([
-        np.abs(np.matmul(np.matmul(theta_diff[:,[i]].T, theta_invcovar[:,:,i]), theta_diff[:,[i]])) 
+        np.matmul(np.matmul(theta_diff[:,[i]].T, theta_invcovar[:,:,i]), theta_diff[:,[i]])
         for i in  range(theta_diff.shape[1])
-    ])
+    ]).flatten()
     pvals = 1 - scipy.stats.chi2(theta_mle.shape[0]).cdf(wald_statistic)
     return pvals
 

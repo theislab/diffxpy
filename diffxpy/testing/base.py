@@ -1420,6 +1420,25 @@ def design_matrix(
 
         return ds
 
+def coef_names(
+        data=None,
+        sample_description: pd.DataFrame = None,
+        formula: str = None,
+        dmat: pd.DataFrame = None
+) -> list:
+    """ Output coefficient names of model only.
+
+    :param data: input data
+    :param formula: model formula.
+    :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param dmat: model design matrix
+    """
+    return design_matrix(
+        data=data,
+        sample_description = sample_description,
+        formula = formula,
+        dmat = dmat
+        ).design_info.column_names
 
 def _fit(
         noise_model,
@@ -1848,10 +1867,18 @@ def wald(
     elif coef_to_test is not None:
         # Directly select coefficients to test from design matrix (xarray):
         # Check that coefficients to test are not dependent parameters if constraints are given:
-        col_indices = np.asarray([
-            list(np.asarray(design_loc.coords['design_params'])).index(x) 
-            for x in coef_to_test
-        ])
+        # TODO: design_loc is sometimes xarray and sometimes patsy when it arrives here, 
+        # should it not always be xarray?
+        if isinstance(design_loc, patsy.design_info.DesignMatrix):
+            col_indices = np.asarray([
+                design_loc.design_info.column_names.index(x) 
+                for x in coef_to_test
+            ])
+        else: 
+            col_indices = np.asarray([
+                list(np.asarray(design_loc.coords['design_params'])).index(x) 
+                for x in coef_to_test
+            ])
         if constraints_loc is not None:
             dep_coef_indices = np.where(np.any(constraints_loc==-1, axis=0)==True)[0]
             assert np.all([x not in dep_coef_indices for x in col_indices]), "cannot test dependent coefficient"
