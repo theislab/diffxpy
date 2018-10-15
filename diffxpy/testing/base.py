@@ -564,7 +564,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         Returns one fold change per gene
 
         Returns coefficient if only one coefficient is testeed.
-        Returns maximum coefficient if multiple coefficients are tested.
+        Returns mean coefficient if multiple coefficients are tested.
         """
         # design = np.unique(self.model_estim.design_loc, axis=0)
         # dmat = np.zeros_like(design)
@@ -575,8 +575,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         if len(self.coef_loc_totest)==1: 
             return self.model_estim.par_link_loc[self.coef_loc_totest]
         else:
-            idx_max = np.argmax(np.abs(self.model_estim.par_link_loc[self.coef_loc_totest]), axis=0)
-            return self.model_estim.par_link_loc[self.coef_loc_totest][idx_max, np.arange(self.model_estim.par_link_loc.shape[1])]
+            return np.mean(self.model_estim.par_link_loc[self.coef_loc_totest], axis=0)
 
     def _test(self):
         # Check whether single- or multiple parameters are tested.
@@ -587,7 +586,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             # standard deviation of estimates: coefficients x genes array with one coefficient per group
             # theta_sd = sqrt(diagonal(fisher_inv))
             self.theta_sd = np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1).T[self.sd_loc_totest]
-            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, where= self.theta_sd < np.nextafter(0, np.inf))
+            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, 
+                where= self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test(
                 theta_mle=self.theta_mle, 
@@ -595,15 +595,19 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 theta0=0
                 )
         else:
+            # We avoid inverting the covariance matrix (FIM) here by directly feeding
+            # its inverse, the negative hessian, to wald_test_chisq. Note that 
+            # the negative hessian is pre-computed within batchglm.
             self.theta_sd = np.vstack([
                 np.diagonal(self.model_estim.fisher_inv[i, self.sd_loc_totest, self.sd_loc_totest])
                 for i in range(self.model_estim.fisher_inv.shape[0])
             ])
-            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, where= self.theta_sd < np.nextafter(0, np.inf))
+            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, 
+                where= self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test_chisq(
                 theta_mle=self.theta_mle, 
-                theta_invcovar=self.model_estim.fisher_inv[:, self.sd_loc_totest, self.sd_loc_totest].T,
+                theta_invcovar=-self.model_estim.hessians[:, self.sd_loc_totest, self.sd_loc_totest].T,
                 theta0=0
                 )
 
@@ -665,7 +669,6 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         plt.show()
         ttest_comp = self.plot_vs_ttest()
         plt.show()
-
 
 class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
     """

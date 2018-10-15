@@ -220,6 +220,8 @@ def wald_test_chisq(
         Maximum likelihood estimator of given parameter by gene.
     :param theta_invcovar:  np.array (par x par x genes)
         Inverse of the covariance matrix of the parameters in theta_mle by gene.
+        This is the negative hessian or the inverse of the 
+        observed fisher information matrix.
     :param theta0: float
         Reference parameter values against which coefficient is tested.
     """
@@ -240,7 +242,13 @@ def wald_test_chisq(
 
     theta_diff = theta_mle - theta0
     wald_statistic = np.array([
-        np.matmul(np.matmul(theta_diff[:,[i]].T, theta_invcovar[:,:,i]), theta_diff[:,[i]])
+        np.matmul(
+            np.matmul(
+                theta_diff[:,[i]].T, 
+                theta_invcovar[:,:,i]
+            ), 
+            theta_diff[:,[i]]
+        )
         for i in  range(theta_diff.shape[1])
     ]).flatten()
     pvals = 1 - scipy.stats.chi2(theta_mle.shape[0]).cdf(wald_statistic)
