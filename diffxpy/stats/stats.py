@@ -228,9 +228,9 @@ def wald_test_chisq(
     if np.size(theta0) == 1:
         theta0 = np.broadcast_to(theta0, theta_mle.shape)
 
-    if theta_mle.shape[1] != theta_invcovar.shape[1]:
+    if theta_mle.shape[0] != theta_invcovar.shape[1]:
         raise ValueError('stats.wald_test(): theta_mle and theta_invcovar have to contain the same number of parameters')
-    if theta_mle.shape[0] != theta_invcovar.shape[0]:
+    if theta_mle.shape[1] != theta_invcovar.shape[0]:
         raise ValueError('stats.wald_test(): theta_mle and theta_invcovar have to contain the same number of genes')
     if theta_invcovar.shape[1] != theta_invcovar.shape[2]:
         raise ValueError('stats.wald_test(): the first two dimensions of theta_invcovar have to be of the same size')
