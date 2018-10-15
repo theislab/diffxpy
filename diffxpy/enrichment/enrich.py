@@ -285,6 +285,7 @@ class Enrich():
         print(str(len(set(self._all_ids).intersection(set(RefSets._genes))))+
             ' overlaps found between refset ('+str(len(RefSets._genes))+
             ') and provided gene list ('+str(len(self._all_ids))+').')
+        self.missing_genes = list(set(RefSets._genes).difference(set(self._all_ids)))
         # Clean reference set to only contains ids that were observed in
         # current study if required.
         self.RefSets = RefSets
