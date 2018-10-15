@@ -218,7 +218,7 @@ def wald_test_chisq(
 
     :param theta_mle: np.array (par x genes)
         Maximum likelihood estimator of given parameter by gene.
-    :param theta_invcovar:  np.array (par x par x genes)
+    :param theta_invcovar:  np.array (genes x par x par)
         Inverse of the covariance matrix of the parameters in theta_mle by gene.
         This is the negative hessian or the inverse of the 
         observed fisher information matrix.
@@ -228,11 +228,11 @@ def wald_test_chisq(
     if np.size(theta0) == 1:
         theta0 = np.broadcast_to(theta0, theta_mle.shape)
 
-    if theta_mle.shape[0] != theta_invcovar.shape[0]:
+    if theta_mle.shape[1] != theta_invcovar.shape[1]:
         raise ValueError('stats.wald_test(): theta_mle and theta_invcovar have to contain the same number of parameters')
-    if theta_mle.shape[1] != theta_invcovar.shape[2]:
+    if theta_mle.shape[0] != theta_invcovar.shape[0]:
         raise ValueError('stats.wald_test(): theta_mle and theta_invcovar have to contain the same number of genes')
-    if theta_invcovar.shape[0] != theta_invcovar.shape[1]:
+    if theta_invcovar.shape[1] != theta_invcovar.shape[2]:
         raise ValueError('stats.wald_test(): the first two dimensions of theta_invcovar have to be of the same size')
     if theta0.shape[0] > 1:
         if theta_mle.shape[0] != theta0.shape[0]:
@@ -245,7 +245,7 @@ def wald_test_chisq(
         np.matmul(
             np.matmul(
                 theta_diff[:,[i]].T, 
-                theta_invcovar[:,:,i]
+                theta_invcovar[i,:,:]
             ), 
             theta_diff[:,[i]]
         )

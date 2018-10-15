@@ -584,7 +584,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # with a normal distribution, for multiple parameters, a chi-square distribution is used.
         self.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
         if len(self.coef_loc_totest)==1:
-            self.theta_mle = self.theta_mle [0] # Make xarray one dimensinoal for stats.wald_test.
+            self.theta_mle = self.theta_mle[0] # Make xarray one dimensinoal for stats.wald_test.
             self.theta_sd = np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1).T[self.sd_loc_totest][0]
             self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, 
                 where= self.theta_sd < np.nextafter(0, np.inf))
@@ -607,7 +607,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test_chisq(
                 theta_mle=self.theta_mle, 
-                theta_invcovar=-self.model_estim.hessians[:, self.sd_loc_totest, self.sd_loc_totest].T,
+                theta_invcovar=-self.model_estim.hessians[:, self.sd_loc_totest, self.sd_loc_totest],
                 theta0=0
                 )
 
