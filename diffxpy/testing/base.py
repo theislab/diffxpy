@@ -564,7 +564,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         Returns one fold change per gene
 
         Returns coefficient if only one coefficient is testeed.
-        Returns mean coefficient if multiple coefficients are tested.
+        Returns mean absolute coefficient if multiple coefficients are tested.
         """
         # design = np.unique(self.model_estim.design_loc, axis=0)
         # dmat = np.zeros_like(design)
@@ -573,9 +573,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # loc = dmat @ self.model_estim.par_link_loc[self.coef_loc_totest]
         # return loc[1] - loc[0]
         if len(self.coef_loc_totest)==1: 
-            return self.model_estim.par_link_loc[self.coef_loc_totest]
+            return self.model_estim.par_link_loc[self.coef_loc_totest][0]
         else:
-            return np.mean(self.model_estim.par_link_loc[self.coef_loc_totest], axis=0)
+            idx_max = np.argmax(np.abs(self.model_estim.par_link_loc[self.coef_loc_totest]), axis=0)
+            return self.model_estim.par_link_loc[self.coef_loc_totest][idx_max, np.arange(self.model_estim.par_link_loc.shape[1])]
 
     def _test(self):
         # Check whether single- or multiple parameters are tested.
@@ -583,15 +584,14 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # with a normal distribution, for multiple parameters, a chi-square distribution is used.
         self.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
         if len(self.coef_loc_totest)==1:
-            # standard deviation of estimates: coefficients x genes array with one coefficient per group
-            # theta_sd = sqrt(diagonal(fisher_inv))
-            self.theta_sd = np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1).T[self.sd_loc_totest]
+            self.theta_mle = self.theta_mle [0] # Make xarray one dimensinoal for stats.wald_test.
+            self.theta_sd = np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1).T[self.sd_loc_totest][0]
             self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, 
                 where= self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test(
-                theta_mle=self.theta_mle, 
-                theta_sd=self.theta_sd, 
+                theta_mle=self.theta_mle,
+                theta_sd=self.theta_sd,
                 theta0=0
                 )
         else:
