@@ -24,3 +24,4 @@ The built documentation will be saved in `build/docs`.
 1. Make sure sphinx is installed (install via pip for example). 
 2. `cd docs/`
 3. `make html`
+The documentation can then be read as a website by opening the file `diffxpy/build/docs/html/index.html`.

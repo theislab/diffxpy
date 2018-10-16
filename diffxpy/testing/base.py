@@ -1590,7 +1590,7 @@ def lrt(
         **kwargs
 ):
     """
-    Perform log-likelihood ratio test for differential expressionfor each gene.
+    Perform log-likelihood ratio test for differential expression for each gene.
 
     :param data: input data
     :param reduced_formula: formula
@@ -2009,13 +2009,16 @@ def two_sample(
     test for the difference of the mean parameter of both samples.
     The exact unit_test are as follows (assuming the group labels
     are saved in a column named "group"):
+
     - lrt(log-likelihood ratio test):
         Requires the fitting of 2 generalized linear models (full and reduced).
+        The models are automatically assembled as follows, use the de.test.lrt()
+        function if you would like to perform a different test.
 
-        * full model location parameter: ~ 1 + group
-        * full model scale parameter: ~ 1 + group
-        * reduced model location parameter: ~ 1
-        * reduced model scale parameter: ~ 1 + group
+            * full model location parameter: ~ 1 + group
+            * full model scale parameter: ~ 1 + group
+            * reduced model location parameter: ~ 1
+            * reduced model scale parameter: ~ 1 + group
     - Wald test:
         Requires the fitting of 1 generalized linear models.
         model location parameter: ~ 1 + group
