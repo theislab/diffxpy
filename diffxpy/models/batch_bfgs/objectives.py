@@ -12,11 +12,11 @@ def clip_theta_disp(theta):
 
 
 def nb_glm_linker_mu(theta, X, lib_size):
-    return np.exp(np.asarray(np.dot(X, np.asmatrix(clip_theta_mu(theta)).T)).flatten() + lib_size)
+    return np.exp(np.asarray(np.dot(X, np.asarray(clip_theta_mu(theta)).T)).flatten() + lib_size)
 
 
 def nb_glm_linker_disp(theta, X):
-    return np.asarray(np.exp(np.dot(X, np.asmatrix(clip_theta_disp(theta)).T))).flatten()
+    return np.asarray(np.exp(np.dot(X, np.asarray(clip_theta_disp(theta)).T))).flatten()
 
 
 def ll_nb(x, mu, disp):
