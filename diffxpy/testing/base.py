@@ -124,6 +124,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         self._pval = None
         self._qval = None
         self._mean = None
+        self._log_probs = None
 
     @property
     @abc.abstractmethod
@@ -168,21 +169,27 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         pass
 
     @property
+    def log_probs(self):
+        if self._log_probs is None:
+            self._log_probs = self._ll().values.copy()
+        return self._log_probs
+
+    @property
     def mean(self):
         if self._mean is None:
-            self._mean = self._ave()
+            self._mean = self._ave().values.copy()
         return self._mean
 
     @property
     def pval(self):
         if self._pval is None:
-            self._pval = self._test()
+            self._pval = self._test().copy()
         return self._pval
 
     @property
     def qval(self, method="fdr_bh"):
         if self._qval is None:
-            self._qval = self._correction(method=method)
+            self._qval = self._correction(method=method).copy()
         return self._qval
 
     @property
@@ -259,8 +266,7 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
         Summarize differential expression results into an output table.
         """
         assert self.gene_ids is not None
-        logger.debug("Performing differential expression test...")
-
+        
         res = pd.DataFrame({
             "gene": self.gene_ids,
             "pval": self.pval,
@@ -539,25 +545,12 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             self._niter = None
 
     @property
-    def log_probs(self):
-        return np.sum(self.model_estim.log_probs(), axis=0)
-
-    @property
     def gene_ids(self) -> np.ndarray:
         return np.asarray(self.model_estim.features)
 
     @property
     def model_gradient(self):
         return self.model_estim.gradient
-
-    def _ave(self):
-        """
-        Returns a xr.DataArray containing the mean expression by gene
-
-        :return: xr.DataArray
-        """
-
-        return np.mean(self.model_estim.X, axis=0)
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -578,7 +571,28 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             idx_max = np.argmax(np.abs(self.model_estim.par_link_loc[self.coef_loc_totest]), axis=0)
             return self.model_estim.par_link_loc[self.coef_loc_totest][idx_max, np.arange(self.model_estim.par_link_loc.shape[1])]
 
+    def _ll(self):
+        """
+        Returns a xr.DataArray containing the log likelihood of each gene
+
+        :return: xr.DataArray
+        """
+        return np.sum(self.model_estim.log_probs(), axis=0)
+
+    def _ave(self):
+        """
+        Returns a xr.DataArray containing the mean expression by gene
+
+        :return: xr.DataArray
+        """
+        return np.mean(self.model_estim.X, axis=0)
+
     def _test(self):
+        """
+        Returns a xr.DataArray containing the p-value for differential expression for each gene
+
+        :return: xr.DataArray
+        """
         # Check whether single- or multiple parameters are tested.
         # For a single parameter, the wald statistic distribution is approximated
         # with a normal distribution, for multiple parameters, a chi-square distribution is used.
