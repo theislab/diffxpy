@@ -171,13 +171,13 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     @property
     def log_probs(self):
         if self._log_probs is None:
-            self._log_probs = self._ll().values.copy()
+            self._log_probs = self._ll().compute()
         return self._log_probs
 
     @property
     def mean(self):
         if self._mean is None:
-            self._mean = self._ave().values.copy()
+            self._mean = self._ave().compute()
         return self._mean
 
     @property
