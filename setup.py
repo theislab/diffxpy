@@ -9,10 +9,10 @@ setup(
     author_email='david.fischer@helmholtz-muenchen.de',
     packages=find_packages(),
     install_requires=[
-        'numpy',
+        'numpy>=1.14.0',
         'scipy',
         'pandas',
-        'patsy',
+        'patsy>=0.5.0',
         'batchglm>=0.3.0',
         'xarray',
         'statsmodels',

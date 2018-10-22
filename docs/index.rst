@@ -13,6 +13,7 @@ Welcome to diffxpy's documentation!
    installation
    tutorials
    api/index
+   parallelization
    references
 
 

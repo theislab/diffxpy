@@ -14,7 +14,7 @@ The aforementioned workflows can be concatenated in pipelines and results can be
 Refer to the documentation for details of the individual submodules.
 
 # Tutorials
-We provide usage example cases (vignettes) in the `tutorials/` directory. These examples are described in the documentation.
+We provide usage example cases (vignettes) in the separate repository [diffxpy_tutorials](https://github.com/theislab/diffxpy_tutorials). These examples are summarized in the documentation of diffxpy.
 
 # Building the documentation
 The documentation is maintained in the `docs/` directory.
@@ -24,3 +24,5 @@ The built documentation will be saved in `build/docs`.
 1. Make sure sphinx is installed (install via pip for example). 
 2. `cd docs/`
 3. `make html`
+
+The documentation can then be read as a website by opening the file `diffxpy/build/docs/html/index.html`.
