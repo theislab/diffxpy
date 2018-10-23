@@ -264,10 +264,10 @@ def two_coef_z_test(
     """
     Perform z-test to compare two coefficients.
 
-    The Wald test unit_test whether a given coefficient deviates significantly
-    from the other ceofficient, based on their standard deviations
+    The Wald test tests whether a given coefficient deviates significantly
+    from the other coefficient, based on their standard deviations
     of the posterior of the parameter estimates. In the context of
-    generalized linear nodels, this standard deviation
+    generalized linear models, this standard deviation
     is typically obtained via the hessian at the maximum likelihood
     estimator, which is an approximation of the fisher information matrix,
     based on which the parameter covariance matrix can be calculated,

@@ -266,7 +266,7 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
         Summarize differential expression results into an output table.
         """
         assert self.gene_ids is not None
-        
+
         res = pd.DataFrame({
             "gene": self.gene_ids,
             "pval": self.pval,
@@ -508,10 +508,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     theta_sd: np.ndarray
 
     def __init__(
-        self, 
-        model_estim: _Estimation, 
-        col_indices: np.ndarray, 
-        indep_coefs: np.ndarray = None
+            self,
+            model_estim: _Estimation,
+            col_indices: np.ndarray,
+            indep_coefs: np.ndarray = None
     ):
         """
         :param model_estim:
@@ -520,11 +520,11 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         """
         super().__init__()
         self.model_estim = model_estim
-        self.coef_loc_totest = col_indices 
+        self.coef_loc_totest = col_indices
         # Note that self.indep_coefs are relevant if constraints are given
         # and hessian is computed across independent coefficients only 
         # whereas point estimators are given for all coefficients.
-        if indep_coefs is not None: 
+        if indep_coefs is not None:
             self.indep_coefs = indep_coefs
             self.sd_loc_totest = np.where(self.indep_coefs == col_indices)[0]
         else:
@@ -565,11 +565,12 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         # loc = dmat @ self.model_estim.par_link_loc[self.coef_loc_totest]
         # return loc[1] - loc[0]
-        if len(self.coef_loc_totest)==1: 
+        if len(self.coef_loc_totest) == 1:
             return self.model_estim.par_link_loc[self.coef_loc_totest][0]
         else:
             idx_max = np.argmax(np.abs(self.model_estim.par_link_loc[self.coef_loc_totest]), axis=0)
-            return self.model_estim.par_link_loc[self.coef_loc_totest][idx_max, np.arange(self.model_estim.par_link_loc.shape[1])]
+            return self.model_estim.par_link_loc[self.coef_loc_totest][
+                idx_max, np.arange(self.model_estim.par_link_loc.shape[1])]
 
     def _ll(self):
         """
@@ -597,31 +598,30 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # For a single parameter, the wald statistic distribution is approximated
         # with a normal distribution, for multiple parameters, a chi-square distribution is used.
         self.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
-        if len(self.coef_loc_totest)==1:
-            self.theta_mle = self.theta_mle[0] # Make xarray one dimensinoal for stats.wald_test.
+        if len(self.coef_loc_totest) == 1:
+            self.theta_mle = self.theta_mle[0]  # Make xarray one dimensinoal for stats.wald_test.
             self.theta_sd = self.model_estim.fisher_inv[:, self.sd_loc_totest[0], self.sd_loc_totest[0]].values
-            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, 
-                where= self.theta_sd < np.nextafter(0, np.inf))
+            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd,
+                                         where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test(
                 theta_mle=self.theta_mle,
                 theta_sd=self.theta_sd,
                 theta0=0
-                )
+            )
         else:
             # We avoid inverting the covariance matrix (FIM) here by directly feeding
             # its inverse, the negative hessian, to wald_test_chisq. Note that 
             # the negative hessian is pre-computed within batchglm.
             self.theta_sd = np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1).copy()
-            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, 
-                where= self.theta_sd < np.nextafter(0, np.inf))
+            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd,
+                                         where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test_chisq(
-                theta_mle=self.theta_mle, 
+                theta_mle=self.theta_mle,
                 theta_invcovar=-self.model_estim.hessians[:, self.sd_loc_totest, self.sd_loc_totest],
                 theta0=0
-                )
-
+            )
 
     def summary(self, qval_thres=None, fc_upper_thres=None,
                 fc_lower_thres=None, mean_thres=None,
@@ -631,9 +631,9 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         """
         res = super().summary(**kwargs)
         res["grad"] = self.model_gradient.data
-        if len(self.theta_mle.shape)==1:
+        if len(self.theta_mle.shape) == 1:
             res["coef_mle"] = self.theta_mle
-        if len(self.theta_sd.shape)==1:
+        if len(self.theta_sd.shape) == 1:
             res["coef_sd"] = self.theta_sd
         # add in info from bfgs
         if self.log_probs is not None:
@@ -680,6 +680,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         plt.show()
         ttest_comp = self.plot_vs_ttest()
         plt.show()
+
 
 class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
     """
@@ -1388,15 +1389,18 @@ def _parse_sample_description(data, sample_description=None) -> pd.DataFrame:
                 "Please specify `sample_description` or provide `data` as xarray.Dataset or anndata.AnnData " +
                 "with corresponding sample annotations"
             )
-    assert data.shape[0]==sample_description.shape[0], "data matrix and sample description must contain same number of cells"
+    assert data.shape[0] == sample_description.shape[
+        0], "data matrix and sample description must contain same number of cells"
     return sample_description
+
 
 def _parse_size_factors(size_factors, data):
     if size_factors is not None:
         if isinstance(size_factors, pd.core.series.Series):
             size_factors = size_factors.values
-        assert size_factors.shape[0]==data.shape[0], "data matrix and size factors must contain same number of cells"
+        assert size_factors.shape[0] == data.shape[0], "data matrix and size factors must contain same number of cells"
     return size_factors
+
 
 def design_matrix(
         data=None,
@@ -1434,6 +1438,7 @@ def design_matrix(
 
         return ds
 
+
 def coef_names(
         data=None,
         sample_description: pd.DataFrame = None,
@@ -1449,10 +1454,11 @@ def coef_names(
     """
     return design_matrix(
         data=data,
-        sample_description = sample_description,
-        formula = formula,
-        dmat = dmat
-        ).design_info.column_names
+        sample_description=sample_description,
+        formula=formula,
+        dmat=dmat
+    ).design_info.column_names
+
 
 def _fit(
         noise_model,
@@ -1725,8 +1731,8 @@ def lrt(
 
 def wald(
         data,
-        factor_loc_totest: list = None,
-        coef_to_test: list = None,  # e.g. coef_to_test="B"
+        factor_loc_totest: Union[str, List[str]] = None,
+        coef_to_test: Union[str, List[str]] = None,  # e.g. coef_to_test="B"
         formula: str = None,
         formula_loc: str = None,
         formula_scale: str = None,
@@ -1748,10 +1754,10 @@ def wald(
     Perform Wald test for differential expression for each gene.
 
     :param data: input data
-    :param factor_loc_totest: list
-        List of factor of formula to test with Wald test.
-        E.g. ["condition"] if formula_loc would be "~ 1 + batch + condition"
-    :param coef_to_test: list
+    :param factor_loc_totest:
+        List of factors of formula to test with Wald test.
+        E.g. "condition" or ["batch", "condition"] if formula_loc would be "~ 1 + batch + condition"
+    :param coef_to_test:
         If there are more than two groups specified by `factor_loc_totest`,
         this parameter allows to specify the group which should be tested.
         Alternatively, if factor_loc_totest is not given, this list sets
@@ -1841,7 +1847,7 @@ def wald(
     # Check that factor_loc_totest is a list and not a single string:
     if isinstance(coef_to_test, str):
         coef_to_test = [coef_to_test]
-        
+
     # # Parse input data formats:
     X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
@@ -1863,15 +1869,16 @@ def wald(
 
     # Coefficients to test:
     indep_coef_indices = None
+    col_indices = None
     if factor_loc_totest is not None:
         # Select coefficients to test via formula model:
         col_indices = np.concatenate([
             np.arange(design_loc.shape[-1])[design_loc.design_info.slice(x)]
             for x in factor_loc_totest
-            ])
+        ])
         assert col_indices.size > 0, "Could not find any matching columns!"
         if coef_to_test is not None:
-            if len(factor_loc_totest)>1:
+            if len(factor_loc_totest) > 1:
                 raise ValueError("do not set coef_to_test if more than one factor_loc_totest is given")
             samples = sample_description[factor_loc_totest].astype(type(coef_to_test)) == coef_to_test
             one_cols = np.where(design_loc[samples][:, col_slices][0] == 1)
@@ -1885,18 +1892,18 @@ def wald(
         # should it not always be xarray?
         if isinstance(design_loc, patsy.design_info.DesignMatrix):
             col_indices = np.asarray([
-                design_loc.design_info.column_names.index(x) 
+                design_loc.design_info.column_names.index(x)
                 for x in coef_to_test
             ])
-        else: 
+        else:
             col_indices = np.asarray([
-                list(np.asarray(design_loc.coords['design_params'])).index(x) 
+                list(np.asarray(design_loc.coords['design_params'])).index(x)
                 for x in coef_to_test
             ])
         if constraints_loc is not None:
-            dep_coef_indices = np.where(np.any(constraints_loc==-1, axis=0)==True)[0]
+            dep_coef_indices = np.where(np.any(constraints_loc == -1, axis=0) == True)[0]
             assert np.all([x not in dep_coef_indices for x in col_indices]), "cannot test dependent coefficient"
-            indep_coef_indices = np.where(np.any(constraints_loc==-1, axis=0)==False)[0]
+            indep_coef_indices = np.where(np.any(constraints_loc == -1, axis=0) == False)[0]
 
     ## Fit GLM:
     model = _fit(
@@ -1917,8 +1924,8 @@ def wald(
 
     ## Perform DE test:
     de_test = DifferentialExpressionTestWald(
-        model, 
-        col_indices=col_indices, 
+        model,
+        col_indices=col_indices,
         indep_coefs=indep_coef_indices
     )
 
@@ -2347,7 +2354,7 @@ def pairwise(
                     gene_names=gene_names,
                     sample_description=sample_description.iloc[sel],
                     noise_model=noise_model,
-                    size_factors=size_factors[sel],
+                    size_factors=size_factors[idx] if size_factors is not None else None,
                     batch_size=batch_size,
                     training_strategy=training_strategy,
                     quick_scale=quick_scale,
@@ -2535,7 +2542,7 @@ def partition(
         partition: Union[str, np.ndarray, list],
         gene_names: str = None,
         sample_description: pd.DataFrame = None):
-    """
+    r"""
     Perform differential expression test for each group. This class handles
     the partitioning of the data set, the differential test callls and
     the sumamry of the individual tests into one
@@ -2546,10 +2553,6 @@ def partition(
     Wraps _Partition so that doc strings are nice.
 
     :param data: input data
-    :param grouping: str, array
-
-        - column in data.obs/sample_description which contains the split of observations into the two groups.
-        - array of length `num_observations` containing group labels
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
@@ -2601,7 +2604,7 @@ class _Partition():
             batch_size: int = None,
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             **kwargs
-    ) -> _DifferentialExpressionTestSingle:
+    ) -> _DifferentialExpressionTestMulti:
         """
         See annotation of de.test.two_sample()
 
@@ -2647,7 +2650,7 @@ class _Partition():
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
-                size_factors=size_factors[idx],
+                size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
                 training_strategy=training_strategy,
                 **kwargs
@@ -2781,7 +2784,7 @@ class _Partition():
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
-                size_factors=size_factors[idx],
+                size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
                 training_strategy=training_strategy,
                 **kwargs
@@ -2860,7 +2863,7 @@ class _Partition():
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
-                size_factors=size_factors[idx],
+                size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
                 training_strategy=training_strategy,
                 **kwargs
