@@ -193,6 +193,42 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         return self._qval
 
     @property
+    def log10_pval_clean(self, log10_threshold=-30):
+        """
+        Return log10 transformed and cleaned p-values.
+
+        NaN p-values are set to one and p-values below log10_threshold
+        in log10 space are set to log10_threshold.
+
+        :param log10_threshold: minimal log10 p-value to return.
+        :return: Cleaned log10 transformed p-values.
+        """
+        pvals = np.reshape(self.pval, -1)
+        pvals = np.nextafter(0, 1, out=pvals, where=pvals == 0)
+        log10_pval_clean = np.log(pvals)/np.log(10)
+        log10_pval_clean[np.isnan(log10_pval_clean)] = 1
+        log10_pval_clean = np.clip(log10_pval_clean, log10_threshold, 0, log10_pval_clean)
+        return log10_pval_clean
+
+    @property
+    def log10_qval_clean(self, log10_threshold=-30):
+        """
+        Return log10 transformed and cleaned q-values.
+
+        NaN p-values are set to one and q-values below log10_threshold
+        in log10 space are set to log10_threshold.
+
+        :param log10_threshold: minimal log10 q-value to return.
+        :return: Cleaned log10 transformed q-values.
+        """
+        qvals = np.reshape(self.qval, -1)
+        qvals = np.nextafter(0, 1, out=qvals, where=qvals == 0)
+        log10_pval_clean = np.log(qvals) / np.log(10)
+        log10_qval_clean[np.isnan(log10_qval_clean)] = 1
+        log10_qval_clean = np.clip(log10_qval_clean, log10_threshold, 0, log10_qval_clean)
+        return log10_qval_clean
+
+    @property
     @abc.abstractmethod
     def summary(self, **kwargs) -> pd.DataFrame:
         pass
@@ -219,7 +255,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         return res
 
-    def plot_volcano(self):
+    def plot_volcano(self, log10_p_threshold=-30, log2_fc_threshold=10):
         """
         returns a volcano plot of p-value vs. log fold change
 
@@ -228,11 +264,9 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         import matplotlib.pyplot as plt
         import seaborn as sns
 
-        pvals = np.reshape(self.pval, -1)
-        pvals = np.nextafter(0, 1, out=pvals, where=pvals == 0)
-        neg_log_pvals = -(np.log(pvals) / np.log(10))
-        neg_log_pvals = np.clip(neg_log_pvals, 0, 30, neg_log_pvals)
+        neg_log_pvals = -self.log10_pval_clean(log10_threshold=log10_p_threshold)
         logfc = np.reshape(self.log2_fold_change(), -1)
+        logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
 
         fig, ax = plt.subplots()
 
