@@ -977,18 +977,77 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
             raise ValueError('group2 not recognized')
 
     def pval_pair(self, group1, group2):
+        """
+        Get p-values of the comparison of group1 and group2.
+
+        :param group1: Identifier of first group of observations in pair-wise comparison.
+        :param group2: Identifier of second group of observations in pair-wise comparison.
+        :return: p-values
+        """
         assert self._pval is not None
 
         self._check_groups(group1, group2)
         return self._pval[self.groups.index(group1), self.groups.index(group2), :]
 
     def qval_pair(self, group1, group2):
+        """
+        Get q-values of the comparison of group1 and group2.
+
+        :param group1: Identifier of first group of observations in pair-wise comparison.
+        :param group2: Identifier of second group of observations in pair-wise comparison.
+        :return: q-values
+        """
         assert self._qval is not None
 
         self._check_groups(group1, group2)
         return self._qval[self.groups.index(group1), self.groups.index(group2), :]
 
+    def log10_pval_pair_clean(self, group1, group2, log10_threshold=-30):
+        """
+        Return log10 transformed and cleaned p-values.
+
+        NaN p-values are set to one and p-values below log10_threshold
+        in log10 space are set to log10_threshold.
+
+        :param group1: Identifier of first group of observations in pair-wise comparison.
+        :param group2: Identifier of second group of observations in pair-wise comparison.
+        :param log10_threshold: minimal log10 p-value to return.
+        :return: Cleaned log10 transformed p-values.
+        """
+        pvals = np.reshape(self.pval_pair(group1=group1, group2=group2), -1)
+        pvals = np.nextafter(0, 1, out=pvals, where=pvals == 0)
+        log10_pval_clean = np.log(pvals) / np.log(10)
+        log10_pval_clean[np.isnan(log10_pval_clean)] = 1
+        log10_pval_clean = np.clip(log10_pval_clean, log10_threshold, 0, log10_pval_clean)
+        return log10_pval_clean
+
+    def log10_qval_pair_clean(self, group1, group2, log10_threshold=-30):
+        """
+        Return log10 transformed and cleaned q-values.
+
+        NaN p-values are set to one and q-values below log10_threshold
+        in log10 space are set to log10_threshold.
+
+        :param group1: Identifier of first group of observations in pair-wise comparison.
+        :param group2: Identifier of second group of observations in pair-wise comparison.
+        :param log10_threshold: minimal log10 q-value to return.
+        :return: Cleaned log10 transformed q-values.
+        """
+        qvals = np.reshape(self.qval_pair(group1=group1, group2=group2), -1)
+        qvals = np.nextafter(0, 1, out=qvals, where=qvals == 0)
+        log10_pval_clean = np.log(qvals) / np.log(10)
+        log10_qval_clean[np.isnan(log10_qval_clean)] = 1
+        log10_qval_clean = np.clip(log10_qval_clean, log10_threshold, 0, log10_qval_clean)
+        return log10_qval_clean
+
     def log_fold_change_pair(self, group1, group2, base=np.e):
+        """
+        Get log fold changes of the comparison of group1 and group2.
+
+        :param group1: Identifier of first group of observations in pair-wise comparison.
+        :param group2: Identifier of second group of observations in pair-wise comparison.
+        :return: log fold changes
+        """
         assert self._logfc is not None
 
         self._check_groups(group1, group2)
@@ -1019,6 +1078,8 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         """
         Summarize differential expression results into an output table.
 
+        :param group1: Identifier of first group of observations in pair-wise comparison.
+        :param group2: Identifier of second group of observations in pair-wise comparison.
         :return: pandas.DataFrame with the following columns:
 
             - gene: the gene id's
