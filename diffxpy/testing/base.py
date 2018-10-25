@@ -738,11 +738,18 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         pval = np.zeros([self._gene_ids.shape[0]]) + np.nan
         pval[idx_tt] = stats.t_test_raw(x0=x0[:, idx_tt], x1=x1[:, idx_tt])
         self._pval = pval
-        self._logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
+
+        mean_x1 = np.mean(x1, axis=0)
+        mean_x1 = mean_x1.clip(np.nextafter(0, 1), np.inf)
+        mean_x2 = np.mean(x1, axis=0)
+        mean_x2 = mean_x2.clip(np.nextafter(0, 1), np.inf)
+
+        self._logfc = np.log(mean_x1) - np.log(mean_x2).data
         # Return 0 if LFC was non-zero and variances are zero,
         # this causes division by zero in the test statistic. This
         # is a highly significant result if one believes the variance estimate.
-        pval[np.logical_and(np.logical_and(self._var_geq_zero == False, self._ave_geq_zero == True),
+        pval[np.logical_and(np.logical_and(self._var_geq_zero == False,
+                                           self._ave_geq_zero == True),
                             self._logfc != 0)] = 0
         q = self.qval
 
