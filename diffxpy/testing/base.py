@@ -192,7 +192,6 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             self._qval = self._correction(method=method).copy()
         return self._qval
 
-    @property
     def log10_pval_clean(self, log10_threshold=-30):
         """
         Return log10 transformed and cleaned p-values.
@@ -210,7 +209,6 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         log10_pval_clean = np.clip(log10_pval_clean, log10_threshold, 0, log10_pval_clean)
         return log10_pval_clean
 
-    @property
     def log10_qval_clean(self, log10_threshold=-30):
         """
         Return log10 transformed and cleaned q-values.
