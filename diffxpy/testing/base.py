@@ -5,9 +5,9 @@ from typing import Union, Dict, Tuple, List, Set, Callable
 import pandas as pd
 
 import numpy as np
-import scipy.sparse
+# import scipy.sparse
 
-import dask
+# import dask
 import xarray as xr
 
 try:
@@ -192,7 +192,6 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             self._qval = self._correction(method=method).copy()
         return self._qval
 
-    @property
     def log10_pval_clean(self, log10_threshold=-30):
         """
         Return log10 transformed and cleaned p-values.
@@ -205,12 +204,11 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         """
         pvals = np.reshape(self.pval, -1)
         pvals = np.nextafter(0, 1, out=pvals, where=pvals == 0)
-        log10_pval_clean = np.log(pvals)/np.log(10)
+        log10_pval_clean = np.log(pvals) / np.log(10)
         log10_pval_clean[np.isnan(log10_pval_clean)] = 1
         log10_pval_clean = np.clip(log10_pval_clean, log10_threshold, 0, log10_pval_clean)
         return log10_pval_clean
 
-    @property
     def log10_qval_clean(self, log10_threshold=-30):
         """
         Return log10 transformed and cleaned q-values.
@@ -223,7 +221,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         """
         qvals = np.reshape(self.qval, -1)
         qvals = np.nextafter(0, 1, out=qvals, where=qvals == 0)
-        log10_pval_clean = np.log(qvals) / np.log(10)
+        log10_qval_clean = np.log(qvals) / np.log(10)
         log10_qval_clean[np.isnan(log10_qval_clean)] = 1
         log10_qval_clean = np.clip(log10_qval_clean, log10_threshold, 0, log10_qval_clean)
         return log10_qval_clean
@@ -264,7 +262,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         import matplotlib.pyplot as plt
         import seaborn as sns
 
-        neg_log_pvals = -self.log10_pval_clean(log10_threshold=log10_p_threshold)
+        neg_log_pvals = - self.log10_pval_clean(log10_threshold=log10_p_threshold)
         logfc = np.reshape(self.log2_fold_change(), -1)
         logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
 
@@ -535,8 +533,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     """
 
     model_estim: _Estimation
-    sd_loc_totest: int
-    coef_loc_totest: int
+    sd_loc_totest: np.ndarray
+    coef_loc_totest: np.ndarray
     indep_coefs: np.ndarray
     theta_mle: np.ndarray
     theta_sd: np.ndarray
@@ -1035,7 +1033,7 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         """
         qvals = np.reshape(self.qval_pair(group1=group1, group2=group2), -1)
         qvals = np.nextafter(0, 1, out=qvals, where=qvals == 0)
-        log10_pval_clean = np.log(qvals) / np.log(10)
+        log10_qval_clean = np.log(qvals) / np.log(10)
         log10_qval_clean[np.isnan(log10_qval_clean)] = 1
         log10_qval_clean = np.clip(log10_qval_clean, log10_threshold, 0, log10_qval_clean)
         return log10_qval_clean
@@ -1939,7 +1937,6 @@ def wald(
     # Check that factor_loc_totest and coef_to_test are lists and not single strings:
     if isinstance(factor_loc_totest, str):
         factor_loc_totest = [factor_loc_totest]
-    # Check that factor_loc_totest is a list and not a single string:
     if isinstance(coef_to_test, str):
         coef_to_test = [coef_to_test]
 
@@ -1976,7 +1973,7 @@ def wald(
             if len(factor_loc_totest) > 1:
                 raise ValueError("do not set coef_to_test if more than one factor_loc_totest is given")
             samples = sample_description[factor_loc_totest].astype(type(coef_to_test)) == coef_to_test
-            one_cols = np.where(design_loc[samples][:, col_slices][0] == 1)
+            one_cols = np.where(design_loc[samples][:, col_indices][0] == 1)
             if one_cols.size == 0:
                 # there is no such column; modify design matrix to create one
                 design_loc[:, col_indices] = np.where(samples, 1, 0)
@@ -2449,7 +2446,7 @@ def pairwise(
                     gene_names=gene_names,
                     sample_description=sample_description.iloc[sel],
                     noise_model=noise_model,
-                    size_factors=size_factors[idx] if size_factors is not None else None,
+                    size_factors=size_factors[sel] if size_factors is not None else None,
                     batch_size=batch_size,
                     training_strategy=training_strategy,
                     quick_scale=quick_scale,
