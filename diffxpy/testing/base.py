@@ -1311,7 +1311,7 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
 
     def _check_group(self, group):
         if group not in self.groups:
-            raise ValueError('group not recognized')
+            raise ValueError('group "%s" not recognized' % group)
 
     def pval_group(self, group):
         self._check_group(group)
@@ -1407,7 +1407,7 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
 
     def _check_partition(self, partition):
         if partition not in self.partitions:
-            raise ValueError('partition not recognized')
+            raise ValueError('partition "%s" not recognized' % partition)
 
     @property
     def tests(self, partition=None):
@@ -1630,7 +1630,7 @@ def _fit(
             estim.run(nproc=3, maxiter=10000, debug=False)
             model = estim.return_batchglm_formated_model()
         else:
-            raise ValueError('base.test(): `noise_model` not recognized.')
+            raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
     else:
         if noise_model == "nb" or noise_model == "negative_binomial":
             import batchglm.api.models.nb_glm as test_model
@@ -1679,7 +1679,7 @@ def _fit(
             logger.debug(" * Model fitting done.")
 
         else:
-            raise ValueError('base.test(): `noise_model` not recognized.')
+            raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
 
     return model
 
@@ -2265,7 +2265,7 @@ def two_sample(
             grouping=grouping,
         )
     else:
-        raise ValueError('base.two_sample(): Parameter `test` not recognized.')
+        raise ValueError('base.two_sample(): Parameter `test="%s"` not recognized.' % test)
 
     return de_test
 
