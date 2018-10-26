@@ -5,6 +5,7 @@ from ..stats import stats
 from ..testing import correction
 from ..testing.base import _DifferentialExpressionTest
 
+
 class RefSets():
     """
     Class for a list of gene sets.
@@ -56,13 +57,13 @@ class RefSets():
         """ 
         Load gene sets from python list.
         """
-        if type=='gmt':
+        if type == 'gmt':
             self._load_as_gmt(sets)
-        elif type=='refset':
+        elif type == 'refset':
             self._load_as_refset(sets)
         else:
             raise ValueError('type not recognized in RefSets.load_sets()')
-        
+
     def _load_as_gmt(self, sets):
         """ 
         Load gene sets from python list formatted like .gmt files.
@@ -86,7 +87,7 @@ class RefSets():
         """ 
         Process gene sets from file.
         """
-        if type=='gmt':
+        if type == 'gmt':
             self._read_from_gmt(fn)
         else:
             raise ValueError('file type not recognized in RefSets.read_from_file()')
@@ -145,7 +146,7 @@ class RefSets():
             are returned.
         """
         idx = np.where([any([key in x for key in keys]) for x in self._ids])[0]
-        print(str(len(idx))+' out of '+str(len(self._ids))+' gene sets were kept.')
+        print(str(len(idx)) + ' out of ' + str(len(self._ids)) + ' gene sets were kept.')
         return self.subset(idx=idx)
 
     ## Accession functions.
@@ -177,22 +178,23 @@ class RefSets():
             which the reference sets are to be overlapped.
             All sef.sets are chosen if set_id is None.
         """
-        if set_id is None: 
+        if set_id is None:
             for x in self.sets:
                 x.intersect = x.genes.intersection(enq_set)
         else:
             x.intersect = self.get_set(id).genes.intersection(enq_set)
 
+
 def test(
-    RefSets: RefSets,
-    DETest: _DifferentialExpressionTest = None,
-    pval: np.array = None,
-    gene_ids: list = None,
-    de_threshold=0.05,
-    all_ids = None,
-    clean_ref = True,
-    upper = False
-    ):
+        RefSets: RefSets,
+        DETest: _DifferentialExpressionTest = None,
+        pval: np.array = None,
+        gene_ids: list = None,
+        de_threshold=0.05,
+        all_ids=None,
+        clean_ref=True,
+        upper=False
+):
     """ Perform gene set enrichment.
 
     Wrapper for Enrich. Just wrote this so that Enrich shows up with a
@@ -224,39 +226,40 @@ def test(
         Make all gene IDs captial.
     """
     return Enrich(
-        RefSets = RefSets,
-        DETest = DETest,
-        pval = pval,
-        gene_ids = gene_ids,
-        de_threshold = de_threshold,
-        all_ids = all_ids,
-        clean_ref = clean_ref,
-        upper = upper)
+        RefSets=RefSets,
+        DETest=DETest,
+        pval=pval,
+        gene_ids=gene_ids,
+        de_threshold=de_threshold,
+        all_ids=all_ids,
+        clean_ref=clean_ref,
+        upper=upper)
+
 
 class Enrich():
     """
     """
 
     def __init__(
-        self, 
-        RefSets: RefSets,
-        DETest: _DifferentialExpressionTest = None,
-        pval: np.array = None,
-        gene_ids: list = None,
-        de_threshold=0.05,
-        all_ids = None,
-        clean_ref = True,
-        upper = False
-        ):
+            self,
+            RefSets: RefSets,
+            DETest: _DifferentialExpressionTest = None,
+            pval: np.array = None,
+            gene_ids: list = None,
+            de_threshold=0.05,
+            all_ids=None,
+            clean_ref=True,
+            upper=False
+    ):
         self._n_overlaps = None
         self._pval_enrich = None
-        self._qval_enrich = None 
+        self._qval_enrich = None
         # Load multiple-testing-corrected differential expression
         # p-values from differential expression output.
         if DETest is not None:
             self._qval_de = DETest.qval
             self._gene_ids = DETest.gene_ids
-        elif pval is not None and gene_ids is not None: 
+        elif pval is not None and gene_ids is not None:
             self._qval_de = np.asarray(pval)
             self._gene_ids = gene_ids
         else:
@@ -265,8 +268,8 @@ class Enrich():
         # Select significant genes based on user defined threshold.
         if any([x is np.nan for x in self._gene_ids]):
             idx_notnan = np.where([x is not np.nan for x in self._gene_ids])[0]
-            print('Discarded '+str(len(self._gene_ids)-len(idx_notnan))+' nan gene ids, leaving '+
-                str(len(idx_notnan))+' genes.')
+            print('Discarded ' + str(len(self._gene_ids) - len(idx_notnan)) + ' nan gene ids, leaving ' +
+                  str(len(idx_notnan)) + ' genes.')
             self._qval_de = self._qval_de[idx_notnan]
             self._gene_ids = self._gene_ids[idx_notnan]
 
@@ -277,27 +280,27 @@ class Enrich():
         else:
             self._all_ids = set(self._gene_ids)
 
-        if upper==True:
+        if upper == True:
             self._gene_ids = [x.upper() for x in self._gene_ids]
             self._all_ids = set([x.upper() for x in self._all_ids])
 
         # Generate diagnostic statistic of number of possible overlaps in total.
-        print(str(len(set(self._all_ids).intersection(set(RefSets._genes))))+
-            ' overlaps found between refset ('+str(len(RefSets._genes))+
-            ') and provided gene list ('+str(len(self._all_ids))+').')
+        print(str(len(set(self._all_ids).intersection(set(RefSets._genes)))) +
+              ' overlaps found between refset (' + str(len(RefSets._genes)) +
+              ') and provided gene list (' + str(len(self._all_ids)) + ').')
         self.missing_genes = list(set(RefSets._genes).difference(set(self._all_ids)))
         # Clean reference set to only contains ids that were observed in
         # current study if required.
         self.RefSets = RefSets
-        if clean_ref==True:
+        if clean_ref == True:
             self.RefSets.clean(self._all_ids)
         # Print if there are empty sets.
-        idx_nonempty = np.where([len(x.genes)>0 for x in self.RefSets.sets])[0]
-        if len(self.RefSets.sets)-len(idx_nonempty) > 0:
-            print('Found '+str(len(self.RefSets.sets)-len(idx_nonempty))+
-                ' empty sets, removing those.')
+        idx_nonempty = np.where([len(x.genes) > 0 for x in self.RefSets.sets])[0]
+        if len(self.RefSets.sets) - len(idx_nonempty) > 0:
+            print('Found ' + str(len(self.RefSets.sets) - len(idx_nonempty)) +
+                  ' empty sets, removing those.')
             self.RefSets = self.RefSets.subset(idx=idx_nonempty)
-        elif len(idx_nonempty)==0:
+        elif len(idx_nonempty) == 0:
             raise ValueError('all RefSets were empty')
 
     @property
@@ -328,11 +331,11 @@ class Enrich():
         """
         """
         pval = stats.hypergeom_test(
-            intersections = self.n_overlaps, 
-            enquiry = len(self._significant_ids), 
-            references = self.RefSets._set_lens, 
-            background = len(self._all_ids)
-            )
+            intersections=self.n_overlaps,
+            enquiry=len(self._significant_ids),
+            references=self.RefSets._set_lens,
+            background=len(self._all_ids)
+        )
         return pval
 
     def _correction(self, method) -> np.ndarray:
@@ -359,13 +362,13 @@ class Enrich():
         """
         return self.RefSets.get_set(id)
 
-    def significant_sets(self, threshold = 0.05) -> list:
+    def significant_sets(self, threshold=0.05) -> list:
         """
         Return significant sets from gene set enrichement analysis as an output table.
         """
         return self.RefSets.subset(idx=np.where(self.qval <= threshold)[0])
 
-    def significant_set_ids(self, threshold = 0.05) -> np.array:
+    def significant_set_ids(self, threshold=0.05) -> np.array:
         """
         Return significant sets from gene set enrichement analysis as an output table.
         """
@@ -385,5 +388,5 @@ class Enrich():
             "background": len(self._all_ids)
         })
         # Sort by p-value
-        res = res.iloc[np.argsort(res['pval'].values),:]
+        res = res.iloc[np.argsort(res['pval'].values), :]
         return res
