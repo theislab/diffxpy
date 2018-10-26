@@ -14,6 +14,7 @@ Welcome to diffxpy's documentation!
    tutorials
    api/index
    parallelization
+   training
    references
 
 

@@ -144,14 +144,18 @@ def t_test_moments(
         raise ValueError('stats.t_test_moments(): mu and mu1 have to contain the same number of entries')
 
     s_delta = np.sqrt((var0 / n0) + (var1 / n1))
+    s_delta = s_delta.clip(np.nextafter(0, 1), np.inf)
+    #np.nextafter(0, 1, out=s_delta, where=s_delta == 0)
 
-    t_statistic = np.abs((mu0 - mu1) / np.nextafter(0, 1, out=s_delta, where=s_delta == 0))
+    t_statistic = np.abs((mu0 - mu1) / s_delta)
 
     divisor = (
             (np.square(var0 / n0) / (n0 - 1)) +
             (np.square(var1 / n1) / (n1 - 1))
     )
-    np.nextafter(0, 1, out=divisor, where=divisor == 0)
+    #divisor[divisor < 2*np.nextafter(0, 1)] = np.nextafter(0, 1) # also does not work?
+    #divisor = divisor.clip(np.nextafter(0, 1), np.inf) # also does not work?
+    np.nextafter(0, 1, out=divisor, where=divisor <= np.nextafter(0, 1)) # does not work?
 
     df = np.square((var0 / n0) + (var1 / n1)) / divisor
     df = np.nextafter(0, 1, out=df, where=df == 0)
