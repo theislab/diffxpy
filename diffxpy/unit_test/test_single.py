@@ -24,7 +24,7 @@ class TestSingle(unittest.TestCase):
         """
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_confounders=0)
+        sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
 
         random_sample_description = pd.DataFrame({
@@ -61,7 +61,7 @@ class TestSingle(unittest.TestCase):
 
         num_non_de = n_genes // 2
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_confounders=2)
+        sim.generate_sample_description(num_batches=0, num_conditions=2)
         # simulate: coefficients ~ log(N(1, 0.5)).
         # re-sample if N(1, 0.5) <= 0
         sim.generate_params(rand_fn=lambda shape: 1 + stats.truncnorm.rvs(-1 / 0.5, np.infty, scale=0.5, size=shape))
@@ -80,9 +80,9 @@ class TestSingle(unittest.TestCase):
         )
 
         print('fraction of non-DE genes with q-value < 0.05: %.1f%%' %
-              (100 * np.sum(test.qval[:num_non_de] < 0.05) / num_non_de))
+              float(100 * np.sum(test.qval[:num_non_de] < 0.05) / num_non_de))
         print('fraction of DE genes with q-value < 0.05: %.1f%%' %
-              (100 * np.sum(test.qval[num_non_de:] < 0.05) / (n_genes - num_non_de)))
+              float(100 * np.sum(test.qval[num_non_de:] < 0.05) / (n_genes - num_non_de)))
 
         return test.qval
 
@@ -98,7 +98,7 @@ class TestSingle(unittest.TestCase):
         """
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_confounders=0)
+        sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
 
         random_sample_description = pd.DataFrame({
@@ -135,7 +135,7 @@ class TestSingle(unittest.TestCase):
         """
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_confounders=0)
+        sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
 
         random_sample_description = pd.DataFrame({
@@ -173,7 +173,7 @@ class TestSingle(unittest.TestCase):
         """
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_confounders=0)
+        sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
 
         random_sample_description = pd.DataFrame({
@@ -208,7 +208,7 @@ class TestSingle(unittest.TestCase):
         """
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_confounders=0)
+        sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
         sim.data.X[:, 0] = np.exp(sim.a)[0, 0]
 
@@ -243,7 +243,7 @@ class TestSingle(unittest.TestCase):
         """
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_confounders=0)
+        sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
 
         random_sample_description = pd.DataFrame({
