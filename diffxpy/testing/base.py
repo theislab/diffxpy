@@ -2608,6 +2608,7 @@ def versus_rest(
             batch_size=batch_size,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
+            size_factors=size_factors,
             dtype=dtype,
             **kwargs
         )
