@@ -12,7 +12,7 @@ import diffxpy.api as de
 
 class TestSingle(unittest.TestCase):
 
-    def test_null_distribution_wald(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_wald(self, n_cells: int = 2000, n_genes: int = 500):
         """
         Test if de.wald() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -36,6 +36,7 @@ class TestSingle(unittest.TestCase):
             factor_loc_totest="condition",
             formula="~ 1 + condition",
             sample_description=random_sample_description,
+            dtype="float64"
         )
         summary = test.summary()
 
@@ -48,7 +49,7 @@ class TestSingle(unittest.TestCase):
 
         return pval_h0
 
-    def test_wald_de(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_wald_de(self, n_cells: int = 2000, n_genes: int = 500):
         """
         Test if de.lrt() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -86,7 +87,7 @@ class TestSingle(unittest.TestCase):
 
         return test.qval
 
-    def test_sparse_anndata(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_sparse_anndata(self, n_cells: int = 2000, n_genes: int = 500):
         """
         Test if de.wald() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -123,7 +124,7 @@ class TestSingle(unittest.TestCase):
         print('KS-test pvalue for null model match of wald(): %f' % pval_h0)
         return pval_h0
 
-    def test_null_distribution_lrt(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_lrt(self, n_cells: int = 2000, n_genes: int = 500):
         """
         Test if de.lrt() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -149,6 +150,7 @@ class TestSingle(unittest.TestCase):
             reduced_formula_loc="~ 1",
             reduced_formula_scale="~ 1",
             sample_description=random_sample_description,
+            dtype="float64"
         )
         summary = test.summary()
 
@@ -161,7 +163,7 @@ class TestSingle(unittest.TestCase):
 
         return pval_h0
 
-    def test_null_distribution_ttest(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_ttest(self, n_cells: int = 2000, n_genes: int = 500):
         """
         Test if de.t_test() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -183,7 +185,8 @@ class TestSingle(unittest.TestCase):
         test = de.test.t_test(
             data=sim.X,
             grouping="condition",
-            sample_description=random_sample_description
+            sample_description=random_sample_description,
+            dtype="float64"
         )
         summary = test.summary()
 
@@ -196,7 +199,7 @@ class TestSingle(unittest.TestCase):
 
         return pval_h0
 
-    def t_test_zero_variance(self, n_cells: int = 1000, n_genes: int = 1000):
+    def t_test_zero_variance(self, n_cells: int = 2000, n_genes: int = 500):
         """
         Test if de.t_test() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -231,7 +234,7 @@ class TestSingle(unittest.TestCase):
 
         return pval_h0
 
-    def test_null_distribution_wilcoxon(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_wilcoxon(self, n_cells: int = 2000, n_genes: int = 500):
         """
         Test if de.wilcoxon() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -253,7 +256,8 @@ class TestSingle(unittest.TestCase):
         test = de.test.wilcoxon(
             data=sim.X,
             grouping="condition",
-            sample_description=random_sample_description
+            sample_description=random_sample_description,
+            dtype="float64"
         )
         summary = test.summary()
 

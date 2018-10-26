@@ -11,7 +11,7 @@ import diffxpy.api as de
 class TestVsRest(unittest.TestCase):
 
     # # The 'fast-wald' test is experimental
-    # def test_null_distribution_fast_wald(self, n_cells: int = 1000, n_genes: int = 1000, n_groups: int = 2,
+    # def test_null_distribution_fast_wald(self, n_cells: int = 2000, n_genes: int = 500, n_groups: int = 2,
     #                                      batch_size=500, training_strategy="AUTO"):
     #     """
     #     Test if de.test_wald_loc() generates a uniform p-value distribution
@@ -52,7 +52,7 @@ class TestVsRest(unittest.TestCase):
     #
     #     return pval_h0
     #
-    # def test_accuracy_fast_wald(self, n_cells: int = 1000, n_genes: int = 1000,
+    # def test_accuracy_fast_wald(self, n_cells: int = 2000, n_genes: int = 500,
     #                             batch_size=500, training_strategy="AUTO"):
     #     """
     #     Test if de.test_lrt() generates a uniform p-value distribution
@@ -94,7 +94,7 @@ class TestVsRest(unittest.TestCase):
     #
     #     return test.qval
 
-    def test_null_distribution_wald(self, n_cells: int = 1000, n_genes: int = 1000, n_groups: int = 2,
+    def test_null_distribution_wald(self, n_cells: int = 2000, n_genes: int = 10000, n_groups: int = 2,
                                     batch_size=500, training_strategy="AUTO"):
         """
         Test if de.test_wald_loc() generates a uniform p-value distribution
@@ -122,6 +122,7 @@ class TestVsRest(unittest.TestCase):
             sample_description=random_sample_description,
             batch_size=batch_size,
             training_strategy=training_strategy,
+            dtype="float64"
         )
         summary = test.summary()
 
@@ -134,7 +135,7 @@ class TestVsRest(unittest.TestCase):
 
         return pval_h0
 
-    def test_null_distribution_lrt(self, n_cells: int = 1000, n_genes: int = 1000, batch_size=500,
+    def test_null_distribution_lrt(self, n_cells: int = 2000, n_genes: int = 10000, batch_size=500,
                                    training_strategy="AUTO"):
         """
         Test if de.test_wald_loc() generates a uniform p-value distribution
@@ -162,6 +163,7 @@ class TestVsRest(unittest.TestCase):
             sample_description=random_sample_description,
             batch_size=batch_size,
             training_strategy=training_strategy,
+            dtype="float64"
         )
         summary = test.summary()
 
@@ -174,7 +176,7 @@ class TestVsRest(unittest.TestCase):
 
         return pval_h0
 
-    def test_null_distribution_wilcoxon(self, n_cells: int = 1000, n_genes: int = 1000, n_groups: int = 2):
+    def test_null_distribution_wilcoxon(self, n_cells: int = 2000, n_genes: int = 10000, n_groups: int = 2):
         """
         Test if de.test_wald_loc() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -198,6 +200,7 @@ class TestVsRest(unittest.TestCase):
             grouping="condition",
             test="wilcoxon",
             sample_description=random_sample_description,
+            dtype="float64"
         )
         summary = test.summary()
 
@@ -210,7 +213,7 @@ class TestVsRest(unittest.TestCase):
 
         return pval_h0
 
-    def test_null_distribution_ttest(self, n_cells: int = 1000, n_genes: int = 1000, n_groups: int = 2):
+    def test_null_distribution_ttest(self, n_cells: int = 2000, n_genes: int = 10000, n_groups: int = 2):
         """
         Test if de.test_wald_loc() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -234,6 +237,7 @@ class TestVsRest(unittest.TestCase):
             grouping="condition",
             test="t-test",
             sample_description=random_sample_description,
+            dtype="float64"
         )
         summary = test.summary()
 

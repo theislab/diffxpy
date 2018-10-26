@@ -10,7 +10,7 @@ import diffxpy.api as de
 
 class TestPairwise(unittest.TestCase):
 
-    def test_null_distribution_ztest(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_ztest(self, n_cells: int = 2000, n_genes: int = 10000, n_groups=2):
         """
         Test if de.wald() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -26,7 +26,7 @@ class TestPairwise(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.num_observations)
+            "condition": np.random.randint(n_groups, size=sim.num_observations)
         })
 
         test = de.test.pairwise(
@@ -35,6 +35,7 @@ class TestPairwise(unittest.TestCase):
             test="z-test",
             noise_model="nb",
             sample_description=random_sample_description,
+            dtype="float64"
         )
         summary = test.summary()
 
@@ -47,7 +48,7 @@ class TestPairwise(unittest.TestCase):
 
         return pval_h0
 
-    def test_ztest_de(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_ztest_de(self, n_cells: int = 2000, n_genes: int = 500):
         """
         Test if de.lrt() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -82,18 +83,18 @@ class TestPairwise(unittest.TestCase):
 
         print('fraction of non-DE genes with q-value < 0.05: %.1f%%' %
               float(100 * np.mean(
-                  np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), :num_non_de] < 0.05) / 2 /
-                  num_non_de
+                  np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), :num_non_de] < 0.05) /
+                  (2 * num_non_de)
               )))
         print('fraction of DE genes with q-value < 0.05: %.1f%%' %
               float(100 * np.mean(
-                  np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), num_non_de:] < 0.05) / 2 /
-                  (n_genes - num_non_de)
+                  np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), num_non_de:] < 0.05) /
+                  (2 * (n_genes - num_non_de))
               )))
 
         return test.qval
 
-    def test_null_distribution_lrt(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_lrt(self, n_cells: int = 2000, n_genes: int = 10000, n_groups=2):
         """
         Test if de.wald() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -109,7 +110,7 @@ class TestPairwise(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.num_observations)
+            "condition": np.random.randint(n_groups, size=sim.num_observations)
         })
 
         test = de.test.pairwise(
@@ -118,6 +119,7 @@ class TestPairwise(unittest.TestCase):
             test="lrt",
             noise_model="nb",
             sample_description=random_sample_description,
+            dtype="float64"
         )
 
         # Compare p-value distribution under null model against uniform distribution.
@@ -129,7 +131,7 @@ class TestPairwise(unittest.TestCase):
 
         return pval_h0
 
-    def test_null_distribution_ttest(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_ttest(self, n_cells: int = 2000, n_genes: int = 10000, n_groups=2):
         """
         Test if de.wald() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -145,7 +147,7 @@ class TestPairwise(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.num_observations)
+            "condition": np.random.randint(n_groups, size=sim.num_observations)
         })
 
         test = de.test.pairwise(
@@ -165,7 +167,7 @@ class TestPairwise(unittest.TestCase):
 
         return pval_h0
 
-    def test_null_distribution_wilcoxon(self, n_cells: int = 1000, n_genes: int = 1000):
+    def test_null_distribution_wilcoxon(self, n_cells: int = 2000, n_genes: int = 10000, n_groups=2):
         """
         Test if de.wald() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -181,7 +183,7 @@ class TestPairwise(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.num_observations)
+            "condition": np.random.randint(n_groups, size=sim.num_observations)
         })
 
         test = de.test.pairwise(
