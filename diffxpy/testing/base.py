@@ -1465,7 +1465,7 @@ def _parse_gene_names(data, gene_names):
     return np.asarray(gene_names)
 
 
-def _parse_data(data, gene_names):
+def _parse_data(data, gene_names) -> xr.DataArray:
     X = data_utils.xarray_from_data(data, dims=("observations", "features"))
     if gene_names is not None:
         X.coords["features"] = gene_names
@@ -2049,7 +2049,8 @@ def t_test(
         data,
         grouping,
         gene_names=None,
-        sample_description=None
+        sample_description=None,
+        dtype="float32"
 ):
     """
     Perform Welch's t-test for differential expression
@@ -2064,11 +2065,11 @@ def t_test(
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
     gene_names = _parse_gene_names(data, gene_names)
-    X = _parse_data(data, gene_names)
+    X: xr.DataArray = _parse_data(data, gene_names)
     grouping = _parse_grouping(data, sample_description, grouping)
 
     de_test = DifferentialExpressionTestTT(
-        data=X,
+        data=X.astype(dtype),
         grouping=grouping,
         gene_ids=gene_names,
     )
@@ -2080,7 +2081,8 @@ def wilcoxon(
         data,
         grouping,
         gene_names=None,
-        sample_description=None
+        sample_description=None,
+        dtype="float32"
 ):
     """
     Perform Wilcoxon rank sum test for differential expression
@@ -2095,10 +2097,11 @@ def wilcoxon(
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
     gene_names = _parse_gene_names(data, gene_names)
+    X: xr.DataArray = _parse_data(data, gene_names)
     grouping = _parse_grouping(data, sample_description, grouping)
 
     de_test = DifferentialExpressionTestWilcoxon(
-        data=data,
+        data=X.astype(dtype),
         grouping=grouping,
         gene_names=gene_names,
     )
@@ -2264,12 +2267,14 @@ def two_sample(
             data=X,
             gene_names=gene_names,
             grouping=grouping,
+            dtype=dtype
         )
     elif test.lower() == 'wilcoxon':
         de_test = wilcoxon(
             data=X,
             gene_names=gene_names,
             grouping=grouping,
+            dtype=dtype
         )
     else:
         raise ValueError('base.two_sample(): Parameter `test="%s"` not recognized.' % test)
@@ -2763,7 +2768,8 @@ class _Partition():
 
     def t_test(
             self,
-            grouping: Union[str]
+            grouping: Union[str],
+            dtype="float32"
     ):
         """
         See annotation of de.test.t_test()
@@ -2778,7 +2784,8 @@ class _Partition():
                 data=self.X[idx, :],
                 grouping=grouping,
                 gene_names=self.gene_names,
-                sample_description=self.sample_description.iloc[idx, :]
+                sample_description=self.sample_description.iloc[idx, :],
+                dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,
@@ -2789,6 +2796,7 @@ class _Partition():
     def wilcoxon(
             self,
             grouping: Union[str],
+            dtype="float32"
     ):
         """
         See annotation of de.test.wilcoxon()
@@ -2804,7 +2812,8 @@ class _Partition():
                 data=self.X[idx, :],
                 grouping=grouping,
                 gene_names=self.gene_names,
-                sample_description=self.sample_description.iloc[idx, :]
+                sample_description=self.sample_description.iloc[idx, :],
+                dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,
