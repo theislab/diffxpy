@@ -17,4 +17,4 @@ Please refer to the [documentation](https://diffxpy.rtfd.io).
 Please refer to the [documentation](https://diffxpy.rtfd.io).
 
 # Documentation
-Find our documentation [here](https://diffxpy.rtfd.io).
+The documentation of diffxpy is hosted [here](https://diffxpy.rtfd.io).
