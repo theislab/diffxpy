@@ -155,7 +155,7 @@ def t_test_moments(
     )
     #divisor[divisor < 2*np.nextafter(0, 1)] = np.nextafter(0, 1) # also does not work?
     #divisor = divisor.clip(np.nextafter(0, 1), np.inf) # also does not work?
-    np.nextafter(0, 1, out=divisor, where=divisor <= np.nextafter(0, 1)) # does not work?
+    divisor = np.nextafter(0, 1, out=divisor, where=divisor <= np.nextafter(0, 1))
 
     df = np.square((var0 / n0) + (var1 / n1)) / divisor
     df = np.nextafter(0, 1, out=df, where=df == 0)

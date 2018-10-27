@@ -1568,6 +1568,8 @@ def _fit(
         constraints_loc: np.ndarray = None,
         constraints_scale: np.ndarray = None,
         init_model=None,
+        init_a: Union[np.ndarray, str] = "AUTO",
+        init_b: Union[np.ndarray, str] = "AUTO",
         gene_names=None,
         size_factors=None,
         batch_size: int = None,
@@ -1600,7 +1602,28 @@ def _fit(
         parameter is indicated by a -1 in this array, the independent parameters
         of that constraint (which may be dependent at an earlier constraint)
         are indicated by a 1.
-    :param size_factors: 1D array of transformed library size factors for each cell in the 
+    :param init_model: (optional) If provided, this model will be used to initialize this Estimator.
+    :param init_a: (Optional) Low-level initial values for a.
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize intercept with observed mean
+            * "init_model": initialize with another model (see `ìnit_model` parameter)
+            * "closed_form": try to initialize with closed form
+        - np.ndarray: direct initialization of 'a'
+    :param init_b: (Optional) Low-level initial values for b
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize with zeros
+            * "init_model": initialize with another model (see `ìnit_model` parameter)
+            * "closed_form": try to initialize with closed form
+        - np.ndarray: direct initialization of 'b'
+    :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -1663,6 +1686,8 @@ def _fit(
             estim = test_model.Estimator(
                 input_data=input_data,
                 init_model=init_model,
+                init_a=init_a,
+                init_b=init_b,
                 dtype=dtype,
                 **constructor_args
             )
@@ -1699,6 +1724,8 @@ def lrt(
         full_formula_loc: str = None,
         reduced_formula_scale: str = None,
         full_formula_scale: str = None,
+        init_a: Union[np.ndarray, str] = "AUTO",
+        init_b: Union[np.ndarray, str] = "AUTO",
         gene_names=None,
         sample_description: pd.DataFrame = None,
         noise_model="nb",
@@ -1729,6 +1756,26 @@ def lrt(
     :param full_formula_scale: formula
         Full model formula for scale parameter model.
         If not specified, `reduced_formula_scale` will be used instead.
+    :param init_a: (Optional) Low-level initial values for a.
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize intercept with observed mean
+            * "init_model": initialize with another model (see `ìnit_model` parameter)
+            * "closed_form": try to initialize with closed form
+        - np.ndarray: direct initialization of 'a'
+    :param init_b: (Optional) Low-level initial values for b
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize with zeros
+            * "init_model": initialize with another model (see `ìnit_model` parameter)
+            * "closed_form": try to initialize with closed form
+        - np.ndarray: direct initialization of 'b'
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
@@ -1794,6 +1841,8 @@ def lrt(
         data=X,
         design_loc=reduced_design_loc,
         design_scale=reduced_design_scale,
+        init_a=init_a,
+        init_b=init_b,
         gene_names=gene_names,
         size_factors=size_factors,
         batch_size=batch_size,
@@ -1808,6 +1857,8 @@ def lrt(
         design_loc=full_design_loc,
         design_scale=full_design_scale,
         gene_names=gene_names,
+        init_a=None,
+        init_b=None,
         init_model=reduced_model,
         size_factors=size_factors,
         batch_size=batch_size,
@@ -1836,6 +1887,8 @@ def wald(
         formula: str = None,
         formula_loc: str = None,
         formula_scale: str = None,
+        init_a: Union[np.ndarray, str] = "AUTO",
+        init_b: Union[np.ndarray, str] = "AUTO",
         gene_names: Union[str, np.ndarray] = None,
         sample_description: pd.DataFrame = None,
         dmat_loc: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
@@ -1870,6 +1923,26 @@ def wald(
     :param formula_scale: formula
         model formula for scale parameter model.
         If not specified, `formula` will be used instead.
+    :param init_a: (Optional) Low-level initial values for a.
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize intercept with observed mean
+            * "init_model": initialize with another model (see `ìnit_model` parameter)
+            * "closed_form": try to initialize with closed form
+        - np.ndarray: direct initialization of 'a'
+    :param init_b: (Optional) Low-level initial values for b
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize with zeros
+            * "init_model": initialize with another model (see `ìnit_model` parameter)
+            * "closed_form": try to initialize with closed form
+        - np.ndarray: direct initialization of 'b'
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     :param dmat_loc: Pre-built location model design matrix. 
@@ -2013,6 +2086,8 @@ def wald(
         design_scale=design_scale,
         constraints_loc=constraints_loc,
         constraints_scale=constraints_scale,
+        init_a=init_a,
+        init_b=init_b,
         gene_names=gene_names,
         size_factors=size_factors,
         batch_size=batch_size,
@@ -2973,3 +3048,260 @@ class _Partition():
             tests=DETestsSingle,
             ave=np.mean(self.X, axis=0),
             correction_type="by_test")
+
+
+def continuous_1d(
+        data,
+        continuous: str,
+        df: int = 5,
+        factor_loc_totest: Union[str, List[str]] = None,
+        formula: str = None,
+        formula_loc: str = None,
+        formula_scale: str = None,
+        test: str = 'wald',
+        init_a: Union[np.ndarray, str] = "standard",
+        init_b: Union[np.ndarray, str] = "standard",
+        gene_names=None,
+        sample_description=None,
+        noise_model: str = 'nb',
+        size_factors: np.ndarray = None,
+        batch_size: int = None,
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        quick_scale: bool = None,
+        dtype="float64",
+        **kwargs
+) -> _DifferentialExpressionTestSingle:
+    r"""
+    Perform differential expression along continous covariate.
+
+    This function wraps the selected statistical test for
+    scenarios with continuous covariates and performs the necessary
+    spline basis transformation of the continuous covariate so that the
+    problem can be framed as a GLM.
+
+    Note that direct supply of dmats is not enabled as this function wraps
+    the building of an adjusted design matrix which contains the spline basis
+    covariates. Advanced users who want to control dmat can directly
+    perform these spline basis transforms outside of diffxpy and feed the
+    dmat directly to one of the test routines wald() or lrt().
+
+    :param data: input data
+    :param continuous: str
+
+        - column in data.obs/sample_description which contains the continuous covariate.
+    :param df: int
+        Degrees of freedom of the spline model, i.e. the number of spline basis vectors.
+        df is equal to the number of coefficients in the GLM which are used to describe the
+        continuous depedency-
+    :param factor_loc_totest:
+        List of factors of formula to test with Wald test.
+        E.g. "condition" or ["batch", "condition"] if formula_loc would be "~ 1 + batch + condition"
+    :param formula: formula
+        Model formula for location and scale parameter models.
+        Refer to continuous covariate by the name givne in the parameter continuous,
+        this will be propagated across all coefficients which represent this covariate
+        in the spline basis space.
+    :param formula_loc: formula
+        Model formula for location and scale parameter models.
+        If not specified, `formula` will be used instead.
+        Refer to continuous covariate by the name givne in the parameter continuous,
+        this will be propagated across all coefficients which represent this covariate
+        in the spline basis space.
+    :param formula_scale: formula
+        model formula for scale parameter model.
+        If not specified, `formula` will be used instead.
+        Refer to continuous covariate by the name givne in the parameter continuous,
+        this will be propagated across all coefficients which represent this covariate
+        in the spline basis space.
+    :param test: str, statistical test to use. Possible options:
+
+        - 'wald': default
+        - 'lrt'
+    :param init_a: (Optional) Low-level initial values for a.
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize intercept with observed mean
+        - np.ndarray: direct initialization of 'a'
+    :param init_b: (Optional) Low-level initial values for b
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize with zeros
+        - np.ndarray: direct initialization of 'b'
+    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param noise_model: str, noise model to use in model-based unit_test. Possible options:
+
+        - 'nb': default
+    :param size_factors: 1D array of transformed library size factors for each cell in the
+        same order as in data
+    :param batch_size: the batch size to use for the estimator
+    :param training_strategy: {str, function, list} training strategy to use. Can be:
+
+        - str: will use Estimator.TrainingStrategy[training_strategy] to train
+        - function: Can be used to implement custom training function will be called as
+          `training_strategy(estimator)`.
+        - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
+          method arguments.
+
+          Example:
+
+          .. code-block:: python
+
+              [
+                {"learning_rate": 0.5, },
+                {"learning_rate": 0.05, },
+              ]
+
+          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
+
+        Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
+    :param dtype: Allows specifying the precision which should be used to fit data.
+
+        Should be "float32" for single precision or "float64" for double precision.
+    :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
+    """
+    if formula is None and (formula_loc is None or formula_scale is None):
+        raise ValueError("supply either formula or fomula_loc and formula_scale")
+    if formula is not None and (formula_loc is not None or formula_scale is not None):
+        raise ValueError("supply either formula or fomula_loc and formula_scale")
+    # Check that continuous factor is contained in model formulas:
+    if formula is not None:
+        pass
+    # Set testing default to continuous covariate if not supplied:
+    if factor_loc_totest is None:
+        factor_loc_totest = [continuous]
+    elif isinstance(factor_loc_totest, str):
+        factor_loc_totest = [factor_loc_totest]
+
+    X = _parse_data(data, gene_names)
+    gene_names = _parse_gene_names(data, gene_names)
+    sample_description = _parse_sample_description(data, sample_description)
+
+    # Check that continuous factor is contained in sample description
+    if continuous not in sample_description.columns:
+        raise ValueError('parameter continuous not found in sample_description')
+
+    # Perform spline basis transform.
+    spline_basis = patsy.dmatrix("0+bs("+continuous+", df="+str(df)+")", sample_description)
+    spline_basis = pd.DataFrame(spline_basis)
+    new_coefs = [continuous + str(i) for i in range(spline_basis.shape[1])]
+    spline_basis.columns = new_coefs
+    formula_extension = '+'.join(new_coefs)
+
+    # Replace continuous factor in formulas by spline basis coefficients.
+    # Note that the brackets around formula_term_continuous propagate the sum
+    # across interaction terms.
+    formula_term_continuous = '(' + formula_extension + ')'
+    if formula is not None:
+        formula_new = formula.split(continuous)
+        formula_new = formula_term_continuous.join(formula_new)
+    else:
+        formula_new = None
+
+    if formula_loc is not None:
+        formula_loc_new = formula_loc.split(continuous)
+        formula_loc_new = formula_term_continuous.join(formula_loc_new)
+    else:
+        formula_loc_new = None
+
+    if formula_scale is not None:
+        formula_scale_new = formula_scale.split(continuous)
+        formula_scale_new = formula_term_continuous.join(formula_scale_new)
+    else:
+        formula_scale_new = None
+
+    # Add spline basis into sample description
+    for x in spline_basis.columns:
+        sample_description[x] = spline_basis[x].values
+
+    if test.lower() == 'wald':
+        if noise_model is None:
+            raise ValueError("Please specify noise_model")
+
+        # Adjust factors / coefficients to test:
+        # Note that the continuous covariate does not necessarily have to be tested,
+        # it could also be a condition effect or similar.
+        # TODO handle interactions
+        if continuous in factor_loc_totest:
+            # Create reduced set of factors to test which does not contain continuous:
+            factor_loc_totest_new = [x for x in factor_loc_totest if x != continuous]
+            # Add spline basis terms in instead of continuous term:
+            factor_loc_totest_new.extend(new_coefs)
+
+        logger.debug("model formulas assembled in de.test.continuos():")
+        logger.debug("factor_loc_totest_new: " + ",".join(factor_loc_totest_new))
+        logger.debug("formula_loc_new: " + formula_loc_new)
+        logger.debug("formula_scale_new: " + formula_scale_new)
+
+        de_test = wald(
+            data=X,
+            factor_loc_totest=factor_loc_totest_new,
+            coef_to_test=None,
+            formula_loc=formula_loc_new,
+            formula_scale=formula_scale_new,
+            init_a=init_a,
+            init_b=init_b,
+            gene_names=gene_names,
+            sample_description=sample_description,
+            noise_model=noise_model,
+            size_factors=size_factors,
+            batch_size=batch_size,
+            training_strategy=training_strategy,
+            quick_scale=quick_scale,
+            dtype=dtype,
+            **kwargs
+        )
+    elif test.lower() == 'lrt':
+        if noise_model is None:
+            raise ValueError("Please specify noise_model")
+        full_formula_loc = formula_loc_new
+        # Assemble reduced loc model:
+        formula_scale_new = formula_scale.split(continuous)
+        formula_scale_new = formula_scale_new.join(formula_scale_new)
+        reduced_formula_loc = formula_scale.split('+')
+        # Take out terms in reduced location model which are to be tested:
+        reduced_formula_loc = [x for x in reduced_formula_loc if x not in factor_loc_totest]
+        reduced_formula_loc = '+'.join(reduced_formula_loc)
+        # Replace occurences of continuous term in reduced model:
+        reduced_formula_loc = reduced_formula_loc.split(continuous)
+        reduced_formula_loc = formula_term_continuous.join(formula_scale_new)
+
+        # Scale model is not tested:
+        full_formula_scale = formula_scale_new
+        reduced_formula_scale = formula_scale_new
+
+        logger.debug("model formulas assembled in de.test.continuos():")
+        logger.debug("full_formula_loc: "+full_formula_scale)
+        logger.debug("reduced_formula_loc: " + reduced_formula_loc)
+        logger.debug("full_formula_scale: " + full_formula_scale)
+        logger.debug("reduced_formula_scale: " + reduced_formula_scale)
+
+        de_test = lrt(
+            data=X,
+            full_formula_loc=full_formula_loc,
+            reduced_formula_loc=reduced_formula_loc,
+            full_formula_scale=full_formula_scale,
+            reduced_formula_scale=reduced_formula_scale,
+            init_a=init_a,
+            init_b=init_b,
+            gene_names=gene_names,
+            sample_description=sample_description,
+            noise_model=noise_model,
+            size_factors=size_factors,
+            batch_size=batch_size,
+            training_strategy=training_strategy,
+            quick_scale=quick_scale,
+            dtype=dtype,
+            **kwargs
+        )
+    else:
+        raise ValueError('base.continuous(): Parameter `test` not recognized.')
+
+    return de_test
