@@ -16,4 +16,5 @@ Please refer to the [documentation](https://diffxpy.rtfd.io).
 # Tutorials
 Please refer to the [documentation](https://diffxpy.rtfd.io).
 
-# [Documentation](https://diffxpy.rtfd.io)
+# Documentation
+Find our documentation [here](https://diffxpy.rtfd.io).
