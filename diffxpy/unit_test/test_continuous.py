@@ -41,8 +41,7 @@ class TestContinuous(unittest.TestCase):
             factor_loc_totest="pseudotime",
             sample_description=random_sample_description,
             quick_scale=True,
-            batch_size=None,
-            training_strategy="QUICK"
+            batch_size=None
         )
         summary = test.summary()
 

@@ -3075,7 +3075,7 @@ def continuous_1d(
         noise_model: str = 'nb',
         size_factors: np.ndarray = None,
         batch_size: int = None,
-        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "CONTINUOUS",
         quick_scale: bool = None,
         dtype="float64",
         **kwargs
