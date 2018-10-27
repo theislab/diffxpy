@@ -1,1 +1,2 @@
-from ..enrichment.enrich import RefSets, test
+from ..enrichment.enrich import RefSets
+from ..enrichment.enrich import test

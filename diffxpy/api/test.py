@@ -1,4 +1,4 @@
-from ..testing.base import stats
+# from ..testing.base import stats
 from ..testing.base import two_sample
 from ..testing.base import lrt
 from ..testing.base import wald

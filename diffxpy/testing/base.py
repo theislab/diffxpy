@@ -5,9 +5,9 @@ from typing import Union, Dict, Tuple, List, Set, Callable
 import pandas as pd
 
 import numpy as np
-import scipy.sparse
+# import scipy.sparse
 
-import dask
+# import dask
 import xarray as xr
 
 try:
@@ -204,7 +204,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         """
         pvals = np.reshape(self.pval, -1)
         pvals = np.nextafter(0, 1, out=pvals, where=pvals == 0)
-        log10_pval_clean = np.log(pvals)/np.log(10)
+        log10_pval_clean = np.log(pvals) / np.log(10)
         log10_pval_clean[np.isnan(log10_pval_clean)] = 1
         log10_pval_clean = np.clip(log10_pval_clean, log10_threshold, 0, log10_pval_clean)
         return log10_pval_clean
@@ -221,7 +221,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         """
         qvals = np.reshape(self.qval, -1)
         qvals = np.nextafter(0, 1, out=qvals, where=qvals == 0)
-        log10_pval_clean = np.log(qvals) / np.log(10)
+        log10_qval_clean = np.log(qvals) / np.log(10)
         log10_qval_clean[np.isnan(log10_qval_clean)] = 1
         log10_qval_clean = np.clip(log10_qval_clean, log10_threshold, 0, log10_qval_clean)
         return log10_qval_clean
@@ -262,7 +262,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         import matplotlib.pyplot as plt
         import seaborn as sns
 
-        neg_log_pvals = -self.log10_pval_clean(log10_threshold=log10_p_threshold)
+        neg_log_pvals = - self.log10_pval_clean(log10_threshold=log10_p_threshold)
         logfc = np.reshape(self.log2_fold_change(), -1)
         logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
 
@@ -533,8 +533,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     """
 
     model_estim: _Estimation
-    sd_loc_totest: int
-    coef_loc_totest: int
+    sd_loc_totest: np.ndarray
+    coef_loc_totest: np.ndarray
     indep_coefs: np.ndarray
     theta_mle: np.ndarray
     theta_sd: np.ndarray
@@ -1040,7 +1040,7 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         """
         qvals = np.reshape(self.qval_pair(group1=group1, group2=group2), -1)
         qvals = np.nextafter(0, 1, out=qvals, where=qvals == 0)
-        log10_pval_clean = np.log(qvals) / np.log(10)
+        log10_qval_clean = np.log(qvals) / np.log(10)
         log10_qval_clean[np.isnan(log10_qval_clean)] = 1
         log10_qval_clean = np.clip(log10_qval_clean, log10_threshold, 0, log10_qval_clean)
         return log10_qval_clean
@@ -1318,7 +1318,7 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
 
     def _check_group(self, group):
         if group not in self.groups:
-            raise ValueError('group not recognized')
+            raise ValueError('group "%s" not recognized' % group)
 
     def pval_group(self, group):
         self._check_group(group)
@@ -1414,7 +1414,7 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
 
     def _check_partition(self, partition):
         if partition not in self.partitions:
-            raise ValueError('partition not recognized')
+            raise ValueError('partition "%s" not recognized' % partition)
 
     @property
     def tests(self, partition=None):
@@ -1465,7 +1465,7 @@ def _parse_gene_names(data, gene_names):
     return np.asarray(gene_names)
 
 
-def _parse_data(data, gene_names):
+def _parse_data(data, gene_names) -> xr.DataArray:
     X = data_utils.xarray_from_data(data, dims=("observations", "features"))
     if gene_names is not None:
         X.coords["features"] = gene_names
@@ -1660,7 +1660,7 @@ def _fit(
             estim.run(nproc=3, maxiter=10000, debug=False)
             model = estim.return_batchglm_formated_model()
         else:
-            raise ValueError('base.test(): `noise_model` not recognized.')
+            raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
     else:
         if noise_model == "nb" or noise_model == "negative_binomial":
             import batchglm.api.models.nb_glm as test_model
@@ -1711,7 +1711,7 @@ def _fit(
             logger.debug(" * Model fitting done.")
 
         else:
-            raise ValueError('base.test(): `noise_model` not recognized.')
+            raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
 
     return model
 
@@ -2017,7 +2017,6 @@ def wald(
     # Check that factor_loc_totest and coef_to_test are lists and not single strings:
     if isinstance(factor_loc_totest, str):
         factor_loc_totest = [factor_loc_totest]
-    # Check that factor_loc_totest is a list and not a single string:
     if isinstance(coef_to_test, str):
         coef_to_test = [coef_to_test]
 
@@ -2054,7 +2053,7 @@ def wald(
             if len(factor_loc_totest) > 1:
                 raise ValueError("do not set coef_to_test if more than one factor_loc_totest is given")
             samples = sample_description[factor_loc_totest].astype(type(coef_to_test)) == coef_to_test
-            one_cols = np.where(design_loc[samples][:, col_slices][0] == 1)
+            one_cols = np.where(design_loc[samples][:, col_indices][0] == 1)
             if one_cols.size == 0:
                 # there is no such column; modify design matrix to create one
                 design_loc[:, col_indices] = np.where(samples, 1, 0)
@@ -2125,7 +2124,8 @@ def t_test(
         data,
         grouping,
         gene_names=None,
-        sample_description=None
+        sample_description=None,
+        dtype="float32"
 ):
     """
     Perform Welch's t-test for differential expression
@@ -2140,11 +2140,11 @@ def t_test(
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
     gene_names = _parse_gene_names(data, gene_names)
-    X = _parse_data(data, gene_names)
+    X: xr.DataArray = _parse_data(data, gene_names)
     grouping = _parse_grouping(data, sample_description, grouping)
 
     de_test = DifferentialExpressionTestTT(
-        data=X,
+        data=X.astype(dtype),
         grouping=grouping,
         gene_ids=gene_names,
     )
@@ -2156,7 +2156,8 @@ def wilcoxon(
         data,
         grouping,
         gene_names=None,
-        sample_description=None
+        sample_description=None,
+        dtype="float32"
 ):
     """
     Perform Wilcoxon rank sum test for differential expression
@@ -2171,10 +2172,11 @@ def wilcoxon(
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
     gene_names = _parse_gene_names(data, gene_names)
+    X: xr.DataArray = _parse_data(data, gene_names)
     grouping = _parse_grouping(data, sample_description, grouping)
 
     de_test = DifferentialExpressionTestWilcoxon(
-        data=data,
+        data=X.astype(dtype),
         grouping=grouping,
         gene_names=gene_names,
     )
@@ -2340,15 +2342,17 @@ def two_sample(
             data=X,
             gene_names=gene_names,
             grouping=grouping,
+            dtype=dtype
         )
     elif test.lower() == 'wilcoxon':
         de_test = wilcoxon(
             data=X,
             gene_names=gene_names,
             grouping=grouping,
+            dtype=dtype
         )
     else:
-        raise ValueError('base.two_sample(): Parameter `test` not recognized.')
+        raise ValueError('base.two_sample(): Parameter `test="%s"` not recognized.' % test)
 
     return de_test
 
@@ -2529,7 +2533,7 @@ def pairwise(
                     gene_names=gene_names,
                     sample_description=sample_description.iloc[sel],
                     noise_model=noise_model,
-                    size_factors=size_factors[idx] if size_factors is not None else None,
+                    size_factors=size_factors[sel] if size_factors is not None else None,
                     batch_size=batch_size,
                     training_strategy=training_strategy,
                     quick_scale=quick_scale,
@@ -2691,6 +2695,7 @@ def versus_rest(
             batch_size=batch_size,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
+            size_factors=size_factors,
             dtype=dtype,
             **kwargs
         )
@@ -2838,7 +2843,8 @@ class _Partition():
 
     def t_test(
             self,
-            grouping: Union[str]
+            grouping: Union[str],
+            dtype="float32"
     ):
         """
         See annotation of de.test.t_test()
@@ -2853,7 +2859,8 @@ class _Partition():
                 data=self.X[idx, :],
                 grouping=grouping,
                 gene_names=self.gene_names,
-                sample_description=self.sample_description.iloc[idx, :]
+                sample_description=self.sample_description.iloc[idx, :],
+                dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,
@@ -2864,6 +2871,7 @@ class _Partition():
     def wilcoxon(
             self,
             grouping: Union[str],
+            dtype="float32"
     ):
         """
         See annotation of de.test.wilcoxon()
@@ -2879,7 +2887,8 @@ class _Partition():
                 data=self.X[idx, :],
                 grouping=grouping,
                 gene_names=self.gene_names,
-                sample_description=self.sample_description.iloc[idx, :]
+                sample_description=self.sample_description.iloc[idx, :],
+                dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,

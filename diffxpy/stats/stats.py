@@ -144,8 +144,12 @@ def t_test_moments(
         raise ValueError('stats.t_test_moments(): mu and mu1 have to contain the same number of entries')
 
     s_delta = np.sqrt((var0 / n0) + (var1 / n1))
-    s_delta = s_delta.clip(np.nextafter(0, 1), np.inf)
-    #np.nextafter(0, 1, out=s_delta, where=s_delta == 0)
+    np.clip(
+        s_delta,
+        a_min=np.nextafter(0, np.inf, dtype=s_delta.dtype),
+        a_max=np.nextafter(np.inf, 0, dtype=s_delta.dtype),
+        out=s_delta
+    )
 
     t_statistic = np.abs((mu0 - mu1) / s_delta)
 
@@ -153,12 +157,21 @@ def t_test_moments(
             (np.square(var0 / n0) / (n0 - 1)) +
             (np.square(var1 / n1) / (n1 - 1))
     )
-    #divisor[divisor < 2*np.nextafter(0, 1)] = np.nextafter(0, 1) # also does not work?
-    #divisor = divisor.clip(np.nextafter(0, 1), np.inf) # also does not work?
-    divisor = np.nextafter(0, 1, out=divisor, where=divisor <= np.nextafter(0, 1))
+    np.clip(
+        divisor,
+        a_min=np.nextafter(0, np.inf, dtype=divisor.dtype),
+        a_max=np.nextafter(np.inf, 0, dtype=divisor.dtype),
+        out=divisor
+    )
 
-    df = np.square((var0 / n0) + (var1 / n1)) / divisor
-    df = np.nextafter(0, 1, out=df, where=df == 0)
+    with np.errstate(over='ignore'):
+        df = np.square((var0 / n0) + (var1 / n1)) / divisor
+    np.clip(
+        df,
+        a_min=np.nextafter(0, np.inf, dtype=df.dtype),
+        a_max=np.nextafter(np.inf, 0, dtype=df.dtype),
+        out=df
+    )
 
     pval = 2 * (1 - scipy.stats.t(df).cdf(t_statistic))
     return pval
@@ -202,6 +215,7 @@ def wald_test(
     pvals = 2 * (1 - scipy.stats.norm(loc=0, scale=1).cdf(wald_statistic))  # two-tailed test
     return pvals
 
+
 def wald_test_chisq(
         theta_mle: np.ndarray,
         theta_invcovar: np.ndarray,
@@ -233,7 +247,8 @@ def wald_test_chisq(
         theta0 = np.broadcast_to(theta0, theta_mle.shape)
 
     if theta_mle.shape[0] != theta_invcovar.shape[1]:
-        raise ValueError('stats.wald_test(): theta_mle and theta_invcovar have to contain the same number of parameters')
+        raise ValueError(
+            'stats.wald_test(): theta_mle and theta_invcovar have to contain the same number of parameters')
     if theta_mle.shape[1] != theta_invcovar.shape[0]:
         raise ValueError('stats.wald_test(): theta_mle and theta_invcovar have to contain the same number of genes')
     if theta_invcovar.shape[1] != theta_invcovar.shape[2]:
@@ -248,12 +263,12 @@ def wald_test_chisq(
     wald_statistic = np.array([
         np.matmul(
             np.matmul(
-                theta_diff[:,[i]].T, 
-                theta_invcovar[i,:,:]
-            ), 
-            theta_diff[:,[i]]
+                theta_diff[:, [i]].T,
+                theta_invcovar[i, :, :]
+            ),
+            theta_diff[:, [i]]
         )
-        for i in  range(theta_diff.shape[1])
+        for i in range(theta_diff.shape[1])
     ]).flatten()
     pvals = 1 - scipy.stats.chi2(theta_mle.shape[0]).cdf(wald_statistic)
     return pvals
@@ -301,11 +316,11 @@ def two_coef_z_test(
 
 
 def hypergeom_test(
-    intersections: np.ndarray,
-    enquiry: int,
-    references: np.ndarray,
-    background: int
-    ) -> np.ndarray:
+        intersections: np.ndarray,
+        enquiry: int,
+        references: np.ndarray,
+        background: int
+) -> np.ndarray:
     """ Run a hypergeometric test (gene set enrichment).
 
     The scipy docs have a nice explanation of the hypergeometric ditribution and its parameters.
@@ -321,5 +336,6 @@ def hypergeom_test(
     :param background: int
         Size of background set.
     """
-    pvals = np.array([1-scipy.stats.hypergeom(M=background, n=references[i], N=enquiry).cdf(x-1) for i,x in enumerate(intersections)])
-    return(pvals)
+    pvals = np.array([1 - scipy.stats.hypergeom(M=background, n=references[i], N=enquiry).cdf(x - 1) for i, x in
+                      enumerate(intersections)])
+    return (pvals)
