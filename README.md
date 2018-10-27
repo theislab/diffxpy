@@ -11,9 +11,9 @@ The aforementioned workflows can be concatenated in pipelines and results can be
 Refer to the documentation for details of the individual submodules.
 
 # Installation
-Please refer to the `documentation <https://diffxpy.rtfd.io>`__.
+Please refer to the [documentation](https://diffxpy.rtfd.io).
 
 # Tutorials
-Please refer to the `documentation <https://diffxpy.rtfd.io>`__.
+Please refer to the [documentation](https://diffxpy.rtfd.io).
 
-# `Documentation <https://diffxpy.rtfd.io>`__
+# [Documentation](https://diffxpy.rtfd.io)
