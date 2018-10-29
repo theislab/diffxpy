@@ -739,12 +739,12 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         pval[idx_tt] = stats.t_test_raw(x0=x0[:, idx_tt], x1=x1[:, idx_tt])
         self._pval = pval
 
+        mean_x0 = np.mean(x0, axis=0)
+        mean_x0 = mean_x0.clip(np.nextafter(0, 1), np.inf)
         mean_x1 = np.mean(x1, axis=0)
         mean_x1 = mean_x1.clip(np.nextafter(0, 1), np.inf)
-        mean_x2 = np.mean(x1, axis=0)
-        mean_x2 = mean_x2.clip(np.nextafter(0, 1), np.inf)
 
-        self._logfc = np.log(mean_x1) - np.log(mean_x2).data
+        self._logfc = np.log(mean_x1) - np.log(mean_x0).data
         # Return 0 if LFC was non-zero and variances are zero,
         # this causes division by zero in the test statistic. This
         # is a highly significant result if one believes the variance estimate.
