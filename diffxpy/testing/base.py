@@ -1775,8 +1775,8 @@ def lrt(
     if reduced_formula_scale is None:
         reduced_formula_scale = reduced_formula
 
-    X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
     size_factors = _parse_size_factors(size_factors=size_factors, data=X)
 
@@ -1948,8 +1948,8 @@ def wald(
         coef_to_test = [coef_to_test]
 
     # # Parse input data formats:
-    X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
     if dmat_loc is None and dmat_scale is None:
         sample_description = _parse_sample_description(data, sample_description)
     size_factors = _parse_size_factors(size_factors=size_factors, data=X)
@@ -2203,8 +2203,8 @@ def two_sample(
         raise ValueError('base.two_sample(): Do not specify `noise_model` if using test t-test or wilcoxon: ' +
                          'The t-test is based on a gaussian noise model and wilcoxon is model free.')
 
-    X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
     grouping = _parse_grouping(data, sample_description, grouping)
     sample_description = pd.DataFrame({"grouping": grouping})
 
@@ -2389,8 +2389,8 @@ def pairwise(
 
     # Do not store all models but only p-value and q-value matrix:
     # genes x groups x groups
-    X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
     grouping = _parse_grouping(data, sample_description, grouping)
     sample_description = pd.DataFrame({"grouping": grouping})
@@ -2593,8 +2593,8 @@ def versus_rest(
 
     # Do not store all models but only p-value and q-value matrix:
     # genes x groups
-    X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
     grouping = _parse_grouping(data, sample_description, grouping)
     sample_description = pd.DataFrame({"grouping": grouping})
