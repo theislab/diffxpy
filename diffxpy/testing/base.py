@@ -739,12 +739,12 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         pval[idx_tt] = stats.t_test_raw(x0=x0[:, idx_tt], x1=x1[:, idx_tt])
         self._pval = pval
 
+        mean_x0 = np.mean(x0, axis=0)
+        mean_x0 = mean_x0.clip(np.nextafter(0, 1), np.inf)
         mean_x1 = np.mean(x1, axis=0)
         mean_x1 = mean_x1.clip(np.nextafter(0, 1), np.inf)
-        mean_x2 = np.mean(x1, axis=0)
-        mean_x2 = mean_x2.clip(np.nextafter(0, 1), np.inf)
 
-        self._logfc = np.log(mean_x1) - np.log(mean_x2).data
+        self._logfc = np.log(mean_x1) - np.log(mean_x0).data
         # Return 0 if LFC was non-zero and variances are zero,
         # this causes division by zero in the test statistic. This
         # is a highly significant result if one believes the variance estimate.
@@ -1822,8 +1822,8 @@ def lrt(
     if reduced_formula_scale is None:
         reduced_formula_scale = reduced_formula
 
-    X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
     size_factors = _parse_size_factors(size_factors=size_factors, data=X)
 
@@ -2021,8 +2021,8 @@ def wald(
         coef_to_test = [coef_to_test]
 
     # # Parse input data formats:
-    X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
     if dmat_loc is None and dmat_scale is None:
         sample_description = _parse_sample_description(data, sample_description)
     size_factors = _parse_size_factors(size_factors=size_factors, data=X)
@@ -2278,8 +2278,8 @@ def two_sample(
         raise ValueError('base.two_sample(): Do not specify `noise_model` if using test t-test or wilcoxon: ' +
                          'The t-test is based on a gaussian noise model and wilcoxon is model free.')
 
-    X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
     grouping = _parse_grouping(data, sample_description, grouping)
     sample_description = pd.DataFrame({"grouping": grouping})
 
@@ -2464,8 +2464,8 @@ def pairwise(
 
     # Do not store all models but only p-value and q-value matrix:
     # genes x groups x groups
-    X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
     grouping = _parse_grouping(data, sample_description, grouping)
     sample_description = pd.DataFrame({"grouping": grouping})
@@ -2668,8 +2668,8 @@ def versus_rest(
 
     # Do not store all models but only p-value and q-value matrix:
     # genes x groups
-    X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
     grouping = _parse_grouping(data, sample_description, grouping)
     sample_description = pd.DataFrame({"grouping": grouping})
