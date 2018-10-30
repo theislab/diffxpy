@@ -13,7 +13,7 @@ import diffxpy.api as de
 
 class TestContinuous(unittest.TestCase):
 
-    def test_null_distribution_wald(self, n_cells: int = 200, n_genes: int = 20):
+    def test_null_distribution_wald(self, n_cells: int = 100, n_genes: int = 4):
         """
         Test if de.test.continuous() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value

@@ -538,6 +538,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     indep_coefs: np.ndarray
     theta_mle: np.ndarray
     theta_sd: np.ndarray
+    _error_codes: np.ndarray
+    _niter: np.ndarray
 
     def __init__(
             self,
@@ -551,6 +553,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         :param indep_coefs: indices of independent coefficients in coefficient vector
         """
         super().__init__()
+        print(col_indices)
+        print(model_estim)
+        print(model_estim.par_link_loc.coords['design_loc_params'])
+
         self.model_estim = model_estim
         self.coef_loc_totest = col_indices
         # Note that self.indep_coefs are relevant if constraints are given
@@ -560,6 +566,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             self.indep_coefs = indep_coefs
             self.sd_loc_totest = np.where(self.indep_coefs == col_indices)[0]
         else:
+            self.indep_coefs = None
             self.sd_loc_totest = self.coef_loc_totest
         # p = self.pval
         # q = self.qval
@@ -1449,6 +1456,60 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
         )
 
         return res
+
+class _DifferentialExpressionTestCont():
+    def log_fold_change(self, base=np.e, **kwargs):
+        # has to be redefined for continuous models
+        pass
+
+    def plotGenes(self, genes):
+        print("plot Gene")
+
+    def plotHeatmap(self, genes):
+        pass
+
+class DifferentialExpressionTestWaldCont(DifferentialExpressionTestWald, _DifferentialExpressionTestCont):
+
+    detest: DifferentialExpressionTestWald
+
+    def __init__(self, detest):
+        self._detest = detest
+        # Propagate properties of detest into this this
+        # class so that properties and high-level functions
+        # which are inherited from super class work.
+        self._pval = self._detest._pval
+        self._qval = self._detest._qval
+        self._mean = self._detest._mean
+        self._log_probs = self._detest._log_probs
+
+        self.model_estim = self._detest.model_estim
+        self.sd_loc_totest = self._detest.sd_loc_totest
+        self.coef_loc_totest = self._detest.coef_loc_totest
+        self.indep_coefs = self._detest.indep_coefs
+        self._error_codes = self._detest._error_codes
+        self._niter = self._detest._niter
+
+
+class DifferentialExpressionTestLRTCont(DifferentialExpressionTestLRT, _DifferentialExpressionTestCont):
+
+    detest: DifferentialExpressionTestLRT
+
+    def __init__(self, detest):
+        self._detest = detest
+        # Propagate properties of detest into this this
+        # class so that properties and high-level functions
+        # which are inherited from super class work.
+        self._pval = self._detest._pval
+        self._qval = self._detest._qval
+        self._mean = self._detest._mean
+        self._log_probs = self._detest._log_probs
+
+        self.sample_description =  self._detest.sample_description
+        self.full_design_info =  self._detest.full_design_loc_info
+        self.full_estim =  self._detest.full_estim
+        self.reduced_design_info =  self._detest.reduced_design_loc_info
+        self.reduced_estim =  self._detest.educed_estim
+
 
 
 def _parse_gene_names(data, gene_names):
@@ -3267,6 +3328,7 @@ def continuous_1d(
             dtype=dtype,
             **kwargs
         )
+        de_test = DifferentialExpressionTestWaldCont(de_test)
     elif test.lower() == 'lrt':
         if noise_model is None:
             raise ValueError("Please specify noise_model")
@@ -3310,6 +3372,7 @@ def continuous_1d(
             dtype=dtype,
             **kwargs
         )
+        de_test = DifferentialExpressionTestLRTCont(de_test)
     else:
         raise ValueError('base.continuous(): Parameter `test` not recognized.')
 
