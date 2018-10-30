@@ -2982,3 +2982,11 @@ class _Partition():
             tests=DETestsSingle,
             ave=np.mean(self.X, axis=0),
             correction_type="by_test")
+
+def perturbed():
+    """
+    Run differential tests between control and each perturbation.
+
+    :return:
+    """
+    pass
