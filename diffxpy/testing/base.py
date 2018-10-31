@@ -1279,6 +1279,185 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
 
         return res
 
+class DifferentialExpressionTestZTestLazy(): # inherit from _DifferentialExpressionTestMulti?
+    """
+    Pairwise unit_test between more than 2 groups per gene with lazy evaluation.
+
+    This class performs pairwise tests upon enquiry only and does not store them
+    and is therefore suited so very large group sets for which the lfc and
+    p-value matrices of the size [genes, groups, groups] are too big to fit into
+    memory.
+    """
+
+    model_estim: _Estimation
+    theta_mle: np.ndarray
+    theta_sd: np.ndarray
+
+    def __init__(self, model_estim: _Estimation, grouping, groups):
+        super().__init__(correction_type=correction_type)
+        self.model_estim = model_estim
+        self.grouping = grouping
+        self.groups = groups
+
+        # values of parameter estimates: coefficients x genes array with one coefficient per group
+        self._theta_mle = model_estim.par_link_loc
+        # standard deviation of estimates: coefficients x genes array with one coefficient per group
+        # theta_sd = sqrt(diagonal(fisher_inv))
+        self._theta_sd = np.sqrt(np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1)).T
+
+    def _correction(self, pval, method) -> np.ndarray:
+        """
+        Performs multiple testing corrections available in statsmodels.stats.multitest.multipletests().
+
+        This overwrites the parent function which uses self.pval which is not used in this
+        lazy implementation.
+
+        :param pval: P-value array to correct.
+        :param method: Multiple testing correction method.
+            Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
+        """
+        return correction.correct(pvals=pval, method=method)
+
+    def _test(self, **kwargs):
+        """
+        This function is not available in lazy results evaluation as it would
+        require all pairwise tests to be performed.
+        """
+        pass
+
+    def _test_pairs(self, groups0, groups1, **kwargs):
+        num_features = self.model_estim.X.shape[1]
+
+        pvals = np.tile(np.NaN, [len(groups0), len(groups1), num_features])
+        pvals[np.eye(pvals.shape[0]).astype(bool)] = 1
+
+        for i, g0 in enumerate(groups0):
+            for j, g1 in enumerate(groups1[(i + 1):]):
+                j = j + i + 1
+
+                pvals[i, j] = stats.two_coef_z_test(theta_mle0=self._theta_mle[i], theta_mle1=self._theta_mle[j],
+                                                    theta_sd0=self._theta_sd[i], theta_sd1=self._theta_sd[j])
+                pvals[j, i] = pvals[i, j]
+
+        return pvals
+
+    @property
+    def log_probs(self):
+        return np.sum(self.model_estim.log_probs(), axis=0)
+
+    @property
+    def gene_ids(self) -> np.ndarray:
+        return np.asarray(self.model_estim.features)
+
+    @property
+    def model_gradient(self):
+        return self.model_estim.gradient
+
+    def _ave(self):
+        """
+        Returns a xr.DataArray containing the mean expression by gene
+
+        :return: xr.DataArray
+        """
+
+        return np.mean(self.model_estim.X, axis=0)
+
+    @property
+    def pval(self, **kwargs):
+        """
+        This function is not available in lazy results evaluation as it would
+        require all pairwise tests to be performed.
+        """
+        pass
+
+    @property
+    def qval(self, **kwargs):
+        """
+        This function is not available in lazy results evaluation as it would
+        require all pairwise tests to be performed.
+        """
+        pass
+
+    def log_fold_change(self, base=np.e, **kwargs):
+        """
+        This function is not available in lazy results evaluation as it would
+        require all pairwise tests to be performed.
+        """
+        pass
+
+    def _check_groups(self, group0, group1):
+        if group0 not in self.groups:
+            raise ValueError('group0 not recognized')
+        if group1 not in self.groups:
+            raise ValueError('group1 not recognized')
+
+    def pval_pair(self, group0, group1):
+        self._check_groups(group0, group1)
+        return self._test_pairs(
+            group0=[self.groups.index(group1)],
+            group1=[self.groups.index(group2)],
+        )
+
+    def qval_pair(self, group0, group1, **kwargs):
+        self._check_groups(group0, group1)
+        pval = self.pval_pair(group0=group0, group1=group1)
+        return self._correction(pval=pval, **kwargs)
+
+    def log_fold_change_pair(self, group0, group1, base=np.e):
+        self._check_groups(group0, group1)
+        logfc = theta_mle[group0] - theta_mle[group1]
+
+        if base == np.e:
+            return logfc
+        else:
+            return logfc / np.log(base)
+
+    def summary(self, qval_thres=None, fc_upper_thres=None,
+                fc_lower_thres=None, mean_thres=None,
+                **kwargs) -> pd.DataFrame:
+        """
+        This function is not available in lazy results evaluation as it would
+        require all pairwise tests to be performed.
+        """
+        pass
+
+    def summary_pair(self, group1, group2,
+                     qval_thres=None, fc_upper_thres=None,
+                     fc_lower_thres=None, mean_thres=None,
+                     **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+
+        :return: pandas.DataFrame with the following columns:
+
+            - gene: the gene id's
+            - pval: the per-gene p-value of the selected test
+            - qval: the per-gene q-value of the selected test
+            - log2fc: the per-gene log2 fold change of the selected test
+            - mean: the mean expression of the gene across all groups
+        """
+        assert self.gene_ids is not None
+
+        pval = self.pval_pair(group0=group0, group1=group1)
+        qval = self._correction(pval=pval, **kwargs)
+        res = pd.DataFrame({
+            "gene": self.gene_ids,
+            "pval": pval,
+            "qval": qval,
+            "log2fc": self.log_fold_change_pair(group0=group0, group1=group1, base=2),
+            "mean": np.asarray(self.mean)
+        })
+
+        res = self._threshold_summary(
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
+            mean_thres=mean_thres
+        )
+
+        return res
+
 
 class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
     """
@@ -2983,10 +3162,158 @@ class _Partition():
             ave=np.mean(self.X, axis=0),
             correction_type="by_test")
 
-def perturbed():
+def perturbed(
+        data,
+        grouping: Union[str, np.ndarray, list],
+        test: str = 'z-test',
+        gene_names: str = None,
+        sample_description: pd.DataFrame = None,
+        noise_model: str = None,
+        pval_correction: str = "global",
+        size_factors: np.ndarray = None,
+        batch_size: int = None,
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        quick_scale: bool = None,
+        dtype="float32",
+        keep_full_test_objs: bool = False,
+        **kwargs
+):
     """
     Run differential tests between control and each perturbation.
 
-    :return:
+    :param data: input data
+    :param grouping: str, array
+
+        - column in data.obs/sample_description which contains the split of observations into the two groups.
+        - array of length `num_observations` containing group labels
+    :param test: str, statistical test to use. Possible options:
+
+        - 'z-test': default
+        - 'wald'
+        - 'lrt'
+        - 't-test'
+        - 'wilcoxon'
+    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param noise_model: str, noise model to use in model-based unit_test. Possible options:
+
+        - 'nb': default
+    :param pval_correction: Choose between global and test-wise correction.
+        Can be:
+
+        - "global": correct all p-values in one operation
+        - "by_test": correct the p-values of each test individually
+    :param size_factors: 1D array of transformed library size factors for each cell in the
+        same order as in data
+    :param batch_size: the batch size to use for the estimator
+    :param training_strategy: {str, function, list} training strategy to use. Can be:
+
+        - str: will use Estimator.TrainingStrategy[training_strategy] to train
+        - function: Can be used to implement custom training function will be called as
+          `training_strategy(estimator)`.
+        - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
+          method arguments.
+
+          Example:
+
+          .. code-block:: python
+
+              [
+                {"learning_rate": 0.5, },
+                {"learning_rate": 0.05, },
+              ]
+
+          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
+
+        Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
+    :param dtype: Allows specifying the precision which should be used to fit data.
+
+        Should be "float32" for single precision or "float64" for double precision.
+    :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test"
+    :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
-    pass
+    if len(kwargs) != 0:
+        logger.info("additional kwargs: %s", str(kwargs))
+
+    # Do not store all models but only p-value and q-value matrix:
+    # genes x groups x groups
+    gene_names = _parse_gene_names(data, gene_names)
+    X = _parse_data(data, gene_names)
+    sample_description = _parse_sample_description(data, sample_description)
+    grouping = _parse_grouping(data, sample_description, grouping)
+    sample_description = pd.DataFrame({"grouping": grouping})
+
+    if test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest':
+        # -1 in formula removes intercept
+        dmat = data_utils.design_matrix(sample_description, formula="~ 1 - 1 + grouping")
+        model = _fit(
+            noise_model=noise_model,
+            data=X,
+            design_loc=dmat,
+            design_scale=dmat,
+            gene_names=gene_names,
+            size_factors=size_factors,
+            batch_size=batch_size,
+            training_strategy=training_strategy,
+            quick_scale=quick_scale,
+            dtype=dtype,
+            **kwargs
+        )
+
+        de_test = DifferentialExpressionTestZTest(
+            model_estim=model,
+            grouping=grouping,
+            groups=np.unique(grouping),
+            correction_type=pval_correction
+        )
+    else:
+        groups = np.unique(grouping)
+        pvals = np.tile(np.NaN, [len(groups), len(groups), X.shape[1]])
+        pvals[np.eye(pvals.shape[0]).astype(bool)] = 0
+        logfc = np.tile(np.NaN, [len(groups), len(groups), X.shape[1]])
+        logfc[np.eye(logfc.shape[0]).astype(bool)] = 0
+
+        if keep_full_test_objs:
+            tests = np.tile([None], [len(groups), len(groups)])
+        else:
+            tests = None
+
+        for i, g1 in enumerate(groups):
+            for j, g2 in enumerate(groups[(i + 1):]):
+                j = j + i + 1
+
+                sel = (grouping == g1) | (grouping == g2)
+                de_test_temp = two_sample(
+                    data=X[sel],
+                    grouping=grouping[sel],
+                    test=test,
+                    gene_names=gene_names,
+                    sample_description=sample_description.iloc[sel],
+                    noise_model=noise_model,
+                    size_factors=size_factors[sel] if size_factors is not None else None,
+                    batch_size=batch_size,
+                    training_strategy=training_strategy,
+                    quick_scale=quick_scale,
+                    dtype=dtype,
+                    **kwargs
+                )
+                pvals[i, j] = de_test_temp.pval
+                pvals[j, i] = pvals[i, j]
+                logfc[i, j] = de_test_temp.log_fold_change()
+                logfc[j, i] = - logfc[i, j]
+                if keep_full_test_objs:
+                    tests[i, j] = de_test_temp
+                    tests[j, i] = de_test_temp
+
+        de_test = DifferentialExpressionTestPairwise(
+            gene_ids=gene_names,
+            pval=pvals,
+            logfc=logfc,
+            ave=np.mean(X, axis=0),
+            groups=groups,
+            tests=tests,
+            correction_type=pval_correction
+        )
+
+    return de_test
