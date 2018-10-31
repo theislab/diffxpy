@@ -15,7 +15,7 @@ class TestContinuous(unittest.TestCase):
 
     def test_null_distribution_wald(self, n_cells: int = 100, n_genes: int = 100):
         """
-        Test if de.test.continuous() generates a uniform p-value distribution
+        Test if de.test.continuous() generates a uniform p-value distribution in the wald test
         if it is given data simulated based on the null model. Returns the p-value
         of the two-side Kolmgorov-Smirnov test for equality of the observed 
         p-value distriubution and a uniform distribution.
@@ -40,6 +40,7 @@ class TestContinuous(unittest.TestCase):
             formula_loc="~ 1 + pseudotime",
             formula_scale="~ 1",
             factor_loc_totest="pseudotime",
+            test="wald",
             sample_description=random_sample_description,
             quick_scale=True,
             batch_size=None
@@ -56,9 +57,9 @@ class TestContinuous(unittest.TestCase):
 
         return pval_h0
 
-    def test_null_distribution_wald(self, n_cells: int = 100, n_genes: int = 100):
+    def test_null_distribution_lrt(self, n_cells: int = 10, n_genes: int = 2):
         """
-        Test if de.test.continuous() generates a uniform p-value distribution
+        Test if de.test.continuous() generates a uniform p-value distribution in lrt
         if it is given data simulated based on the null model. Returns the p-value
         of the two-side Kolmgorov-Smirnov test for equality of the observed
         p-value distriubution and a uniform distribution.
@@ -83,6 +84,7 @@ class TestContinuous(unittest.TestCase):
             formula_loc="~ 1 + pseudotime",
             formula_scale="~ 1",
             factor_loc_totest="pseudotime",
+            test="lrt",
             sample_description=random_sample_description,
             quick_scale=True,
             batch_size=None

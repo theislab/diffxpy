@@ -3423,14 +3423,14 @@ def continuous_1d(
         full_formula_loc = formula_loc_new
         # Assemble reduced loc model:
         formula_scale_new = formula_scale.split(continuous)
-        formula_scale_new = formula_scale_new.join(formula_scale_new)
+        formula_scale_new = formula_term_continuous.join(formula_scale_new)
         reduced_formula_loc = formula_scale.split('+')
         # Take out terms in reduced location model which are to be tested:
         reduced_formula_loc = [x for x in reduced_formula_loc if x not in factor_loc_totest]
         reduced_formula_loc = '+'.join(reduced_formula_loc)
         # Replace occurences of continuous term in reduced model:
         reduced_formula_loc = reduced_formula_loc.split(continuous)
-        reduced_formula_loc = formula_term_continuous.join(formula_scale_new)
+        reduced_formula_loc = formula_term_continuous.join(reduced_formula_loc)
 
         # Scale model is not tested:
         full_formula_scale = formula_scale_new
