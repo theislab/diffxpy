@@ -553,9 +553,6 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         :param indep_coefs: indices of independent coefficients in coefficient vector
         """
         super().__init__()
-        print(col_indices)
-        print(model_estim)
-        print(model_estim.par_link_loc.coords['design_loc_params'])
 
         self.model_estim = model_estim
         self.coef_loc_totest = col_indices
@@ -1785,6 +1782,7 @@ def lrt(
         full_formula_loc: str = None,
         reduced_formula_scale: str = None,
         full_formula_scale: str = None,
+        as_numeric: Union[list, str] = [],
         init_a: Union[np.ndarray, str] = "AUTO",
         init_b: Union[np.ndarray, str] = "AUTO",
         gene_names=None,
@@ -1817,6 +1815,12 @@ def lrt(
     :param full_formula_scale: formula
         Full model formula for scale parameter model.
         If not specified, `reduced_formula_scale` will be used instead.
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
     :param init_a: (Optional) Low-level initial values for a.
         Can be:
 
@@ -1883,6 +1887,9 @@ def lrt(
     if reduced_formula_scale is None:
         reduced_formula_scale = reduced_formula
 
+    if isinstance(as_numeric, str):
+        as_numeric = [as_numeric]
+
     gene_names = _parse_gene_names(data, gene_names)
     X = _parse_data(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
@@ -1948,6 +1955,7 @@ def wald(
         formula: str = None,
         formula_loc: str = None,
         formula_scale: str = None,
+        as_numeric: Union[list, str] = [],
         init_a: Union[np.ndarray, str] = "AUTO",
         init_b: Union[np.ndarray, str] = "AUTO",
         gene_names: Union[str, np.ndarray] = None,
@@ -1984,6 +1992,12 @@ def wald(
     :param formula_scale: formula
         model formula for scale parameter model.
         If not specified, `formula` will be used instead.
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
     :param init_a: (Optional) Low-level initial values for a.
         Can be:
 
@@ -2080,6 +2094,8 @@ def wald(
         factor_loc_totest = [factor_loc_totest]
     if isinstance(coef_to_test, str):
         coef_to_test = [coef_to_test]
+    if isinstance(as_numeric, str):
+        as_numeric = [as_numeric]
 
     # # Parse input data formats:
     gene_names = _parse_gene_names(data, gene_names)
@@ -2090,13 +2106,19 @@ def wald(
 
     if dmat_loc is None:
         design_loc = data_utils.design_matrix(
-            sample_description=sample_description, formula=formula_loc)
+            sample_description=sample_description,
+            formula=formula_loc,
+            as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        )
     else:
         design_loc = dmat_loc
 
     if dmat_scale is None:
         design_scale = data_utils.design_matrix(
-            sample_description=sample_description, formula=formula_scale)
+            sample_description=sample_description,
+            formula=formula_scale,
+            as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        )
     else:
         design_scale = dmat_scale
 
@@ -2248,6 +2270,7 @@ def wilcoxon(
 def two_sample(
         data,
         grouping: Union[str, np.ndarray, list],
+        as_numeric: Union[list, str] = [],
         test=None,
         gene_names=None,
         sample_description=None,
@@ -2295,6 +2318,12 @@ def two_sample(
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
     :param test: str, statistical test to use. Possible options:
 
         - 'wald': default
@@ -2362,6 +2391,7 @@ def two_sample(
         de_test = wald(
             data=X,
             factor_loc_totest="grouping",
+            as_numeric=as_numeric,
             coef_to_test=None,
             formula_loc=formula_loc,
             formula_scale=formula_scale,
@@ -2388,6 +2418,7 @@ def two_sample(
             reduced_formula_loc=reduced_formula_loc,
             full_formula_scale=full_formula_scale,
             reduced_formula_scale=reduced_formula_scale,
+            as_numeric=as_numeric,
             gene_names=gene_names,
             sample_description=sample_description,
             noise_model=noise_model,
@@ -2421,6 +2452,7 @@ def two_sample(
 def pairwise(
         data,
         grouping: Union[str, np.ndarray, list],
+        as_numeric: Union[list, str] = [],
         test: str = 'z-test',
         gene_names: str = None,
         sample_description: pd.DataFrame = None,
@@ -2473,6 +2505,12 @@ def pairwise(
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
     :param test: str, statistical test to use. Possible options:
 
         - 'z-test': default
@@ -2533,7 +2571,10 @@ def pairwise(
 
     if test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest':
         # -1 in formula removes intercept
-        dmat = data_utils.design_matrix(sample_description, formula="~ 1 - 1 + grouping")
+        dmat = data_utils.design_matrix(
+            sample_description,
+            formula="~ 1 - 1 + grouping"
+        )
         model = _fit(
             noise_model=noise_model,
             data=X,
@@ -2590,6 +2631,7 @@ def pairwise(
                 de_test_temp = two_sample(
                     data=X[sel],
                     grouping=grouping[sel],
+                    as_numeric=as_numeric,
                     test=test,
                     gene_names=gene_names,
                     sample_description=sample_description.iloc[sel],
@@ -2625,6 +2667,7 @@ def pairwise(
 def versus_rest(
         data,
         grouping: Union[str, np.ndarray, list],
+        as_numeric: Union[list, str] = [],
         test: str = 'wald',
         gene_names: str = None,
         sample_description: pd.DataFrame = None,
@@ -2678,6 +2721,12 @@ def versus_rest(
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
     :param test: str, statistical test to use. Possible options:
 
         - 'wald'
@@ -2749,6 +2798,7 @@ def versus_rest(
         de_test_temp = two_sample(
             data=X,
             grouping=test_grouping,
+            as_numeric=as_numeric,
             test=test,
             gene_names=gene_names,
             sample_description=sample_description,
@@ -2839,6 +2889,7 @@ class _Partition():
     def two_sample(
             self,
             grouping: Union[str],
+            as_numeric: Union[list, str] = [],
             test=None,
             noise_model: str = None,
             size_factors: np.ndarray = None,
@@ -2852,6 +2903,12 @@ class _Partition():
         :param grouping: str
 
             - column in data.obs/sample_description which contains the split of observations into the two groups.
+        :param as_numeric:
+            Which columns of sample_description to treat as numeric and
+            not as categorical. This yields columns in the design matrix
+            which do not correpond to one-hot encoded discrete factors.
+            This makes sense for number of genes, time, pseudotime or space
+            for example.
         :param test: str, statistical test to use. Possible options:
 
             - 'wald': default
@@ -2887,6 +2944,7 @@ class _Partition():
             DETestsSingle.append(two_sample(
                 data=self.X[idx, :],
                 grouping=grouping,
+                as_numeric=as_numeric,
                 test=test,
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
@@ -2965,6 +3023,7 @@ class _Partition():
             full_formula_loc: str = None,
             reduced_formula_scale: str = None,
             full_formula_scale: str = None,
+            as_numeric: Union[list, str] = [],
             noise_model="nb",
             size_factors: np.ndarray = None,
             batch_size: int = None,
@@ -2990,6 +3049,12 @@ class _Partition():
         :param full_formula_scale: formula
             Full model formula for scale parameter model.
             If not specified, `reduced_formula_scale` will be used instead.
+        :param as_numeric:
+            Which columns of sample_description to treat as numeric and
+            not as categorical. This yields columns in the design matrix
+            which do not correpond to one-hot encoded discrete factors.
+            This makes sense for number of genes, time, pseudotime or space
+            for example.
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
@@ -3026,6 +3091,7 @@ class _Partition():
                 full_formula_loc=full_formula_loc,
                 reduced_formula_scale=reduced_formula_scale,
                 full_formula_scale=full_formula_scale,
+                as_numeric=as_numeric,
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
@@ -3047,6 +3113,7 @@ class _Partition():
             formula: str = None,
             formula_loc: str = None,
             formula_scale: str = None,
+            as_numeric: Union[list, str] = [],
             noise_model: str = "nb",
             size_factors: np.ndarray = None,
             batch_size: int = None,
@@ -3070,6 +3137,12 @@ class _Partition():
             E.g. "condition" if formula_loc would be "~ 1 + batch + condition"
         :param coef_to_test: If there are more than two groups specified by `factor_loc_totest`,
             this parameter allows to specify the group which should be tested
+        :param as_numeric:
+            Which columns of sample_description to treat as numeric and
+            not as categorical. This yields columns in the design matrix
+            which do not correpond to one-hot encoded discrete factors.
+            This makes sense for number of genes, time, pseudotime or space
+            for example.
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
@@ -3105,6 +3178,7 @@ class _Partition():
                 formula=formula,
                 formula_loc=formula_loc,
                 formula_scale=formula_scale,
+                as_numeric=as_numeric,
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
@@ -3128,6 +3202,7 @@ def continuous_1d(
         formula: str = None,
         formula_loc: str = None,
         formula_scale: str = None,
+        as_numeric: Union[list, str] = [],
         test: str = 'wald',
         init_a: Union[np.ndarray, str] = "standard",
         init_b: Union[np.ndarray, str] = "standard",
@@ -3183,6 +3258,12 @@ def continuous_1d(
         Refer to continuous covariate by the name givne in the parameter continuous,
         this will be propagated across all coefficients which represent this covariate
         in the spline basis space.
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
     :param test: str, statistical test to use. Possible options:
 
         - 'wald': default
@@ -3250,6 +3331,9 @@ def continuous_1d(
     elif isinstance(factor_loc_totest, str):
         factor_loc_totest = [factor_loc_totest]
 
+    if isinstance(as_numeric, str):
+        as_numeric = [as_numeric]
+
     X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
     sample_description = _parse_sample_description(data, sample_description)
@@ -3291,6 +3375,9 @@ def continuous_1d(
     for x in spline_basis.columns:
         sample_description[x] = spline_basis[x].values
 
+    # Add spline basis to continuous covariate list
+    as_numeric.extend(new_coefs)
+
     if test.lower() == 'wald':
         if noise_model is None:
             raise ValueError("Please specify noise_model")
@@ -3316,6 +3403,7 @@ def continuous_1d(
             coef_to_test=None,
             formula_loc=formula_loc_new,
             formula_scale=formula_scale_new,
+            as_numeric=as_numeric,
             init_a=init_a,
             init_b=init_b,
             gene_names=gene_names,
@@ -3360,6 +3448,7 @@ def continuous_1d(
             reduced_formula_loc=reduced_formula_loc,
             full_formula_scale=full_formula_scale,
             reduced_formula_scale=reduced_formula_scale,
+            as_numeric=as_numeric,
             init_a=init_a,
             init_b=init_b,
             gene_names=gene_names,
