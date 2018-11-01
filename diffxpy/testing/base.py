@@ -1454,6 +1454,7 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
 
         return res
 
+
 class _DifferentialExpressionTestCont():
     def log_fold_change(self, base=np.e, **kwargs):
         # has to be redefined for continuous models
@@ -1465,8 +1466,8 @@ class _DifferentialExpressionTestCont():
     def plotHeatmap(self, genes):
         pass
 
-class DifferentialExpressionTestWaldCont(DifferentialExpressionTestWald, _DifferentialExpressionTestCont):
 
+class DifferentialExpressionTestWaldCont(DifferentialExpressionTestWald, _DifferentialExpressionTestCont):
     detest: DifferentialExpressionTestWald
 
     def __init__(self, detest):
@@ -1488,7 +1489,6 @@ class DifferentialExpressionTestWaldCont(DifferentialExpressionTestWald, _Differ
 
 
 class DifferentialExpressionTestLRTCont(DifferentialExpressionTestLRT, _DifferentialExpressionTestCont):
-
     detest: DifferentialExpressionTestLRT
 
     def __init__(self, detest):
@@ -1501,12 +1501,11 @@ class DifferentialExpressionTestLRTCont(DifferentialExpressionTestLRT, _Differen
         self._mean = self._detest._mean
         self._log_probs = self._detest._log_probs
 
-        self.sample_description =  self._detest.sample_description
-        self.full_design_info =  self._detest.full_design_loc_info
-        self.full_estim =  self._detest.full_estim
-        self.reduced_design_info =  self._detest.reduced_design_loc_info
-        self.reduced_estim =  self._detest.educed_estim
-
+        self.sample_description = self._detest.sample_description
+        self.full_design_info = self._detest.full_design_loc_info
+        self.full_estim = self._detest.full_estim
+        self.reduced_design_info = self._detest.reduced_design_loc_info
+        self.reduced_estim = self._detest.educed_estim
 
 
 def _parse_gene_names(data, gene_names):
@@ -1782,7 +1781,7 @@ def lrt(
         full_formula_loc: str = None,
         reduced_formula_scale: str = None,
         full_formula_scale: str = None,
-        as_numeric: Union[list, str] = [],
+        as_numeric: Union[List[str], Tuple[str], str] = (),
         init_a: Union[np.ndarray, str] = "AUTO",
         init_b: Union[np.ndarray, str] = "AUTO",
         gene_names=None,
@@ -1925,8 +1924,8 @@ def lrt(
         design_loc=full_design_loc,
         design_scale=full_design_scale,
         gene_names=gene_names,
-        init_a=None,
-        init_b=None,
+        init_a="init_model",
+        init_b="init_model",
         init_model=reduced_model,
         size_factors=size_factors,
         batch_size=batch_size,
@@ -1955,7 +1954,7 @@ def wald(
         formula: str = None,
         formula_loc: str = None,
         formula_scale: str = None,
-        as_numeric: Union[list, str] = [],
+        as_numeric: Union[List[str], Tuple[str], str] = (),
         init_a: Union[np.ndarray, str] = "AUTO",
         init_b: Union[np.ndarray, str] = "AUTO",
         gene_names: Union[str, np.ndarray] = None,
@@ -2270,7 +2269,7 @@ def wilcoxon(
 def two_sample(
         data,
         grouping: Union[str, np.ndarray, list],
-        as_numeric: Union[list, str] = [],
+        as_numeric: Union[List[str], Tuple[str], str] = (),
         test=None,
         gene_names=None,
         sample_description=None,
@@ -2452,7 +2451,7 @@ def two_sample(
 def pairwise(
         data,
         grouping: Union[str, np.ndarray, list],
-        as_numeric: Union[list, str] = [],
+        as_numeric: Union[List[str], Tuple[str], str] = [],
         test: str = 'z-test',
         gene_names: str = None,
         sample_description: pd.DataFrame = None,
@@ -2667,7 +2666,7 @@ def pairwise(
 def versus_rest(
         data,
         grouping: Union[str, np.ndarray, list],
-        as_numeric: Union[list, str] = [],
+        as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
         gene_names: str = None,
         sample_description: pd.DataFrame = None,
@@ -2889,7 +2888,7 @@ class _Partition():
     def two_sample(
             self,
             grouping: Union[str],
-            as_numeric: Union[list, str] = [],
+            as_numeric: Union[List[str], Tuple[str], str] = (),
             test=None,
             noise_model: str = None,
             size_factors: np.ndarray = None,
@@ -3023,7 +3022,7 @@ class _Partition():
             full_formula_loc: str = None,
             reduced_formula_scale: str = None,
             full_formula_scale: str = None,
-            as_numeric: Union[list, str] = [],
+            as_numeric: Union[List[str], Tuple[str], str] = (),
             noise_model="nb",
             size_factors: np.ndarray = None,
             batch_size: int = None,
@@ -3113,7 +3112,7 @@ class _Partition():
             formula: str = None,
             formula_loc: str = None,
             formula_scale: str = None,
-            as_numeric: Union[list, str] = [],
+            as_numeric: Union[List[str], Tuple[str], str] = (),
             noise_model: str = "nb",
             size_factors: np.ndarray = None,
             batch_size: int = None,
@@ -3202,7 +3201,7 @@ def continuous_1d(
         formula: str = None,
         formula_loc: str = None,
         formula_scale: str = None,
-        as_numeric: Union[list, str] = [],
+        as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
         init_a: Union[np.ndarray, str] = "standard",
         init_b: Union[np.ndarray, str] = "standard",
@@ -3343,7 +3342,7 @@ def continuous_1d(
         raise ValueError('parameter continuous not found in sample_description')
 
     # Perform spline basis transform.
-    spline_basis = patsy.dmatrix("0+bs("+continuous+", df="+str(df)+")", sample_description)
+    spline_basis = patsy.highlevel.dmatrix("0+bs(" + continuous + ", df=" + str(df) + ")", sample_description)
     spline_basis = pd.DataFrame(spline_basis)
     new_coefs = [continuous + str(i) for i in range(spline_basis.shape[1])]
     spline_basis.columns = new_coefs
@@ -3437,7 +3436,7 @@ def continuous_1d(
         reduced_formula_scale = formula_scale_new
 
         logger.debug("model formulas assembled in de.test.continuos():")
-        logger.debug("full_formula_loc: "+full_formula_scale)
+        logger.debug("full_formula_loc: " + full_formula_scale)
         logger.debug("reduced_formula_loc: " + reduced_formula_loc)
         logger.debug("full_formula_scale: " + full_formula_scale)
         logger.debug("reduced_formula_scale: " + reduced_formula_scale)
