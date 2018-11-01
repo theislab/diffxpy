@@ -1279,7 +1279,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
 
         return res
 
-class DifferentialExpressionTestZTestLazy(): # inherit from _DifferentialExpressionTestMulti?
+class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
     """
     Pairwise unit_test between more than 2 groups per gene with lazy evaluation.
 
@@ -1331,12 +1331,14 @@ class DifferentialExpressionTestZTestLazy(): # inherit from _DifferentialExpress
         pvals = np.tile(np.NaN, [len(groups0), len(groups1), num_features])
         pvals[np.eye(pvals.shape[0]).astype(bool)] = 1
 
-        for i, g0 in enumerate(groups0):
-            for j, g1 in enumerate(groups1[(i + 1):]):
-                j = j + i + 1
-
-                pvals[i, j] = stats.two_coef_z_test(theta_mle0=self._theta_mle[i], theta_mle1=self._theta_mle[j],
-                                                    theta_sd0=self._theta_sd[i], theta_sd1=self._theta_sd[j])
+        for i in groups0:
+            for j in groups1:
+                pvals[i, j] = stats.two_coef_z_test(
+                    theta_mle0=self._theta_mle[i],
+                    theta_mle1=self._theta_mle[j],
+                    theta_sd0=self._theta_sd[i],
+                    theta_sd1=self._theta_sd[j]
+                )
                 pvals[j, i] = pvals[i, j]
 
         return pvals
@@ -1385,33 +1387,6 @@ class DifferentialExpressionTestZTestLazy(): # inherit from _DifferentialExpress
         """
         pass
 
-    def _check_groups(self, group0, group1):
-        if group0 not in self.groups:
-            raise ValueError('group0 not recognized')
-        if group1 not in self.groups:
-            raise ValueError('group1 not recognized')
-
-    def pval_pair(self, group0, group1):
-        self._check_groups(group0, group1)
-        return self._test_pairs(
-            group0=[self.groups.index(group1)],
-            group1=[self.groups.index(group2)],
-        )
-
-    def qval_pair(self, group0, group1, **kwargs):
-        self._check_groups(group0, group1)
-        pval = self.pval_pair(group0=group0, group1=group1)
-        return self._correction(pval=pval, **kwargs)
-
-    def log_fold_change_pair(self, group0, group1, base=np.e):
-        self._check_groups(group0, group1)
-        logfc = theta_mle[group0] - theta_mle[group1]
-
-        if base == np.e:
-            return logfc
-        else:
-            return logfc / np.log(base)
-
     def summary(self, qval_thres=None, fc_upper_thres=None,
                 fc_lower_thres=None, mean_thres=None,
                 **kwargs) -> pd.DataFrame:
@@ -1421,13 +1396,94 @@ class DifferentialExpressionTestZTestLazy(): # inherit from _DifferentialExpress
         """
         pass
 
-    def summary_pair(self, group1, group2,
+    def _check_groups(self, groups0, groups1):
+        for g in groups0:
+            if g not in self.groups:
+                raise ValueError('groups0 element'+str(g)+' not recognized')
+        for g in groups1:
+            if g not in self.groups:
+                raise ValueError('groups1 element'+str(g)+' not recognized')
+
+    def _groups_idx(self, groups):
+        if isinstance(groups, list) is False:
+            groups = [groups]
+        return np.array([self.groups.index(x) for x in groups])
+
+    def pval_pairs(self, groups0, groups1=None):
+        """
+        Return p-values for all pairwise comparisons of groups0 and groups1.
+
+        If you want to test one group (such as a control) against all other groups
+        (one test for each other group), give the control group id in groups0
+        and leave groups1=None, groups1 is then set to the full set of all groups.
+
+        :param groups0: First set of groups in pair-wise comparison.
+        :param groups0: Second set of groups in pair-wise comparison.
+        :return: P-values of pair-wise comparison.
+        """
+        if groups1 is None:
+            groups1 = self.groups
+        self._check_groups(groups0, groups1)
+        groups0 = self._groups_idx(groups0)
+        groups1 = self._groups_idx(groups1)
+        return self._test_pairs(group0=groups0, group1=groups1)
+
+    def qval_pairs(self, groups0, groups1=None, **kwargs):
+        """
+        Return multiple testing-corrected p-values for all
+        pairwise comparisons of groups0 and groups1.
+
+        If you want to test one group (such as a control) against all other groups
+        (one test for each other group), give the control group id in groups0
+        and leave groups1=None, groups1 is then set to the full set of all groups.
+
+        :param groups0: First set of groups in pair-wise comparison.
+        :param groups0: Second set of groups in pair-wise comparison.
+        :return: Multiple testing-corrected p-values of pair-wise comparison.
+        """
+        if groups1 is None:
+            groups1 = self.groups
+        self._check_groups(groups0, groups1)
+        groups0 = self._groups_idx(groups0)
+        groups1 = self._groups_idx(groups1)
+        pval = self.pval_pair(groups0=groups0, groups1=groups1)
+        return self._correction(pval=pval, **kwargs)
+
+    def log_fold_change_pairs(self, groups0, groups1=None, base=np.e):
+        """
+        Return log-fold changes for all pairwise comparisons of groups0 and groups1.
+
+        If you want to test one group (such as a control) against all other groups
+        (one test for each other group), give the control group id in groups0
+        and leave groups1=None, groups1 is then set to the full set of all groups.
+
+        :param groups0: First set of groups in pair-wise comparison.
+        :param groups0: Second set of groups in pair-wise comparison.
+        :param base: Base of logarithm of log-fold change.
+        :return: P-values of pair-wise comparison.
+        """
+        if groups1 is None:
+            groups1 = self.groups
+        self._check_groups(groups0, groups1)
+        groups0 = self._groups_idx(groups0)
+        groups1 = self._groups_idx(groups1)
+        logfc = theta_mle[groups0] - theta_mle[groups1]
+
+        if base == np.e:
+            return logfc
+        else:
+            return logfc / np.log(base)
+
+    def summary_pair(self, group0, group1,
                      qval_thres=None, fc_upper_thres=None,
                      fc_lower_thres=None, mean_thres=None,
                      **kwargs) -> pd.DataFrame:
         """
-        Summarize differential expression results into an output table.
+        Summarize differential expression results of single pairwose comparison
+        into an output table.
 
+        :param group0: Firt group in pair-wise comparison.
+        :param group0: Second group in pair-wise comparison.
         :return: pandas.DataFrame with the following columns:
 
             - gene: the gene id's
@@ -1438,13 +1494,66 @@ class DifferentialExpressionTestZTestLazy(): # inherit from _DifferentialExpress
         """
         assert self.gene_ids is not None
 
-        pval = self.pval_pair(group0=group0, group1=group1)
+        group0 = self._groups_idx(groups0)
+        group1 = self._groups_idx(groups1)
+        if len(group0) != 1:
+            raise ValueError("group0 should only contain one entry in summary_pair()")
+        if len(group1) != 1:
+            raise ValueError("group1 should only contain one entry in summary_pair()")
+
+        pval = self.pval_pairs(group0=group0, group1=group1)
         qval = self._correction(pval=pval, **kwargs)
         res = pd.DataFrame({
             "gene": self.gene_ids,
-            "pval": pval,
-            "qval": qval,
-            "log2fc": self.log_fold_change_pair(group0=group0, group1=group1, base=2),
+            "pval": pval.values.flatten(),
+            "qval": qval.values.flatten(),
+            "log2fc": self.log_fold_change_pairs(group0=group0, group1=group1, base=2).values.flatten(),
+            "mean": np.asarray(self.mean)
+        })
+
+        res = self._threshold_summary(
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
+            mean_thres=mean_thres
+        )
+
+        return res
+
+    def summary_pairs(self, groups0, groups1=None,
+                     qval_thres=None, fc_upper_thres=None,
+                     fc_lower_thres=None, mean_thres=None,
+                     **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results of a set of
+        pairwise comparisons into an output table.
+
+        :param groups0: First set of groups in pair-wise comparison.
+        :param groups0: Second set of groups in pair-wise comparison.
+        :return: pandas.DataFrame with the following columns:
+
+            - gene: the gene id's
+            - pval: the per-gene p-value of the selected test
+            - qval: the per-gene q-value of the selected test
+            - log2fc: the per-gene log2 fold change of the selected test
+            - mean: the mean expression of the gene across all groups
+        """
+        assert self.gene_ids is not None
+        if groups1 is None:
+            groups1 = self.groups
+
+        groups0 = self._groups_idx(groups0)
+        groups1 = self._groups_idx(groups1)
+
+        pval = self.pval_pairs(group0=groups0, group1=groups1)
+        qval = self._correction(pval=pval, **kwargs)
+        lfc = self.log_fold_change_pair(group0=groups0, group1=groups1, base=2)
+        res = pd.DataFrame({
+            "gene": self.gene_ids,
+            "pval": np.max(pval, axis=(0,1)),
+            "qval": np.max(qval, axis=(0,1)),
+            "log2fc": np.max(lfc, axis=(0,1)),,
             "mean": np.asarray(self.mean)
         })
 
@@ -3162,7 +3271,7 @@ class _Partition():
             ave=np.mean(self.X, axis=0),
             correction_type="by_test")
 
-def perturbed(
+def perturb(
         data,
         grouping: Union[str, np.ndarray, list],
         test: str = 'z-test',
@@ -3181,6 +3290,11 @@ def perturbed(
     """
     Run differential tests between control and each perturbation.
 
+    This function only supports z-tests right now as z-test are the only test
+    with sensible lazy evaluation which is important given the large numer of groups
+    in these scenarios. Use raw testing functions such as de.test.wald to perform
+    tests other than z-tests on the coefficient posteriors.
+
     :param data: input data
     :param grouping: str, array
 
@@ -3189,10 +3303,6 @@ def perturbed(
     :param test: str, statistical test to use. Possible options:
 
         - 'z-test': default
-        - 'wald'
-        - 'lrt'
-        - 't-test'
-        - 'wilcoxon'
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
@@ -3268,52 +3378,6 @@ def perturbed(
             correction_type=pval_correction
         )
     else:
-        groups = np.unique(grouping)
-        pvals = np.tile(np.NaN, [len(groups), len(groups), X.shape[1]])
-        pvals[np.eye(pvals.shape[0]).astype(bool)] = 0
-        logfc = np.tile(np.NaN, [len(groups), len(groups), X.shape[1]])
-        logfc[np.eye(logfc.shape[0]).astype(bool)] = 0
-
-        if keep_full_test_objs:
-            tests = np.tile([None], [len(groups), len(groups)])
-        else:
-            tests = None
-
-        for i, g1 in enumerate(groups):
-            for j, g2 in enumerate(groups[(i + 1):]):
-                j = j + i + 1
-
-                sel = (grouping == g1) | (grouping == g2)
-                de_test_temp = two_sample(
-                    data=X[sel],
-                    grouping=grouping[sel],
-                    test=test,
-                    gene_names=gene_names,
-                    sample_description=sample_description.iloc[sel],
-                    noise_model=noise_model,
-                    size_factors=size_factors[sel] if size_factors is not None else None,
-                    batch_size=batch_size,
-                    training_strategy=training_strategy,
-                    quick_scale=quick_scale,
-                    dtype=dtype,
-                    **kwargs
-                )
-                pvals[i, j] = de_test_temp.pval
-                pvals[j, i] = pvals[i, j]
-                logfc[i, j] = de_test_temp.log_fold_change()
-                logfc[j, i] = - logfc[i, j]
-                if keep_full_test_objs:
-                    tests[i, j] = de_test_temp
-                    tests[j, i] = de_test_temp
-
-        de_test = DifferentialExpressionTestPairwise(
-            gene_ids=gene_names,
-            pval=pvals,
-            logfc=logfc,
-            ave=np.mean(X, axis=0),
-            groups=groups,
-            tests=tests,
-            correction_type=pval_correction
-        )
+        raise ValueError("test "+test+"not recognized in de.test.perturb")
 
     return de_test
