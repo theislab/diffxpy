@@ -13,7 +13,7 @@ import diffxpy.api as de
 
 class TestContinuous(unittest.TestCase):
 
-    def test_null_distribution_wald(self, n_cells: int = 100, n_genes: int = 100):
+    def test_null_distribution_wald(self, n_cells: int = 10, n_genes: int = 2):
         """
         Test if de.test.continuous() generates a uniform p-value distribution in the wald test
         if it is given data simulated based on the null model. Returns the p-value
@@ -47,6 +47,8 @@ class TestContinuous(unittest.TestCase):
             dtype="float64"
         )
         summary = test.summary()
+        ax_scatter = test.plot_genes(genes=0, show=False)
+        ax_hm = test.plot_heatmap(genes=np.asarray(range(np.min([n_genes, 5]))), show=False)
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue

@@ -19,6 +19,11 @@ import patsy
 import batchglm.data as data_utils
 from batchglm.api.models.glm import Model as GeneralizedLinearModel
 
+try:
+    import seaborn
+except ImportError:
+    seaborn = None
+
 from ..stats import stats
 from . import correction
 from ..models.batch_bfgs.optim import Estim_BFGS
@@ -131,6 +136,11 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     def gene_ids(self) -> np.ndarray:
         pass
 
+    @property
+    @abc.abstractmethod
+    def X(self):
+        pass
+
     @abc.abstractmethod
     def log_fold_change(self, base=np.e, **kwargs):
         pass
@@ -226,7 +236,6 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         log10_qval_clean = np.clip(log10_qval_clean, log10_threshold, 0, log10_qval_clean)
         return log10_qval_clean
 
-    @property
     @abc.abstractmethod
     def summary(self, **kwargs) -> pd.DataFrame:
         pass
@@ -292,8 +301,14 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
     All implementations of this class should return one p-value and one fold change per gene.
     """
 
-    def summary(self, qval_thres=None,
-                fc_upper_thres=None, fc_lower_thres=None, mean_thres=None, **kwargs) -> pd.DataFrame:
+    def summary(
+            self,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None,
+            **kwargs
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
@@ -339,6 +354,10 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
     @property
     def gene_ids(self) -> np.ndarray:
         return np.asarray(self.full_estim.features)
+
+    @property
+    def X(self):
+        return self.full_estim.X
 
     @property
     def reduced_model_gradient(self):
@@ -585,6 +604,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         return np.asarray(self.model_estim.features)
 
     @property
+    def X(self):
+        return self.model_estim.X
+
+    @property
     def model_gradient(self):
         return self.model_estim.gradient
 
@@ -725,7 +748,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
 
     def __init__(self, data, grouping, gene_ids):
         super().__init__()
-        self.data = data
+        self._X = data
         self.grouping = grouping
         self._gene_ids = np.asarray(gene_ids)
 
@@ -760,6 +783,10 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
     @property
     def gene_ids(self) -> np.ndarray:
         return self._gene_ids
+
+    @property
+    def X(self):
+        return self._X
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -798,7 +825,7 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
 
     def __init__(self, data, grouping, gene_names):
         super().__init__()
-        self.data = data
+        self._X = data
         self.grouping = grouping
         self._gene_names = np.asarray(gene_names)
 
@@ -812,6 +839,10 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
     @property
     def gene_ids(self) -> np.ndarray:
         return self._gene_names
+
+    @property
+    def X(self):
+        return self._X
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -846,7 +877,7 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
 
         grouping = self.grouping
         ttest = t_test(
-            data=self.data,
+            data=self.X,
             grouping=grouping,
             gene_names=self.gene_ids,
         )
@@ -1455,57 +1486,279 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
         return res
 
 
-class _DifferentialExpressionTestCont():
-    def log_fold_change(self, base=np.e, **kwargs):
-        # has to be redefined for continuous models
-        pass
+class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
+    _de_test: _DifferentialExpressionTestSingle
+    _model_estim: _Estimation
+    _size_factors: np.ndarray
+    _continuous: str
+    _spline_coefs: list
 
-    def plotGenes(self, genes):
-        print("plot Gene")
+    def __init__(
+            self,
+            de_test: _DifferentialExpressionTestSingle,
+            model_estim: _Estimation,
+            size_factors: np.ndarray,
+            continuous: str,
+            spline_coefs: list
+    ):
+        self._de_test = de_test
+        self._model_estim = model_estim
+        self._size_factors = size_factors
+        self._continuous = continuous
+        self._spline_coefs = spline_coefs
 
-    def plotHeatmap(self, genes):
-        pass
+    @property
+    def gene_ids(self) -> np.ndarray:
+        return self._de_test.gene_ids
+
+    @property
+    def X(self):
+        return self._de_test.X
+
+    @property
+    def pval(self) -> np.ndarray:
+        return self._de_test.pval
+
+    @property
+    def qval(self) -> np.ndarray:
+        return self._de_test.qval
+
+    @property
+    def mean(self) -> np.ndarray:
+        return self._de_test.mean
+
+    @property
+    def log_probs(self) -> np.ndarray:
+        return self._de_test.log_probs
+
+    def summary(self, **kwargs):
+        return self._de_test.summary(**kwargs)
+
+    def log_fold_change(self, base=np.e, genes=None, nonnumeric=False):
+        """
+        Return log_fold_change based on fitted expression values by gene.
+
+        The log_fold_change is defined as the log of the fold change
+        from the minimal to the maximal fitted value by gene.
+
+        :param base: Basis of logarithm.
+        :param genes: Genes for which to return maximum fitted value. Defaults
+            to all genes if None.
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :return: Log-fold change of fitted expression value by gene.
+        """
+        if genes is None:
+            genes = np.asarray(range(self.X.shape[1]))
+        else:
+            genes = self._idx_genes(genes)
+
+        fc = self.max(genes=genes, nonnumeric=nonnumeric) - \
+             self.min(genes=genes, nonnumeric=nonnumeric)
+        fc = np.nextafter(0, 1, out=fc, where=fc == 0)
+
+        return np.log(fc) / np.log(base)
+
+    def _filter_genes_str(self, genes: list):
+        """
+        Filter genes indexed by ID strings by list of genes given in data set.
+
+        :param genes: List of genes to filter.
+        :return: Filtered list of genes
+        """
+        genes_found = np.array([x in self.gene_ids for x in genes])
+        if any(genes_found == False):
+            logger.info("did not find some genes, omitting")
+            genes = genes[genes_found]
+        return genes
+
+    def _filter_genes_int(self, genes: list):
+        """
+        Filter genes indexed by integers by gene list length.
+
+        :param genes: List of genes to filter.
+        :return: Filtered list of genes
+        """
+        genes_found = np.array([x < self.X.shape[1] for x in genes])
+        if any(genes_found == False):
+            logger.info("did not find some genes, omitting")
+            genes = genes[genes_found]
+        return genes
+
+    def _idx_genes(self, genes):
+        if not isinstance(genes, list):
+            if isinstance(genes, np.ndarray):
+                genes = genes.tolist()
+            else:
+                genes = [genes]
+
+        if isinstance(genes[0], str):
+            genes = self._filter_genes_str(genes)
+            genes = np.array([self.gene_ids.index(x) for x in genes])
+        elif isinstance(genes[0], int):
+            genes = self._filter_genes_int(genes)
+        else:
+            print(genes)
+            raise ValueError("only string and integer elements allowed in genes")
+        return genes
+
+    def _continuous_model(self, idx, nonnumeric=False):
+        """
+        Recover continuous fit for a gene.
+
+        :param idx: Index of genes to recover fit for.
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :return: Continuuos fit for each cell for given gene.
+        """
+        if len(idx) == 1:
+            idx = np.array([idx])
+        if nonnumeric:
+            mu = np.matmul(self._model_estim.design_loc,
+                           self._model_estim.par_link_loc[idx,:])
+            if self._size_factors is not None:
+                mu = mu + self._size_factors
+        else:
+            idx_basis = None
+            mu = np.matmul(self._model_estim.design_loc,
+                           self._model_estim.par_link_loc[idx, :])
+
+        mu = np.exp(mu)
+        return mu
+
+    def max(self, genes, nonnumeric=False):
+        """
+        Return maximum fitted expression value by gene.
+
+        :param genes: Genes for which to return maximum fitted value.
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :return: Maximum fitted expression value by gene.
+        """
+        genes = self._idx_genes(genes)
+        return np.array([np.max(self._continuous_model(idx=i, nonnumeric=nonnumeric))
+                         for x in genes])
+
+    def min(self, genes, nonnumeric=False):
+        """
+        Return minimum fitted expression value by gene.
+
+        :param genes: Genes for which to return maximum fitted value.
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :return: Maximum fitted expression value by gene.
+        """
+        genes = self._idx_genes(genes)
+        return np.array([np.min(self._continuous_model(idx=i, nonnumeric=nonnumeric))
+                         for x in genes])
+
+    def argmax(self, genes, nonnumeric=False):
+        """
+        Return maximum fitted expression value by gene.
+
+        :param genes: Genes for which to return maximum fitted value.
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :return: Maximum fitted expression value by gene.
+        """
+        genes = self._idx_genes(genes)
+        idx = np.array([np.argmax(self._continuous_model(idx=i, nonnumeric=nonnumeric))
+                        for x in genes])
+        return xx[idx]
+
+    def argmin(self, genes, nonnumeric=False):
+        """
+        Return minimum fitted expression value by gene.
+
+        :param genes: Genes for which to return maximum fitted value.
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :return: Maximum fitted expression value by gene.
+        """
+        genes = self._idx_genes(genes)
+        idx = np.array([np.argmin(self._continuous_model(idx=i, nonnumeric=nonnumeric))
+                        for x in genes])
+
+    def plot_genes(self, genes, hue=None, raw=False, save=False, show=True):
+        genes = self._idx_genes(genes)
+
+        ax = []
+        for g in genes:
+            axi = sns.scatterplot(x=None, y=self.X[:, g], hue=hue)
+            ax.extend(axi)
+
+        if show:
+            pass
+
+        if save:
+            pass
+
+        return ax
+
+    def plot_heatmap(self, genes, save=None, show=True, transform="none"):
+        """
+        Plot a heatmaps with the continuous model fits of the indicated genes.
+
+        :param genes: Genes to include in heatmap.
+        :param save: Whether and where to save plots to file. Does not save if None,
+            save is otherwise treated as the path to save to.
+        :param show: Whether to show plots.
+        :param transform: Gene-wise transform to apply. Must be one of
+
+            - "log10"
+            - "zscore"
+        :return: axis object
+        """
+
+        genes = self._idx_genes(genes)
+        data = self.X[:,genes]
+        if transform == "log10":
+            data = np.log(data)
+        elif transform == "zscore":
+            pass
+        else:
+            raise ValueError("transform not recognized in plotHeatmap()")
+
+        ax = sns.heatmap(data=data)
+
+        if show:
+            ax
+
+        if save:
+            pass
+
+        return ax
 
 
-class DifferentialExpressionTestWaldCont(DifferentialExpressionTestWald, _DifferentialExpressionTestCont):
-    detest: DifferentialExpressionTestWald
+class DifferentialExpressionTestWaldCont(_DifferentialExpressionTestCont):
+    de_test: DifferentialExpressionTestWald
 
-    def __init__(self, detest):
-        self._detest = detest
-        # Propagate properties of detest into this this
-        # class so that properties and high-level functions
-        # which are inherited from super class work.
-        self._pval = self._detest._pval
-        self._qval = self._detest._qval
-        self._mean = self._detest._mean
-        self._log_probs = self._detest._log_probs
-
-        self.model_estim = self._detest.model_estim
-        self.sd_loc_totest = self._detest.sd_loc_totest
-        self.coef_loc_totest = self._detest.coef_loc_totest
-        self.indep_coefs = self._detest.indep_coefs
-        self._error_codes = self._detest._error_codes
-        self._niter = self._detest._niter
+    def __init__(
+            self,
+            de_test: DifferentialExpressionTestWald,
+            size_factors: np.ndarray,
+            continuous: str,
+            spline_coefs: list
+    ):
+        super().__init__(
+            de_test=de_test,
+            model_estim=de_test.model_estim,
+            size_factors=size_factors,
+            continuous=continuous,
+            spline_coefs=spline_coefs
+        )
 
 
-class DifferentialExpressionTestLRTCont(DifferentialExpressionTestLRT, _DifferentialExpressionTestCont):
-    detest: DifferentialExpressionTestLRT
+class DifferentialExpressionTestLRTCont(_DifferentialExpressionTestCont):
+    de_test: DifferentialExpressionTestLRT
 
-    def __init__(self, detest):
-        self._detest = detest
-        # Propagate properties of detest into this this
-        # class so that properties and high-level functions
-        # which are inherited from super class work.
-        self._pval = self._detest._pval
-        self._qval = self._detest._qval
-        self._mean = self._detest._mean
-        self._log_probs = self._detest._log_probs
-
-        self.sample_description = self._detest.sample_description
-        self.full_design_info = self._detest.full_design_loc_info
-        self.full_estim = self._detest.full_estim
-        self.reduced_design_info = self._detest.reduced_design_loc_info
-        self.reduced_estim = self._detest.educed_estim
+    def __init__(self,
+            de_test: DifferentialExpressionTestLRT,
+            size_factors: np.ndarray,
+            continuous: str,
+            spline_coefs: list
+    ):
+        super().__init__(
+            de_test=de_test,
+            model_estim=de_test.full_estim,
+            size_factors=size_factors,
+            continuous=continuous,
+            spline_coefs=spline_coefs
+        )
 
 
 def _parse_gene_names(data, gene_names):
@@ -3421,7 +3674,12 @@ def continuous_1d(
             dtype=dtype,
             **kwargs
         )
-        de_test = DifferentialExpressionTestWaldCont(de_test)
+        de_test = DifferentialExpressionTestWaldCont(
+            de_test=de_test,
+            size_factors=size_factors,
+            continuous=continuous,
+            spline_coefs=new_coefs
+        )
     elif test.lower() == 'lrt':
         if noise_model is None:
             raise ValueError("Please specify noise_model")
@@ -3466,7 +3724,12 @@ def continuous_1d(
             dtype=dtype,
             **kwargs
         )
-        de_test = DifferentialExpressionTestLRTCont(de_test)
+        de_test = DifferentialExpressionTestLRTCont(
+            de_test=de_test,
+            size_factors=size_factors,
+            continuous=continuous,
+            spline_coefs=new_coefs
+        )
     else:
         raise ValueError('base.continuous(): Parameter `test` not recognized.')
 
