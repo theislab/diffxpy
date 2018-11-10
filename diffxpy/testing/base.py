@@ -3329,9 +3329,13 @@ def continuous_1d(
         factor_loc_totest = [continuous]
     elif isinstance(factor_loc_totest, str):
         factor_loc_totest = [factor_loc_totest]
+    elif isinstance(factor_loc_totest, tuple):
+        factor_loc_totest = list(factor_loc_totest)
 
     if isinstance(as_numeric, str):
         as_numeric = [as_numeric]
+    if isinstance(as_numeric, tuple):
+        as_numeric = list(as_numeric)
 
     X = _parse_data(data, gene_names)
     gene_names = _parse_gene_names(data, gene_names)
