@@ -3390,6 +3390,8 @@ def continuous_1d(
             factor_loc_totest_new = [x for x in factor_loc_totest if x != continuous]
             # Add spline basis terms in instead of continuous term:
             factor_loc_totest_new.extend(new_coefs)
+        else:
+            factor_loc_totest_new = factor_loc_totest
 
         logger.debug("model formulas assembled in de.test.continuos():")
         logger.debug("factor_loc_totest_new: " + ",".join(factor_loc_totest_new))
