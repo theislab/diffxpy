@@ -43,7 +43,8 @@ class TestContinuous(unittest.TestCase):
             test="wald",
             sample_description=random_sample_description,
             quick_scale=True,
-            batch_size=None
+            batch_size=None,
+            dtype="float64"
         )
         summary = test.summary()
 
@@ -87,7 +88,8 @@ class TestContinuous(unittest.TestCase):
             test="lrt",
             sample_description=random_sample_description,
             quick_scale=True,
-            batch_size=None
+            batch_size=None,
+            dtype="float64"
         )
         summary = test.summary()
 
