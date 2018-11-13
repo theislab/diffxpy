@@ -97,6 +97,25 @@ class TestContinuous(unittest.TestCase):
             factor_loc_totest="pseudotime",
             test="wald",
             sample_description=random_sample_description,
+            init_a="standard",
+            init_b="standard",
+            training_strategy=[
+                {
+                    "learning_rate": 0.5,
+                    "convergence_criteria": "t_test",
+                    "stopping_criteria": 0.05,
+                    "loss_window_size": 20,
+                    "use_batching": False,
+                    "optim_algo": "ADAM",
+                },
+                {
+                    "convergence_criteria": "scaled_moving_average",
+                    "stopping_criteria": 1e-10,
+                    "loss_window_size": 20,
+                    "use_batching": False,
+                    "optim_algo": "newton",
+                },
+            ],
             quick_scale=True,
             batch_size=None,
             dtype="float64"
@@ -107,6 +126,7 @@ class TestContinuous(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         print('KS-test pvalue for null model match of wald(): %f' % pval_h0)
+        print(np.mean(test.pval))
         print(test.pval)
 
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
