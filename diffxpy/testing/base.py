@@ -19,11 +19,6 @@ import patsy
 import batchglm.data as data_utils
 from batchglm.api.models.glm import Model as GeneralizedLinearModel
 
-try:
-    import seaborn
-except ImportError:
-    seaborn = None
-
 from ..stats import stats
 from . import correction
 from ..models.batch_bfgs.optim import Estim_BFGS
@@ -1490,7 +1485,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
     _de_test: _DifferentialExpressionTestSingle
     _model_estim: _Estimation
     _size_factors: np.ndarray
-    _continuous: str
+    _continuous_coords: np.ndarray
     _spline_coefs: list
 
     def __init__(
@@ -1498,13 +1493,13 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             de_test: _DifferentialExpressionTestSingle,
             model_estim: _Estimation,
             size_factors: np.ndarray,
-            continuous: str,
+            continuous_coords: str,
             spline_coefs: list
     ):
         self._de_test = de_test
         self._model_estim = model_estim
         self._size_factors = size_factors
-        self._continuous = continuous
+        self._continuous_coords = continuous_coords
         self._spline_coefs = spline_coefs
 
     @property
@@ -1531,8 +1526,30 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
     def log_probs(self) -> np.ndarray:
         return self._de_test.log_probs
 
-    def summary(self, **kwargs):
-        return self._de_test.summary(**kwargs)
+    def summary(self, nonnumeric=False, qval_thres=None, fc_upper_thres=None,
+                fc_lower_thres=None, mean_thres=None) -> pd.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        """
+        # Collect summary from differential test object.
+        res = self._de_test.summary()
+        # Overwrite fold change with fold change from temporal model.
+        # Note that log2_fold_change calls log_fold_change from this class
+        # and not from the self._de_test object,
+        # which is called by self._de_test.summary().
+        res['log2fc'] = self.log2_fold_change()
+
+        res = self._threshold_summary(
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
+            mean_thres=mean_thres
+        )
+
+        return res
 
     def log_fold_change(self, base=np.e, genes=None, nonnumeric=False):
         """
@@ -1594,12 +1611,26 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         if isinstance(genes[0], str):
             genes = self._filter_genes_str(genes)
             genes = np.array([self.gene_ids.index(x) for x in genes])
-        elif isinstance(genes[0], int):
+        elif isinstance(genes[0], int) or isinstance(genes[0], np.int64):
             genes = self._filter_genes_int(genes)
         else:
             print(genes)
             raise ValueError("only string and integer elements allowed in genes")
         return genes
+
+    def _spline_par_loc_idx(self, intercept=True):
+        """
+        Get indices of spline basis model parameters in
+        entire location parameter model parameter set.
+
+        :param intercept: Whether to include intercept.
+        :return: Indices of spline basis parameters of location model.
+        """
+        par_loc_names = self._model_estim.design_loc.coords['design_loc_params'].values.tolist()
+        idx = [par_loc_names.index(x) for x in self._spline_coefs]
+        if 'Intercept' in par_loc_names and intercept == True:
+            idx = np.concatenate([np.where([[x == 'Intercept' for x in par_loc_names]])[0], idx])
+        return idx
 
     def _continuous_model(self, idx, nonnumeric=False):
         """
@@ -1609,17 +1640,16 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :param nonnumeric: Whether to include non-numeric covariates in fit.
         :return: Continuuos fit for each cell for given gene.
         """
-        if len(idx) == 1:
-            idx = np.array([idx])
+        idx = np.asarray(idx)
         if nonnumeric:
             mu = np.matmul(self._model_estim.design_loc,
-                           self._model_estim.par_link_loc[idx,:])
+                           self._model_estim.par_link_loc[:,idx])
             if self._size_factors is not None:
                 mu = mu + self._size_factors
         else:
-            idx_basis = None
-            mu = np.matmul(self._model_estim.design_loc,
-                           self._model_estim.par_link_loc[idx, :])
+            idx_basis = self._spline_par_loc_idx(intercept=True)
+            mu = np.matmul(self._model_estim.design_loc[:,idx_basis],
+                           self._model_estim.par_link_loc[idx_basis, idx])
 
         mu = np.exp(mu)
         return mu
@@ -1634,7 +1664,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         """
         genes = self._idx_genes(genes)
         return np.array([np.max(self._continuous_model(idx=i, nonnumeric=nonnumeric))
-                         for x in genes])
+                         for i in genes])
 
     def min(self, genes, nonnumeric=False):
         """
@@ -1646,7 +1676,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         """
         genes = self._idx_genes(genes)
         return np.array([np.min(self._continuous_model(idx=i, nonnumeric=nonnumeric))
-                         for x in genes])
+                         for i in genes])
 
     def argmax(self, genes, nonnumeric=False):
         """
@@ -1658,8 +1688,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         """
         genes = self._idx_genes(genes)
         idx = np.array([np.argmax(self._continuous_model(idx=i, nonnumeric=nonnumeric))
-                        for x in genes])
-        return xx[idx]
+                        for i in genes])
+        return self._continuous_coords[idx]
 
     def argmin(self, genes, nonnumeric=False):
         """
@@ -1671,55 +1701,182 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         """
         genes = self._idx_genes(genes)
         idx = np.array([np.argmin(self._continuous_model(idx=i, nonnumeric=nonnumeric))
-                        for x in genes])
+                        for i in genes])
+        return self._continuous_coords[idx]
 
-    def plot_genes(self, genes, hue=None, raw=False, save=False, show=True):
-        genes = self._idx_genes(genes)
+    def plot_genes(
+            self,
+            genes,
+            hue=None,
+            nonnumeric=False,
+            save=None,
+            show=True,
+            ncols=2,
+            row_gap=0.3,
+            col_gap=0.25
+    ):
+        """
+        Plot observed data and spline fits of selected genes.
 
-        ax = []
-        for g in genes:
-            axi = sns.scatterplot(x=None, y=self.X[:, g], hue=hue)
-            ax.extend(axi)
+        :param genes: Gene IDs to plot.
+        :param hue: Confounder to include in plot.
+        :param nonnumeric:
+        :param save: Path+file name stem to save plots to.
+            File will be save+"_genes.png". Does not save if save is None.
+        :param show: Whether to display plot.
+        :param ncols: Number of columns in plot grid if multiple genes are plotted.
+        :param row_gap: Vertical gap between panel rows relative to panel height.
+        :param col_gap: Horizontal gap between panel columns relative to panel width.
+        :return: Matplotlib axis objects.
+        """
+
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        from matplotlib import gridspec
+        from matplotlib import rcParams
+
+        plt.ioff()
+
+        gene_idx = self._idx_genes(genes)
+
+        # Set up gridspec.
+        ncols = ncols if len(gene_idx) > ncols else len(gene_idx)
+        nrows = len(gene_idx) // ncols + (len(gene_idx) - (len(gene_idx) // ncols) * ncols)
+        gs = gridspec.GridSpec(
+            nrows=nrows,
+            ncols=ncols,
+            hspace=row_gap,
+            wspace=col_gap
+        )
+
+        # Define figure size based on panel number and grid.
+        fig = plt.figure(
+            figsize=(
+                ncols * rcParams['figure.figsize'][0],  # width in inches
+                nrows * rcParams['figure.figsize'][1] * (1 + row_gap)  # height in inches
+            )
+        )
+
+        # Build axis objects in loop.
+        axs = []
+        for i, g in enumerate(gene_idx):
+            ax = plt.subplot(gs[i])
+            axs.append(ax)
+
+            sns.scatterplot(
+                x=self._continuous_coords,
+                y=self.X[:, genes[0]],
+                hue=hue,
+                ax=ax
+            )
+            sns.lineplot(
+                x=self._continuous_coords,
+                y=self._continuous_model(idx=g, nonnumeric=nonnumeric),
+                hue=hue,
+                ax=ax
+            )
+            ax.set_title(genes[i])
+            ax.set_xlabel("continuous")
+            ax.set_ylabel("expression")
+
+        # Save, show and return figure.
+        if save is not None:
+            plt.savefig(save+'_genes.png')
 
         if show:
-            pass
+            plt.show()
 
-        if save:
-            pass
+        plt.close(fig)
 
-        return ax
+        return axs
 
-    def plot_heatmap(self, genes, save=None, show=True, transform="none"):
+
+    def plot_heatmap(
+            self,
+            genes,
+            save=None,
+            show=True,
+            transform: str = "zscore",
+            nticks=10,
+            cmap: str = "YlGnBu",
+            width=10,
+            height_per_gene=0.5
+    ):
         """
-        Plot a heatmaps with the continuous model fits of the indicated genes.
+        Plot observed data and spline fits of selected genes.
 
-        :param genes: Genes to include in heatmap.
-        :param save: Whether and where to save plots to file. Does not save if None,
-            save is otherwise treated as the path to save to.
-        :param show: Whether to show plots.
-        :param transform: Gene-wise transform to apply. Must be one of
-
-            - "log10"
-            - "zscore"
-        :return: axis object
+        :param genes: Gene IDs to plot.
+        :param save: Path+file name stem to save plots to.
+            File will be save+"_genes.png". Does not save if save is None.
+        :param show: Whether to display plot.
+        :param transform: Gene-wise transform to use.
+        :param nticks: Number of x ticks.
+        :param cmap: matplotlib cmap.
+        :param width: Width of heatmap figure.
+        :param height_per_gene: Height of each row (gene) in heatmap figure.
+        :return: Matplotlib axis objects.
         """
+        import seaborn as sns
+        import matplotlib.pyplot as plt
 
-        genes = self._idx_genes(genes)
-        data = self.X[:,genes]
-        if transform == "log10":
-            data = np.log(data)
-        elif transform == "zscore":
+        plt.ioff()
+
+        gene_idx = self._idx_genes(genes)
+
+        # Define figure.
+        fig = plt.figure(figsize=(width, height_per_gene * len(gene_idx)))
+        ax = fig.add_subplot(111)
+
+        # Build heatmap matrix.
+        ## Add in data.
+        data = np.array([
+            self._continuous_model(idx=g, nonnumeric=False)
+            for i, g in enumerate(gene_idx)
+        ])
+        ## Order columns by continuous covariate.
+        idx_x_sorted = np.argsort(self._continuous_coords)
+        data = data[:, idx_x_sorted]
+        xcoord = self._continuous_coords[idx_x_sorted]
+
+        if transform.lower() == "log10":
+            data = np.nextafter(0, 1, out=data, where=data == 0)
+            data = np.log(data) / np.log(10)
+        elif transform.lower() == "zscore":
+            mu = np.mean(data, axis=0)
+            sd = np.std(data, axis=0)
+            sd = np.nextafter(0, 1, out=sd, where=sd == 0)
+            data = np.array([(x - mu[i]) / sd[i] for i, x in enumerate(data)])
+        elif transform.lower() == "none":
             pass
         else:
-            raise ValueError("transform not recognized in plotHeatmap()")
+            raise ValueError("transform not recognized in plot_heatmap()")
 
-        ax = sns.heatmap(data=data)
+        # Create heatmap.
+        sns.heatmap(data=data, cmap=cmap, ax=ax)
+
+        # Set up axis labels.
+        xtick_pos = np.asarray(np.round(np.linspace(
+            start=0,
+            stop=data.shape[1] - 1,
+            num=nticks,
+            endpoint=True
+        )), dtype=int)
+        xtick_lab = [str(np.round(xcoord[np.argmin(np.abs(xcoord - xcoord[i]))], 2))
+                     for i in xtick_pos]
+        ax.set_xticks(xtick_pos)
+        ax.set_xticklabels(xtick_lab)
+        ax.set_xlabel("continuous")
+        plt.yticks(np.arange(len(genes)), genes, rotation='horizontal')
+        ax.set_ylabel("genes")
+
+        # Save, show and return figure.
+        if save is not None:
+            plt.savefig(save + '_genes.png')
 
         if show:
-            ax
+            plt.show()
 
-        if save:
-            pass
+        plt.close(fig)
 
         return ax
 
@@ -1731,14 +1888,14 @@ class DifferentialExpressionTestWaldCont(_DifferentialExpressionTestCont):
             self,
             de_test: DifferentialExpressionTestWald,
             size_factors: np.ndarray,
-            continuous: str,
+            continuous_coords: np.ndarray,
             spline_coefs: list
     ):
         super().__init__(
             de_test=de_test,
             model_estim=de_test.model_estim,
             size_factors=size_factors,
-            continuous=continuous,
+            continuous_coords=continuous_coords,
             spline_coefs=spline_coefs
         )
 
@@ -1749,14 +1906,14 @@ class DifferentialExpressionTestLRTCont(_DifferentialExpressionTestCont):
     def __init__(self,
             de_test: DifferentialExpressionTestLRT,
             size_factors: np.ndarray,
-            continuous: str,
+            continuous_coords: np.ndarray,
             spline_coefs: list
     ):
         super().__init__(
             de_test=de_test,
             model_estim=de_test.full_estim,
             size_factors=size_factors,
-            continuous=continuous,
+            continuous_coords=continuous_coords,
             spline_coefs=spline_coefs
         )
 
@@ -3677,7 +3834,7 @@ def continuous_1d(
         de_test = DifferentialExpressionTestWaldCont(
             de_test=de_test,
             size_factors=size_factors,
-            continuous=continuous,
+            continuous_coords=sample_description[continuous].values,
             spline_coefs=new_coefs
         )
     elif test.lower() == 'lrt':
@@ -3727,7 +3884,7 @@ def continuous_1d(
         de_test = DifferentialExpressionTestLRTCont(
             de_test=de_test,
             size_factors=size_factors,
-            continuous=continuous,
+            continuous_coords=sample_description[continuous].values,
             spline_coefs=new_coefs
         )
     else:
