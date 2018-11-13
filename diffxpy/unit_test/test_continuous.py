@@ -68,7 +68,7 @@ class TestContinuous(unittest.TestCase):
         temp = test.summary(nonnumeric=True)
 
 
-    def test_null_distribution_wald(self, n_cells: int = 10, n_genes: int = 2):
+    def test_null_distribution_wald(self, n_cells: int = 1000, n_genes: int = 20):
         """
         Test if de.test.continuous() generates a uniform p-value distribution in the wald test
         if it is given data simulated based on the null model. Returns the p-value
