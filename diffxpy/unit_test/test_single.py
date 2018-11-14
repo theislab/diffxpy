@@ -49,6 +49,43 @@ class TestSingle(unittest.TestCase):
 
         return pval_h0
 
+    def test_null_distribution_wald_multi(self, n_cells: int = 2000, n_genes: int = 500):
+        """
+        Test if de.wald() (multivariate mode) generates a uniform p-value distribution
+        if it is given data simulated based on the null model. Returns the p-value
+        of the two-side Kolmgorov-Smirnov test for equality of the observed
+        p-value distriubution and a uniform distribution.
+
+        :param n_cells: Number of cells to simulate (number of observations per test).
+        :param n_genes: Number of genes to simulate (number of tests).
+        """
+
+        sim = Simulator(num_observations=n_cells, num_features=n_genes)
+        sim.generate_sample_description(num_batches=0, num_conditions=0)
+        sim.generate()
+
+        random_sample_description = pd.DataFrame({
+            "condition": np.random.randint(4, size=sim.num_observations)
+        })
+
+        test = de.test.wald(
+            data=sim.X,
+            factor_loc_totest="condition",
+            formula="~ 1 + condition",
+            sample_description=random_sample_description,
+            dtype="float64"
+        )
+        summary = test.summary()
+
+        # Compare p-value distribution under null model against uniform distribution.
+        pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
+
+        print('KS-test pvalue for null model match of wald(): %f' % pval_h0)
+
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+
+        return pval_h0
+
     def test_wald_de(self, n_cells: int = 2000, n_genes: int = 500):
         """
         Test if de.lrt() generates a uniform p-value distribution
