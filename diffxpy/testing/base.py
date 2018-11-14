@@ -988,6 +988,10 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         return self._gene_ids
 
     @property
+    def X(self):
+        return None
+
+    @property
     def tests(self):
         """
         If `keep_full_test_objs` was set to `True`, this will return a matrix of differential expression tests.
@@ -1192,12 +1196,16 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         return pvals
 
     @property
-    def log_probs(self):
-        return np.sum(self.model_estim.log_probs(), axis=0)
-
-    @property
     def gene_ids(self) -> np.ndarray:
         return np.asarray(self.model_estim.features)
+
+    @property
+    def X(self):
+        return self.model_estim.X
+
+    @property
+    def log_probs(self):
+        return np.sum(self.model_estim.log_probs(), axis=0)
 
     @property
     def model_gradient(self):
@@ -1392,12 +1400,16 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         return pvals
 
     @property
-    def log_probs(self):
-        return np.sum(self.model_estim.log_probs(), axis=0)
-
-    @property
     def gene_ids(self) -> np.ndarray:
         return np.asarray(self.model_estim.features)
+
+    @property
+    def X(self):
+        return self.model_estim.X
+
+    @property
+    def log_probs(self):
+        return np.sum(self.model_estim.log_probs(), axis=0)
 
     @property
     def model_gradient(self):
@@ -1656,6 +1668,10 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
     def gene_ids(self) -> np.ndarray:
         return self._gene_ids
 
+    @property
+    def X(self) -> np.ndarray:
+        return None
+
     def log_fold_change(self, base=np.e, **kwargs):
         if base == np.e:
             return self._logfc
@@ -1751,6 +1767,10 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
     @property
     def gene_ids(self) -> np.ndarray:
         return self._gene_ids
+
+    @property
+    def X(self) -> np.ndarray:
+        return None
 
     def log_fold_change(self, base=np.e, **kwargs):
         if base == np.e:
