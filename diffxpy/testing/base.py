@@ -1329,10 +1329,10 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
     """
 
     model_estim: _Estimation
-    theta_mle: np.ndarray
-    theta_sd: np.ndarray
+    _theta_mle: np.ndarray
+    _theta_sd: np.ndarray
 
-    def __init__(self, model_estim: _Estimation, grouping, groups, correction_type):
+    def __init__(self, model_estim: _Estimation, grouping, groups, correction_type="global"):
         super().__init__(correction_type=correction_type)
         self.model_estim = model_estim
         self.grouping = grouping
@@ -1347,9 +1347,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         # theta_sd = sqrt(diagonal(fisher_inv))
         self._theta_sd = np.sqrt(np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1)).T
 
-        self._correction_type = correction_type
-
-    def _correction(self, pvals, method) -> np.ndarray:
+    def _correction(self, pvals, method="fdr_bh") -> np.ndarray:
         """
         Performs multiple testing corrections available in statsmodels.stats.multitest.multipletests().
 
@@ -1361,15 +1359,18 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
             Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
         """
         if self._correction_type.lower() == "global":
+            pval_shape = pvals.shape
             pvals = np.reshape(pvals, -1)
             qvals = correction.correct(pvals=pvals, method=method)
-            qvals = np.reshape(qvals, self.pval.shape)
+            qvals = np.reshape(qvals, pval_shape)
         elif self._correction_type.lower() == "by_test":
             qvals = np.apply_along_axis(
                 func1d=lambda p: correction.correct(pvals=p, method=method),
                 axis=-1,
                 arr=pvals,
             )
+        else:
+            raise ValueError("method " + method + " not recognized in _correction()")
 
         return qvals
 
@@ -1463,10 +1464,10 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
             groups1 = [groups1]
         for g in groups0:
             if g not in self.groups:
-                raise ValueError('groups0 element'+str(g)+' not recognized')
+                raise ValueError('groups0 element '+str(g)+' not recognized')
         for g in groups1:
             if g not in self.groups:
-                raise ValueError('groups1 element'+str(g)+' not recognized')
+                raise ValueError('groups1 element '+str(g)+' not recognized')
 
     def _groups_idx(self, groups):
         if isinstance(groups, list)==False:
@@ -1494,7 +1495,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         groups1 = self._groups_idx(groups1)
         return self._test_pairs(groups0=groups0, groups1=groups1)
 
-    def qval_pairs(self, groups0=None, groups1=None, **kwargs):
+    def qval_pairs(self, groups0=None, groups1=None, method="fdr_bh", **kwargs):
         """
         Return multiple testing-corrected p-values for all
         pairwise comparisons of groups0 and groups1.
@@ -1505,6 +1506,8 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
 
         :param groups0: First set of groups in pair-wise comparison.
         :param groups0: Second set of groups in pair-wise comparison.
+        :param method: Multiple testing correction method.
+            Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
         :return: Multiple testing-corrected p-values of pair-wise comparison.
         """
         if groups0 is None:
@@ -1515,7 +1518,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         groups0 = self._groups_idx(groups0)
         groups1 = self._groups_idx(groups1)
         pval = self.pval_pair(groups0=groups0, groups1=groups1)
-        return self._correction(pval=pval, **kwargs)
+        return self._correction(pval=pval, method=method, **kwargs)
 
     def log_fold_change_pairs(self, groups0=None, groups1=None, base=np.e):
         """
@@ -1537,7 +1540,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         self._check_groups(groups0, groups1)
         groups0 = self._groups_idx(groups0)
         groups1 = self._groups_idx(groups1)
-        logfc = theta_mle[groups0] - theta_mle[groups1]
+        logfc = self._theta_mle[groups0].values - self._theta_mle[groups1].values
 
         if base == np.e:
             return logfc
@@ -1564,20 +1567,18 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         """
         assert self.gene_ids is not None
 
-        group0 = self._groups_idx(groups0)
-        group1 = self._groups_idx(groups1)
         if len(group0) != 1:
             raise ValueError("group0 should only contain one entry in summary_pair()")
         if len(group1) != 1:
             raise ValueError("group1 should only contain one entry in summary_pair()")
 
         pval = self.pval_pairs(groups0=group0, groups1=group1)
-        qval = self._correction(pval=pval, **kwargs)
+        qval = self._correction(pvals=pval, **kwargs)
         res = pd.DataFrame({
             "gene": self.gene_ids,
-            "pval": pval.values.flatten(),
-            "qval": qval.values.flatten(),
-            "log2fc": self.log_fold_change_pairs(groups0=group0, groups1=group1, base=2).values.flatten(),
+            "pval": pval.flatten(),
+            "qval": qval.flatten(),
+            "log2fc": self.log_fold_change_pairs(groups0=group0, groups1=group1, base=2).flatten(),
             "mean": np.asarray(self.mean)
         })
 
@@ -1604,21 +1605,18 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         :return: pandas.DataFrame with the following columns:
 
             - gene: the gene id's
-            - pval: the per-gene p-value of the selected test
-            - qval: the per-gene q-value of the selected test
-            - log2fc: the per-gene log2 fold change of the selected test
+            - pval: the minimum per-gene p-value of all tests
+            - qval: the minimum per-gene q-value of all tests
+            - log2fc: the maximal/minimal (depending on which one is higher) log2 fold change of the genes
             - mean: the mean expression of the gene across all groups
         """
         assert self.gene_ids is not None
         if groups1 is None:
             groups1 = self.groups
 
-        groups0 = self._groups_idx(groups0)
-        groups1 = self._groups_idx(groups1)
-
         pval = self.pval_pairs(groups0=groups0, groups1=groups1)
-        qval = self._correction(pval=pval, **kwargs)
-        lfc = self.log_fold_change_pair(groups0=groups0, groups1=groups1, base=2)
+        qval = self._correction(pvals=pval, **kwargs)
+        lfc = self.log_fold_change_pairs(groups0=groups0, groups1=groups1, base=2)
         res = pd.DataFrame({
             "gene": self.gene_ids,
             "pval": np.max(pval, axis=(0,1)),
