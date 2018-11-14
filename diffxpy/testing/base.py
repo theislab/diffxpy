@@ -268,7 +268,11 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         neg_log_pvals = - self.log10_pval_clean(log10_threshold=log10_p_threshold)
         logfc = np.reshape(self.log2_fold_change(), -1)
-        logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
+        # Clipping throws errors if not performed in actual data format (ndarray or DataArray):
+        if isinstance(logfc, xr.DataArray):
+            logfc = logfc.clip(-log2_fc_threshold, log2_fc_threshold)
+        else:
+            logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
 
         fig, ax = plt.subplots()
 
@@ -664,16 +668,13 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 theta0=0
             )
         else:
-            # We avoid inverting the covariance matrix (FIM) here by directly feeding
-            # its inverse, the negative hessian, to wald_test_chisq. Note that 
-            # the negative hessian is pre-computed within batchglm.
             self.theta_sd = np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1).copy()
             self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd,
                                          where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test_chisq(
                 theta_mle=self.theta_mle,
-                theta_invcovar=-self.model_estim.hessians[:, self.sd_loc_totest, self.sd_loc_totest],
+                theta_covar=self.model_estim.fisher_inv[:, self.sd_loc_totest, self.sd_loc_totest],
                 theta0=0
             )
 
