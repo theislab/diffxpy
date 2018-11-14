@@ -1615,7 +1615,6 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         elif isinstance(genes[0], int) or isinstance(genes[0], np.int64):
             genes = self._filter_genes_int(genes)
         else:
-            print(genes)
             raise ValueError("only string and integer elements allowed in genes")
         return genes
 
@@ -2306,13 +2305,25 @@ def lrt(
     size_factors = _parse_size_factors(size_factors=size_factors, data=X)
 
     full_design_loc = data_utils.design_matrix(
-        sample_description=sample_description, formula=full_formula_loc)
+        sample_description=sample_description,
+        formula=full_formula_loc,
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+    )
     reduced_design_loc = data_utils.design_matrix(
-        sample_description=sample_description, formula=reduced_formula_loc)
+        sample_description=sample_description,
+        formula=reduced_formula_loc,
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+    )
     full_design_scale = data_utils.design_matrix(
-        sample_description=sample_description, formula=full_formula_scale)
+        sample_description=sample_description,
+        formula=full_formula_scale,
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+    )
     reduced_design_scale = data_utils.design_matrix(
-        sample_description=sample_description, formula=reduced_formula_scale)
+        sample_description=sample_description,
+        formula=reduced_formula_scale,
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+    )
 
     reduced_model = _fit(
         noise_model=noise_model,
@@ -2340,7 +2351,6 @@ def lrt(
         init_model=reduced_model,
         size_factors=size_factors,
         batch_size=batch_size,
-        # batch_size=X.shape[0],  # workaround: batch_size=num_observations
         training_strategy=training_strategy,
         quick_scale=quick_scale,
         dtype=dtype,
@@ -3857,8 +3867,8 @@ def continuous_1d(
         full_formula_scale = formula_scale_new
         reduced_formula_scale = formula_scale_new
 
-        logger.debug("model formulas assembled in de.test.continuos():")
-        logger.debug("full_formula_loc: " + full_formula_scale)
+        logger.debug("model formulas assembled in de.test.continuous():")
+        logger.debug("full_formula_loc: " + full_formula_loc)
         logger.debug("reduced_formula_loc: " + reduced_formula_loc)
         logger.debug("full_formula_scale: " + full_formula_scale)
         logger.debug("reduced_formula_scale: " + reduced_formula_scale)

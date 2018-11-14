@@ -112,7 +112,7 @@ class TestContinuous(unittest.TestCase):
 
         return pval_h0
 
-    def test_null_distribution_lrt(self, n_cells: int = 10, n_genes: int = 2):
+    def test_null_distribution_lrt(self, n_cells: int = 2000, n_genes: int = 500):
         """
         Test if de.test.continuous() generates a uniform p-value distribution in lrt
         if it is given data simulated based on the null model. Returns the p-value
@@ -141,7 +141,7 @@ class TestContinuous(unittest.TestCase):
             factor_loc_totest="pseudotime",
             test="lrt",
             sample_description=random_sample_description,
-            quick_scale=True,
+            quick_scale=False,
             batch_size=None,
             dtype="float64"
         )
@@ -151,8 +151,7 @@ class TestContinuous(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         print('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-        print(test.pval)
-
+        
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
 
         return pval_h0
