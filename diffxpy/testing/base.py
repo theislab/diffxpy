@@ -646,16 +646,13 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 theta0=0
             )
         else:
-            # We avoid inverting the covariance matrix (FIM) here by directly feeding
-            # its inverse, the negative hessian, to wald_test_chisq. Note that 
-            # the negative hessian is pre-computed within batchglm.
             self.theta_sd = np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1).copy()
             self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd,
                                          where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test_chisq(
                 theta_mle=self.theta_mle,
-                theta_invcovar=-self.model_estim.hessians[:, self.sd_loc_totest, self.sd_loc_totest],
+                theta_covar=self.model_estim.fisher_inv[:, self.sd_loc_totest, self.sd_loc_totest],
                 theta0=0
             )
 
