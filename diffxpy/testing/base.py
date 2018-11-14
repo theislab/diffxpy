@@ -1396,7 +1396,6 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
                     )
                 else:
                     pvals[i, j] = 1
-                pvals[j, i] = 1
 
         return pvals
 
