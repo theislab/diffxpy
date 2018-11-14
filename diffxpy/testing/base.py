@@ -1540,7 +1540,13 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         self._check_groups(groups0, groups1)
         groups0 = self._groups_idx(groups0)
         groups1 = self._groups_idx(groups1)
-        logfc = self._theta_mle[groups0].values - self._theta_mle[groups1].values
+
+        num_features = self._theta_mle.shape[1]
+
+        logfc = np.zeros(shape=(len(groups0), len(groups1), num_features))
+        for i,g0 in enumerate(groups0):
+            for j,g1 in enumerate(groups1):
+                logfc[i,j,:] = self._theta_mle[g0,:].values - self._theta_mle[g1,:].values
 
         if base == np.e:
             return logfc
@@ -1616,12 +1622,22 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
 
         pval = self.pval_pairs(groups0=groups0, groups1=groups1)
         qval = self._correction(pvals=pval, **kwargs)
-        lfc = self.log_fold_change_pairs(groups0=groups0, groups1=groups1, base=2)
+
+        # calculate maximum logFC of lower triangular fold change matrix
+        raw_logfc = self.log_fold_change_pairs(groups0=groups0, groups1=groups1, base=2)
+
+        # first flatten all dimensions up to the last 'gene' dimension
+        flat_logfc = raw_logfc.reshape(-1, raw_logfc.shape[-1])
+        # next, get argmax of flattened logfc and unravel the true indices from it
+        r, c = np.unravel_index(flat_logfc.argmax(0), raw_logfc.shape[:2])
+        # if logfc is maximal in the lower triangular matrix, multiply it with -1
+        logfc = raw_logfc[r, c, np.arange(raw_logfc.shape[-1])] * np.where(r <= c, 1, -1)
+
         res = pd.DataFrame({
             "gene": self.gene_ids,
-            "pval": np.max(pval, axis=(0,1)),
-            "qval": np.max(qval, axis=(0,1)),
-            "log2fc": np.max(lfc, axis=(0,1)),
+            "pval": np.min(pval, axis=(0,1)),
+            "qval": np.min(qval, axis=(0,1)),
+            "log2fc": np.asarray(logfc),
             "mean": np.asarray(self.mean)
         })
 
