@@ -1384,18 +1384,19 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         num_features = self.model_estim.X.shape[1]
 
         pvals = np.tile(np.NaN, [len(groups0), len(groups1), num_features])
-        pvals[np.eye(pvals.shape[0]).astype(bool)] = 1
 
         for i,g0 in enumerate(groups0):
             for j,g1 in enumerate(groups1):
-                pvals[i, j] = stats.two_coef_z_test(
-                    theta_mle0=self._theta_mle[g0],
-                    theta_mle1=self._theta_mle[g1],
-                    theta_sd0=self._theta_sd[g0],
-                    theta_sd1=self._theta_sd[g1]
-                )
-                if i!=j:
-                    pvals[j, i] = pvals[i, j]
+                if g0 != g1:
+                    pvals[i, j] = stats.two_coef_z_test(
+                        theta_mle0=self._theta_mle[g0],
+                        theta_mle1=self._theta_mle[g1],
+                        theta_sd0=self._theta_sd[g0],
+                        theta_sd1=self._theta_sd[g1]
+                    )
+                else:
+                    pvals[i, j] = 1
+                pvals[j, i] = 1
 
         return pvals
 
