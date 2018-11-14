@@ -264,7 +264,11 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         neg_log_pvals = - self.log10_pval_clean(log10_threshold=log10_p_threshold)
         logfc = np.reshape(self.log2_fold_change(), -1)
-        logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
+        # Clipping throws errors if not performed in actual data format (ndarray or DataArray):
+        if isinstance(logfc, xr.DataArray):
+            logfc = logfc.clip(-log2_fc_threshold, log2_fc_threshold)
+        else:
+            logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
 
         fig, ax = plt.subplots()
 
