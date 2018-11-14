@@ -31,10 +31,11 @@ class TestSingle(unittest.TestCase):
             "condition": np.random.randint(4, size=sim.num_observations)
         })
 
-        test = de.test.perturb(
+        test = de.test.pairwise(
             data=sim.X,
             grouping="condition",
             test='z-test',
+            lazy=True,
             noise_model="nb",
             pval_correction="global",
             quick_scale=True,
@@ -45,7 +46,6 @@ class TestSingle(unittest.TestCase):
         # Compare p-value distribution under null model against uniform distribution.
         pvals = test.pval_pairs(groups0=0, groups1=1)
         pval_h0 = stats.kstest(pvals.flatten(), 'uniform').pvalue
-        print(pvals.flatten())
 
         print('KS-test pvalue for null model match of wald(): %f' % pval_h0)
 
