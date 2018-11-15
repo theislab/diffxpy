@@ -1483,7 +1483,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         and leave groups1=None, groups1 is then set to the full set of all groups.
 
         :param groups0: First set of groups in pair-wise comparison.
-        :param groups0: Second set of groups in pair-wise comparison.
+        :param groups1: Second set of groups in pair-wise comparison.
         :return: P-values of pair-wise comparison.
         """
         if groups0 is None:
@@ -1505,7 +1505,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         and leave groups1=None, groups1 is then set to the full set of all groups.
 
         :param groups0: First set of groups in pair-wise comparison.
-        :param groups0: Second set of groups in pair-wise comparison.
+        :param groups1: Second set of groups in pair-wise comparison.
         :param method: Multiple testing correction method.
             Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
         :return: Multiple testing-corrected p-values of pair-wise comparison.
@@ -1529,7 +1529,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         and leave groups1=None, groups1 is then set to the full set of all groups.
 
         :param groups0: First set of groups in pair-wise comparison.
-        :param groups0: Second set of groups in pair-wise comparison.
+        :param groups1: Second set of groups in pair-wise comparison.
         :param base: Base of logarithm of log-fold change.
         :return: P-values of pair-wise comparison.
         """
@@ -1562,7 +1562,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         into an output table.
 
         :param group0: Firt group in pair-wise comparison.
-        :param group0: Second group in pair-wise comparison.
+        :param group1: Second group in pair-wise comparison.
         :return: pandas.DataFrame with the following columns:
 
             - gene: the gene id's
@@ -1607,7 +1607,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         pairwise comparisons into an output table.
 
         :param groups0: First set of groups in pair-wise comparison.
-        :param groups0: Second set of groups in pair-wise comparison.
+        :param groups1: Second set of groups in pair-wise comparison.
         :return: pandas.DataFrame with the following columns:
 
             - gene: the gene id's
