@@ -579,10 +579,11 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # whereas point estimators are given for all coefficients.
         if indep_coefs is not None:
             self.indep_coefs = indep_coefs
-            self.sd_loc_totest = np.where(self.indep_coefs == col_indices)[0]
+            self.sd_loc_totest = np.where([x in col_indices for x in self.indep_coefs])[0]
         else:
             self.indep_coefs = None
             self.sd_loc_totest = self.coef_loc_totest
+
         # p = self.pval
         # q = self.qval
 
