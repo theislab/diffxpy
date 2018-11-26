@@ -8,5 +8,5 @@ from ..testing.base import partition
 from ..testing.base import pairwise
 from ..testing.base import versus_rest
 from ..testing.base import continuous_1d
-from ..testing.base import design_matrix 
+from ..testing.base import design_matrix
 from ..testing.base import coef_names 

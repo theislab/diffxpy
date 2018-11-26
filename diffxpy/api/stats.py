@@ -6,3 +6,5 @@ from ..stats.stats import two_coef_z_test
 from ..stats.stats import wilcoxon_test
 from ..stats.stats import t_test_moments
 from ..stats.stats import t_test_raw
+
+from ..testing.correction import correct
