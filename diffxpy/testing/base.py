@@ -2387,6 +2387,7 @@ def _fit(
         init_model=None,
         init_a: Union[np.ndarray, str] = "AUTO",
         init_b: Union[np.ndarray, str] = "AUTO",
+        as_numeric: Union[np.ndarray, list, Tuple] = [],
         gene_names=None,
         size_factors=None,
         batch_size: int = None,
@@ -2440,6 +2441,13 @@ def _fit(
             * "init_model": initialize with another model (see `ìnit_model` parameter)
             * "closed_form": try to initialize with closed form
         - np.ndarray: direct initialization of 'b'
+    :param as_numeric:
+        Which columns of sample_description were treated as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correspond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example. This is passed to Estimator so that this information
+        can be used for initialization.
     :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data
     :param batch_size: the batch size to use for the estimator
@@ -2505,6 +2513,7 @@ def _fit(
                 init_model=init_model,
                 init_a=init_a,
                 init_b=init_b,
+                as_continuous=as_numeric,
                 dtype=dtype,
                 **constructor_args
             )
@@ -2682,6 +2691,7 @@ def lrt(
         design_scale=reduced_design_scale,
         init_a=init_a,
         init_b=init_b,
+        as_numeric=as_numeric,
         gene_names=gene_names,
         size_factors=size_factors,
         batch_size=batch_size,
@@ -2698,6 +2708,7 @@ def lrt(
         gene_names=gene_names,
         init_a="init_model",
         init_b="init_model",
+        as_numeric=as_numeric,
         init_model=reduced_model,
         size_factors=size_factors,
         batch_size=batch_size,
@@ -2940,6 +2951,7 @@ def wald(
         constraints_scale=constraints_scale,
         init_a=init_a,
         init_b=init_b,
+        as_numeric=as_numeric,
         gene_names=gene_names,
         size_factors=size_factors,
         batch_size=batch_size,
