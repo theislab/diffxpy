@@ -257,16 +257,39 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         return res
 
-    def plot_volcano(self, log10_p_threshold=-30, log2_fc_threshold=10):
+    def plot_volcano(
+            self,
+            corrected_pval=True,
+            log10_p_threshold=-30,
+            log2_fc_threshold=10,
+            alpha=0.05,
+            min_fc=1,
+            size=20
+    ):
         """
-        returns a volcano plot of p-value vs. log fold change
+        Returns a volcano plot of p-value vs. log fold change
+
+        :param corrected_pval: Whether to use multiple testing corrected
+            or raw p-values.
+        :param log10_p_threshold: lower bound of log10 p-values displayed in plot.
+        :param log2_fc_threshold: Negative lower and upper bound of
+            log2 fold change displayed in plot.
+        :param alpha: p/q-value lower bound at which a test is considered
+            non-significant. The corresponding points are colored in grey.
+        :param min_fc: Fold-change lower bound for visualization,
+            the points below the threshold are colored in grey.
+        :param size: Size of points.
 
         :return: Tuple of matplotlib (figure, axis)
         """
         import matplotlib.pyplot as plt
         import seaborn as sns
 
-        neg_log_pvals = - self.log10_pval_clean(log10_threshold=log10_p_threshold)
+        if corrected_pval == True:
+            neg_log_pvals = - self.log10_qval_clean(log10_threshold=log10_p_threshold)
+        else:
+            neg_log_pvals = - self.log10_pval_clean(log10_threshold=log10_p_threshold)
+
         logfc = np.reshape(self.log2_fold_change(), -1)
         # Clipping throws errors if not performed in actual data format (ndarray or DataArray):
         if isinstance(logfc, xr.DataArray):
@@ -276,9 +299,19 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         fig, ax = plt.subplots()
 
-        sns.scatterplot(y=neg_log_pvals, x=logfc, ax=ax)
+        is_significant = np.logical_and(
+            neg_log_pvals >= np.log(alpha) / np.log(10),
+            np.abs(logfc) >= np.log(min_fc) / np.log(2)
+        )
 
-        ax.set(xlabel="log2FC", ylabel='-log10(pval)')
+        sns.scatterplot(y=neg_log_pvals, x=logfc, hue=is_significant, ax=ax,
+                        legend=False, s=size,
+                        palette={True: "orange", False: "black"})
+
+        if corrected_pval == True:
+            ax.set(xlabel="log2FC", ylabel='-log10(corrected p-value)')
+        else:
+            ax.set(xlabel="log2FC", ylabel='-log10(p-value)')
 
         return fig, ax
 
