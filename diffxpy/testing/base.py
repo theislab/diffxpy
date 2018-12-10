@@ -310,7 +310,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         fig, ax = plt.subplots()
 
         is_significant = np.logical_and(
-            neg_log_pvals >= np.log(alpha) / np.log(10),
+            neg_log_pvals >= - np.log(alpha) / np.log(10),
             np.abs(logfc) >= np.log(min_fc) / np.log(2)
         )
 
