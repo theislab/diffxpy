@@ -264,7 +264,9 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             log2_fc_threshold=10,
             alpha=0.05,
             min_fc=1,
-            size=20
+            size=20,
+            show=True,
+            save=None
     ):
         """
         Returns a volcano plot of p-value vs. log fold change
@@ -279,11 +281,19 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         :param min_fc: Fold-change lower bound for visualization,
             the points below the threshold are colored in grey.
         :param size: Size of points.
+        :param save: Path+file name stem to save plots to.
+            File will be save+"_volcano.png". Does not save if save is None.
+        :param show: Whether to display plot.
+
 
         :return: Tuple of matplotlib (figure, axis)
         """
-        import matplotlib.pyplot as plt
         import seaborn as sns
+        import matplotlib.pyplot as plt
+        from matplotlib import gridspec
+        from matplotlib import rcParams
+
+        plt.ioff()
 
         if corrected_pval == True:
             neg_log_pvals = - self.log10_qval_clean(log10_threshold=log10_p_threshold)
@@ -313,7 +323,16 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         else:
             ax.set(xlabel="log2FC", ylabel='-log10(p-value)')
 
-        return fig, ax
+        # Save, show and return figure.
+        if save is not None:
+            plt.savefig(save + '_volcano.png')
+
+        if show:
+            plt.show()
+
+        plt.close(fig)
+
+        return ax
 
     def plot_diagnostics(self):
         """
