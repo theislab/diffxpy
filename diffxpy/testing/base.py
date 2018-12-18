@@ -2565,7 +2565,6 @@ def _fit(
                 init_model=init_model,
                 init_a=init_a,
                 init_b=init_b,
-                as_continuous=as_numeric,
                 dtype=dtype,
                 **constructor_args
             )
