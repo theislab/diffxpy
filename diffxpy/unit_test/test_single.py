@@ -6,8 +6,12 @@ import scipy.stats as stats
 import scipy.sparse
 import anndata
 
+import batchglm.api as glm
 from batchglm.api.models.nb_glm import Simulator, Estimator, InputData
 import diffxpy.api as de
+
+glm.setup_logging(verbosity="INFO", stream="STDOUT")
+logging.getLogger("tensorflow").setLevel(logging.INFO)
 
 
 class TestSingle(unittest.TestCase):
