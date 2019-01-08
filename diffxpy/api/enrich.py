@@ -1,2 +1,2 @@
-from ..enrichment.enrich import RefSets
-from ..enrichment.enrich import test
+from diffxpy.enrichment.enrich import RefSets
+from diffxpy.enrichment.enrich import test

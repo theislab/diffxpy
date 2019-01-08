@@ -6,7 +6,7 @@ import scipy.stats as stats
 import logging
 
 import batchglm.api as glm
-from batchglm.api.models.nb_glm import Simulator, Estimator, InputData
+from batchglm.api.models.glm_nb import Simulator, Estimator, InputData
 import diffxpy.api as de
 
 glm.setup_logging(verbosity="INFO", stream="STDOUT")

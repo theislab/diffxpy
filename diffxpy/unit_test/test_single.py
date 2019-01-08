@@ -1,4 +1,5 @@
 import unittest
+import logging
 
 import numpy as np
 import pandas as pd
@@ -7,10 +8,10 @@ import scipy.sparse
 import anndata
 
 import batchglm.api as glm
-from batchglm.api.models.nb_glm import Simulator, Estimator, InputData
+from batchglm.api.models.glm_nb import Simulator
 import diffxpy.api as de
 
-glm.setup_logging(verbosity="INFO", stream="STDOUT")
+glm.setup_logging(verbosity="DEBUG", stream="STDOUT")
 logging.getLogger("tensorflow").setLevel(logging.INFO)
 
 
@@ -32,13 +33,14 @@ class TestSingle(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.num_observations)
+            "condition": np.random.randint(2, size=sim.num_observations),
+            "batch": np.random.randint(2, size=sim.num_observations)
         })
 
         test = de.test.wald(
             data=sim.X,
             factor_loc_totest="condition",
-            formula="~ 1 + condition",
+            formula="~ 1 + condition + batch",
             sample_description=random_sample_description,
             dtype="float64"
         )

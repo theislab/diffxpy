@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 
-from batchglm.api.models.nb_glm import Simulator, Estimator, InputData
+from batchglm.api.models.glm_nb import Simulator, Estimator, InputData
 import diffxpy.api as de
 
 

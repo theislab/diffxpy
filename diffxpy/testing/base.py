@@ -5,9 +5,6 @@ from typing import Union, Dict, Tuple, List, Set, Callable
 import pandas as pd
 
 import numpy as np
-# import scipy.sparse
-
-# import dask
 import xarray as xr
 
 try:
@@ -17,11 +14,12 @@ except ImportError:
 
 import patsy
 import batchglm.data as data_utils
-from batchglm.api.models.glm import Model as GeneralizedLinearModel
+from batchglm.api.models.glm_nb import Model as GeneralizedLinearModel
 
 from ..stats import stats
 from . import correction
 from ..models.batch_bfgs.optim import Estim_BFGS
+from diffxpy import pkg_constants
 
 logger = logging.getLogger(__name__)
 
@@ -603,9 +601,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     """
 
     model_estim: _Estimation
-    sd_loc_totest: np.ndarray
     coef_loc_totest: np.ndarray
-    indep_coefs: np.ndarray
     theta_mle: np.ndarray
     theta_sd: np.ndarray
     _error_codes: np.ndarray
@@ -614,30 +610,16 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     def __init__(
             self,
             model_estim: _Estimation,
-            col_indices: np.ndarray,
-            indep_coefs: np.ndarray = None
+            col_indices: np.ndarray
     ):
         """
         :param model_estim:
-        :param cold_index: indices of indep_coefs to test
-        :param indep_coefs: indices of independent coefficients in coefficient vector
+        :param cold_index: indices of coefs to test
         """
         super().__init__()
 
         self.model_estim = model_estim
         self.coef_loc_totest = col_indices
-        # Note that self.indep_coefs are relevant if constraints are given
-        # and hessian is computed across independent coefficients only 
-        # whereas point estimators are given for all coefficients.
-        if indep_coefs is not None:
-            self.indep_coefs = indep_coefs
-            self.sd_loc_totest = np.where([x in col_indices for x in self.indep_coefs])[0]
-        else:
-            self.indep_coefs = None
-            self.sd_loc_totest = self.coef_loc_totest
-
-        # p = self.pval
-        # q = self.qval
 
         try:
             if model_estim._error_codes is not None:
@@ -689,7 +671,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         :return: xr.DataArray
         """
-        return np.sum(self.model_estim.log_probs(), axis=0)
+        return np.sum(self.model_estim.log_likelihood, axis=0)
 
     def _ave(self):
         """
@@ -697,7 +679,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         :return: xr.DataArray
         """
-        return np.mean(self.model_estim.X, axis=0)
+        return np.mean(self.X, axis=0)
 
     def _test(self):
         """
@@ -710,8 +692,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # with a normal distribution, for multiple parameters, a chi-square distribution is used.
         self.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
         if len(self.coef_loc_totest) == 1:
-            self.theta_mle = self.theta_mle[0]  # Make xarray one dimensinoal for stats.wald_test.
-            self.theta_sd = self.model_estim.fisher_inv[:, self.sd_loc_totest[0], self.sd_loc_totest[0]].values
+            self.theta_mle = self.theta_mle[0]  # Make xarray one dimensional for stats.wald_test.
+            self.theta_sd = self.model_estim.fisher_inv[:, self.coef_loc_totest[0], self.coef_loc_totest[0]].values
             self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd,
                                          where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
@@ -727,7 +709,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test_chisq(
                 theta_mle=self.theta_mle,
-                theta_covar=self.model_estim.fisher_inv[:, self.sd_loc_totest, self.sd_loc_totest],
+                theta_covar=self.model_estim.fisher_inv[:, self.coef_loc_totest, self.coef_loc_totest],
                 theta0=0
             )
 
@@ -2529,6 +2511,16 @@ def _fit(
         Should be "float32" for single precision or "float64" for double precision.
     :param close_session: If True, will finalize the estimator. Otherwise, return the estimator itself.
     """
+    provide_optimizers = {
+        "gd": pkg_constants.BATCHGLM_OPTIM_GD,
+        "adam": pkg_constants.BATCHGLM_OPTIM_ADAM,
+        "adagrad": pkg_constants.BATCHGLM_OPTIM_ADAGRAD,
+        "rmsprop": pkg_constants.BATCHGLM_OPTIM_RMSPROP,
+        "nr": pkg_constants.BATCHGLM_OPTIM_NEWTON,
+        "irls": pkg_constants.BATCHGLM_OPTIM_IRLS
+    }
+    termination_type = pkg_constants.BATCHGLM_TERMINATION_TYPE
+
     if isinstance(training_strategy, str) and training_strategy.lower() == 'bfgs':
         lib_size = np.zeros(data.shape[0])
         if noise_model == "nb" or noise_model == "negative_binomial":
@@ -2540,7 +2532,7 @@ def _fit(
             raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
     else:
         if noise_model == "nb" or noise_model == "negative_binomial":
-            import batchglm.api.models.nb_glm as test_model
+            import batchglm.api.models.glm_nb as test_model
 
             logger.info("Fitting model...")
             logger.debug(" * Assembling input data...")
@@ -2565,6 +2557,8 @@ def _fit(
                 init_model=init_model,
                 init_a=init_a,
                 init_b=init_b,
+                provide_optimizers=provide_optimizers,
+                termination_type=termination_type,
                 dtype=dtype,
                 **constructor_args
             )
@@ -2955,8 +2949,6 @@ def wald(
         design_scale = dmat_scale
 
     # Coefficients to test:
-    indep_coef_indices = None
-    col_indices = None
     if factor_loc_totest is not None:
         # Select coefficients to test via formula model:
         col_indices = np.concatenate([
@@ -2975,7 +2967,7 @@ def wald(
     elif coef_to_test is not None:
         # Directly select coefficients to test from design matrix (xarray):
         # Check that coefficients to test are not dependent parameters if constraints are given:
-        # TODO: design_loc is sometimes xarray and sometimes patsy when it arrives here, 
+        # TODO: design_loc is sometimes xarray and sometimes patsy when it arrives here,
         # should it not always be xarray?
         if isinstance(design_loc, patsy.design_info.DesignMatrix):
             col_indices = np.asarray([
@@ -2987,10 +2979,8 @@ def wald(
                 list(np.asarray(design_loc.coords['design_params'])).index(x)
                 for x in coef_to_test
             ])
-        if constraints_loc is not None:
-            dep_coef_indices = np.where(np.any(constraints_loc == -1, axis=0) == True)[0]
-            assert np.all([x not in dep_coef_indices for x in col_indices]), "cannot test dependent coefficient"
-            indep_coef_indices = np.where(np.any(constraints_loc == -1, axis=0) == False)[0]
+    else:
+        raise ValueError("either set factor_loc_totest or coef_to_test")
 
     ## Fit GLM:
     model = _fit(
@@ -3014,9 +3004,8 @@ def wald(
 
     ## Perform DE test:
     de_test = DifferentialExpressionTestWald(
-        model,
-        col_indices=col_indices,
-        indep_coefs=indep_coef_indices
+        model_estim=model,
+        col_indices=col_indices
     )
 
     return de_test

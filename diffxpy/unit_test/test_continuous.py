@@ -7,7 +7,7 @@ import scipy.sparse
 import anndata
 import logging
 
-from batchglm.api.models.nb_glm import Simulator, Estimator, InputData
+from batchglm.api.models.glm_nb import Simulator, Estimator, InputData
 import diffxpy.api as de
 
 
