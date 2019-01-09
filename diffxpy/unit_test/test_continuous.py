@@ -3,11 +3,9 @@ import unittest
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
-import scipy.sparse
-import anndata
 import logging
 
-from batchglm.api.models.glm_nb import Simulator, Estimator, InputData
+from batchglm.api.models.glm_nb import Simulator
 import diffxpy.api as de
 
 
@@ -20,7 +18,9 @@ class TestContinuous(unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
-        logging.getLogger('diffxpy').addFilter('DEBUG')
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         num_observations = 10
         num_features = 2
@@ -45,6 +45,7 @@ class TestContinuous(unittest.TestCase):
             sample_description=random_sample_description,
             quick_scale=True,
             batch_size=None,
+            training_strategy="DEFAULT",
             dtype="float64"
         )
 
@@ -67,8 +68,9 @@ class TestContinuous(unittest.TestCase):
         temp = test.argmin(genes=ids, nonnumeric=True)
         temp = test.summary(nonnumeric=True)
 
+        return True
 
-    def test_null_distribution_wald(self, n_cells: int = 2000, n_genes: int = 500):
+    def test_null_distribution_wald(self, n_cells: int = 2000, n_genes: int = 100):
         """
         Test if de.test.continuous() generates a uniform p-value distribution in the wald test
         if it is given data simulated based on the null model. Returns the p-value
@@ -78,7 +80,9 @@ class TestContinuous(unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
-        logging.getLogger('diffxpy').addFilter('DEBUG')
+        logging.getLogger("tensorflow").setLevel(logging.INFO)
+        logging.getLogger("batchglm").setLevel(logging.INFO)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -99,6 +103,7 @@ class TestContinuous(unittest.TestCase):
             sample_description=random_sample_description,
             quick_scale=True,
             batch_size=None,
+            training_strategy="DEFAULT",
             dtype="float64"
         )
         summary = test.summary()
@@ -106,13 +111,12 @@ class TestContinuous(unittest.TestCase):
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
-        print('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-
+        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
 
-        return pval_h0
+        return True
 
-    def test_null_distribution_lrt(self, n_cells: int = 2000, n_genes: int = 500):
+    def test_null_distribution_lrt(self, n_cells: int = 2000, n_genes: int = 100):
         """
         Test if de.test.continuous() generates a uniform p-value distribution in lrt
         if it is given data simulated based on the null model. Returns the p-value
@@ -122,7 +126,9 @@ class TestContinuous(unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
-        logging.getLogger('diffxpy').addFilter('DEBUG')
+        logging.getLogger("tensorflow").setLevel(logging.INFO)
+        logging.getLogger("batchglm").setLevel(logging.INFO)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -143,6 +149,7 @@ class TestContinuous(unittest.TestCase):
             sample_description=random_sample_description,
             quick_scale=False,
             batch_size=None,
+            training_strategy="DEFAULT",
             dtype="float64"
         )
         summary = test.summary()
@@ -150,11 +157,10 @@ class TestContinuous(unittest.TestCase):
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
-        print('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-        
+        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
 
-        return pval_h0
+        return True
 
 if __name__ == '__main__':
     unittest.main()

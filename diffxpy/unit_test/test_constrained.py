@@ -75,11 +75,10 @@ class TestSingle(unittest.TestCase):
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
-        print('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-
+        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
 
-        return pval_h0
+        return True
 
     def test_null_distribution_wald_constrained_2layer(self, n_genes: int = 100):
         """
@@ -162,11 +161,10 @@ class TestSingle(unittest.TestCase):
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
-        print('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-
+        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
 
-        return pval_h0
+        return True
 
     def test_null_distribution_wald_multi_constrained_2layer(self, n_genes: int = 50):
         """
@@ -181,8 +179,8 @@ class TestSingle(unittest.TestCase):
         :param n_genes: Number of genes to simulate (number of tests).
         """
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
-        logging.getLogger("batchglm").setLevel(logging.INFO)
-        logging.getLogger("diffxpy").setLevel(logging.INFO)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         n_cells = 3000
 
@@ -239,11 +237,10 @@ class TestSingle(unittest.TestCase):
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
-        print('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-
+        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
 
-        return pval_h0
+        return True
 
 
 if __name__ == '__main__':

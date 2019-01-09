@@ -55,6 +55,16 @@ class _Estimation(GeneralizedLinearModel, metaclass=abc.ABCMeta):
 
     @property
     @abc.abstractmethod
+    def constraints_loc(self) -> np.ndarray:
+        pass
+
+    @property
+    @abc.abstractmethod
+    def constraints_scale(self) -> np.ndarray:
+        pass
+
+    @property
+    @abc.abstractmethod
     def num_observations(self) -> int:
         pass
 
@@ -73,12 +83,9 @@ class _Estimation(GeneralizedLinearModel, metaclass=abc.ABCMeta):
     def observations(self) -> np.ndarray:
         pass
 
+    @property
     @abc.abstractmethod
-    def probs(self) -> np.ndarray:
-        pass
-
-    @abc.abstractmethod
-    def log_probs(self) -> np.ndarray:
+    def log_likelihood(self, **kwargs) -> np.ndarray:
         pass
 
     @property
@@ -88,7 +95,7 @@ class _Estimation(GeneralizedLinearModel, metaclass=abc.ABCMeta):
 
     @property
     @abc.abstractmethod
-    def gradient(self, **kwargs) -> np.ndarray:
+    def gradients(self, **kwargs) -> np.ndarray:
         pass
 
     @property
@@ -410,24 +417,21 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
     @property
     def reduced_model_gradient(self):
-        return self.reduced_estim.gradient
+        return self.reduced_estim.gradients
 
     @property
     def full_model_gradient(self):
-        return self.full_estim.gradient
+        return self.full_estim.gradients
 
     def _test(self):
-        full = np.sum(self.full_estim.log_probs(), axis=0)
-        reduced = np.sum(self.reduced_estim.log_probs(), axis=0)
-
-        if np.any(full < reduced):
-            logger.warning("Test assumption failed: full model is (partially) less probable than reduced model!")
+        if np.any(self.full_estim.log_likelihood < self.reduced_estim.log_likelihood):
+            logger.warning("Test assumption failed: full model is (partially) less probable than reduced model")
 
         return stats.likelihood_ratio_test(
-            ll_full=full,
-            ll_reduced=reduced,
-            df_full=self.full_estim.design_loc.shape[-1] + self.full_estim.design_scale.shape[-1],
-            df_reduced=self.reduced_estim.design_loc.shape[-1] + self.reduced_estim.design_scale.shape[-1],
+            ll_full=self.full_estim.log_likelihood,
+            ll_reduced=self.reduced_estim.log_likelihood,
+            df_full=self.full_estim.constraints_loc.shape[1] + self.full_estim.constraints_scale.shape[1],
+            df_reduced=self.reduced_estim.constraints_loc.shape[1] + self.reduced_estim.constraints_scale.shape[1],
         )
 
     def _ave(self):
@@ -643,7 +647,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
     @property
     def model_gradient(self):
-        return self.model_estim.gradient
+        return self.model_estim.gradients
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -1244,7 +1248,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
 
     @property
     def model_gradient(self):
-        return self.model_estim.gradient
+        return self.model_estim.gradients
 
     def _ave(self):
         """
@@ -1449,7 +1453,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
 
     @property
     def model_gradient(self):
-        return self.model_estim.gradient
+        return self.model_estim.gradients
 
     def _ave(self):
         """
@@ -2611,6 +2615,9 @@ def lrt(
     """
     Perform log-likelihood ratio test for differential expression for each gene.
 
+    Note that lrt() does not support constraints in its current form. Please
+    use wald() for constraints.
+
     :param data: input data
     :param reduced_formula: formula
         Reduced model formula for location and scale parameter models.
@@ -2734,6 +2741,8 @@ def lrt(
         data=X,
         design_loc=reduced_design_loc,
         design_scale=reduced_design_scale,
+        constraints_loc=None,
+        constraints_scale=None,
         init_a=init_a,
         init_b=init_b,
         as_numeric=as_numeric,
@@ -2750,6 +2759,8 @@ def lrt(
         data=X,
         design_loc=full_design_loc,
         design_scale=full_design_scale,
+        constraints_loc=None,
+        constraints_scale=None,
         gene_names=gene_names,
         init_a="init_model",
         init_b="init_model",
@@ -4035,7 +4046,7 @@ def continuous_1d(
         noise_model: str = 'nb',
         size_factors: np.ndarray = None,
         batch_size: int = None,
-        training_strategy: Union[str, List[Dict[str, object]], Callable] = "CONTINUOUS",
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "DEFAULT",
         quick_scale: bool = None,
         dtype="float64",
         **kwargs

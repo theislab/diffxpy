@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 import versioneer
 
-author = 'Florian R. Hölzlwimmer, David S. Fischer'
-author_email='diffxpy@frhoelzlwimmer.de, david.fischer@helmholtz-muenchen.de'
+author = 'David S. Fischer, Florian R. Hölzlwimmer'
+author_email='david.fischer@helmholtz-muenchen.de, diffxpy@frhoelzlwimmer.de'
 description="Fast and scalable differential expression analysis on single-cell RNA-seq data"
 
 with open("README.md", "r") as fh:
