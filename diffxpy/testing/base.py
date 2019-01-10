@@ -1,20 +1,19 @@
 import abc
 import logging
 from typing import Union, Dict, Tuple, List, Set, Callable
-
 import pandas as pd
+import warnings
 
 import numpy as np
 import xarray as xr
-
+import patsy
 try:
     import anndata
 except ImportError:
     anndata = None
 
-import patsy
 import batchglm.data as data_utils
-from batchglm.api.models.glm_nb import Model as GeneralizedLinearModel
+from batchglm.models.glm_nb import Model as GeneralizedLinearModel
 
 from ..stats import stats
 from . import correction
@@ -129,7 +128,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         self._pval = None
         self._qval = None
         self._mean = None
-        self._log_probs = None
+        self._log_likelihood = None
 
     @property
     @abc.abstractmethod
@@ -179,10 +178,10 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         pass
 
     @property
-    def log_probs(self):
-        if self._log_probs is None:
-            self._log_probs = self._ll().compute()
-        return self._log_probs
+    def log_likelihood(self):
+        if self._log_likelihood is None:
+            self._log_likelihood = self._ll().compute()
+        return self._log_likelihood
 
     @property
     def mean(self):
@@ -675,7 +674,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         :return: xr.DataArray
         """
-        return np.sum(self.model_estim.log_likelihood, axis=0)
+        return self.model_estim.log_likelihood
 
     def _ave(self):
         """
@@ -730,8 +729,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         if len(self.theta_sd.shape) == 1:
             res["coef_sd"] = self.theta_sd
         # add in info from bfgs
-        if self.log_probs is not None:
-            res["ll"] = self.log_probs
+        if self.log_likelihood is not None:
+            res["ll"] = self.log_likelihood
         if self._error_codes is not None:
             res["err"] = self._error_codes
         if self._niter is not None:
@@ -1243,7 +1242,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         return self.model_estim.X
 
     @property
-    def log_probs(self):
+    def log_likelihood(self):
         return np.sum(self.model_estim.log_probs(), axis=0)
 
     @property
@@ -1448,7 +1447,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         return self.model_estim.X
 
     @property
-    def log_probs(self):
+    def log_likelihood(self):
         return np.sum(self.model_estim.log_probs(), axis=0)
 
     @property
@@ -1912,8 +1911,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         return self._de_test.mean
 
     @property
-    def log_probs(self) -> np.ndarray:
-        return self._de_test.log_probs
+    def log_likelihood(self) -> np.ndarray:
+        return self._de_test.log_likelihood
 
     def summary(self, nonnumeric=False, qval_thres=None, fc_upper_thres=None,
                 fc_lower_thres=None, mean_thres=None) -> pd.DataFrame:
@@ -2096,6 +2095,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             self,
             genes,
             hue=None,
+            size=1,
+            log=True,
             nonnumeric=False,
             save=None,
             show=True,
@@ -2108,6 +2109,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
 
         :param genes: Gene IDs to plot.
         :param hue: Confounder to include in plot.
+        :param size: Point size.
         :param nonnumeric:
         :param save: Path+file name stem to save plots to.
             File will be save+"_genes.png". Does not save if save is None.
@@ -2151,21 +2153,33 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             ax = plt.subplot(gs[i])
             axs.append(ax)
 
+            y = self.X[:, genes[0]]
+            yhat = self._continuous_model(idx=g, nonnumeric=nonnumeric)
+            if log:
+                y = np.log(y + 1)
+                yhat = np.log(yhat + 1)
+
             sns.scatterplot(
                 x=self._continuous_coords,
-                y=self.X[:, genes[0]],
+                y=y,
                 hue=hue,
-                ax=ax
+                size=size,
+                ax=ax,
+                legend=False
             )
             sns.lineplot(
                 x=self._continuous_coords,
-                y=self._continuous_model(idx=g, nonnumeric=nonnumeric),
+                y=yhat,
                 hue=hue,
                 ax=ax
             )
+
             ax.set_title(genes[i])
             ax.set_xlabel("continuous")
-            ax.set_ylabel("expression")
+            if log:
+                ax.set_ylabel("log expression")
+            else:
+                ax.set_ylabel("expression")
 
         # Save, show and return figure.
         if save is not None:
@@ -2536,57 +2550,56 @@ def _fit(
             raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
     else:
         if noise_model == "nb" or noise_model == "negative_binomial":
-            import batchglm.api.models.glm_nb as test_model
-
-            logger.info("Fitting model...")
-            logger.debug(" * Assembling input data...")
-            input_data = test_model.InputData.new(
-                data=data,
-                design_loc=design_loc,
-                design_scale=design_scale,
-                constraints_loc=constraints_loc,
-                constraints_scale=constraints_scale,
-                size_factors=size_factors,
-                feature_names=gene_names,
-            )
-
-            logger.debug(" * Set up Estimator...")
-            constructor_args = {}
-            if batch_size is not None:
-                constructor_args["batch_size"] = batch_size
-            if quick_scale is not None:
-                constructor_args["quick_scale"] = quick_scale
-            estim = test_model.Estimator(
-                input_data=input_data,
-                init_model=init_model,
-                init_a=init_a,
-                init_b=init_b,
-                provide_optimizers=provide_optimizers,
-                termination_type=termination_type,
-                dtype=dtype,
-                **constructor_args
-            )
-
-            logger.debug(" * Initializing Estimator...")
-            estim.initialize()
-
-            logger.debug(" * Run estimation...")
-            # training:
-            if callable(training_strategy):
-                # call training_strategy if it is a function
-                training_strategy(estim)
-            else:
-                estim.train_sequence(training_strategy)
-
-            if close_session:
-                logger.debug(" * Finalize estimation...")
-                model = estim.finalize()
-            else:
-                model = estim
-            logger.debug(" * Model fitting done.")
-
+            from batchglm.api.models.glm_nb import Estimator, InputData
         else:
             raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
+
+        logger.info("Fitting model...")
+        logger.debug(" * Assembling input data...")
+        input_data = InputData.new(
+            data=data,
+            design_loc=design_loc,
+            design_scale=design_scale,
+            constraints_loc=constraints_loc,
+            constraints_scale=constraints_scale,
+            size_factors=size_factors,
+            feature_names=gene_names,
+        )
+
+        logger.debug(" * Set up Estimator...")
+        constructor_args = {}
+        if batch_size is not None:
+            constructor_args["batch_size"] = batch_size
+        if quick_scale is not None:
+            constructor_args["quick_scale"] = quick_scale
+        estim = Estimator(
+            input_data=input_data,
+            init_model=init_model,
+            init_a=init_a,
+            init_b=init_b,
+            provide_optimizers=provide_optimizers,
+            termination_type=termination_type,
+            dtype=dtype,
+            **constructor_args
+        )
+
+        logger.debug(" * Initializing Estimator...")
+        estim.initialize()
+
+        logger.debug(" * Run estimation...")
+        # training:
+        if callable(training_strategy):
+            # call training_strategy if it is a function
+            training_strategy(estim)
+        else:
+            estim.train_sequence(training_strategy=training_strategy)
+
+        if close_session:
+            logger.debug(" * Finalize estimation...")
+            model = estim.finalize()
+        else:
+            model = estim
+        logger.debug(" * Model fitting done.")
 
     return model
 
@@ -2788,10 +2801,9 @@ def lrt(
 def wald(
         data,
         factor_loc_totest: Union[str, List[str]] = None,
-        coef_to_test: Union[str, List[str]] = None,  # e.g. coef_to_test="B"
-        formula: str = None,
+        coef_to_test: Union[str, List[str]] = None,
         formula_loc: str = None,
-        formula_scale: str = None,
+        formula_scale: str = "~1",
         as_numeric: Union[List[str], Tuple[str], str] = (),
         init_a: Union[np.ndarray, str] = "AUTO",
         init_b: Union[np.ndarray, str] = "AUTO",
@@ -2918,10 +2930,6 @@ def wald(
     if len(kwargs) != 0:
         logger.debug("additional kwargs: %s", str(kwargs))
 
-    if formula_loc is None:
-        formula_loc = formula
-    if formula_scale is None:
-        formula_scale = formula
     if dmat_loc is None and formula_loc is None:
         raise ValueError("Supply either dmat_loc or formula_loc or formula.")
     if dmat_scale is None and formula_scale is None:
@@ -2959,7 +2967,8 @@ def wald(
     else:
         design_scale = dmat_scale
 
-    # Coefficients to test:
+    # Define indices of coefficients to test:
+    contraints_loc_temp = constraints_loc if constraints_loc is not None else np.eye(design_loc.shape[-1])
     if factor_loc_totest is not None:
         # Select coefficients to test via formula model:
         col_indices = np.concatenate([
@@ -2992,6 +3001,12 @@ def wald(
             ])
     else:
         raise ValueError("either set factor_loc_totest or coef_to_test")
+    # Check that all tested coefficients are independent:
+    for x in col_indices:
+        if np.sum(contraints_loc_temp[x,:]) != 1:
+            raise ValueError("Constraints input is wrong: not all tested coefficients are unconstrained.")
+    # Adjust tested coefficients from dependent to independent (fitted) parameters:
+    col_indices = np.array([np.where(contraints_loc_temp[x,:] == 1)[0][0] for x in col_indices])
 
     ## Fit GLM:
     model = _fit(

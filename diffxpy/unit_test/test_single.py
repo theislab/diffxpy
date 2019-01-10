@@ -38,6 +38,7 @@ class TestSingleNull(unittest.TestCase):
             factor_loc_totest="condition",
             formula="~ 1 + condition + batch",
             sample_description=random_sample_description,
+            batch_size=500,
             training_strategy="DEFAULT",
             dtype="float64"
         )

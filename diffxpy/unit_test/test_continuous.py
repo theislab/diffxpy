@@ -81,7 +81,7 @@ class TestContinuous(unittest.TestCase):
         :param n_genes: Number of genes to simulate (number of tests).
         """
         logging.getLogger("tensorflow").setLevel(logging.INFO)
-        logging.getLogger("batchglm").setLevel(logging.INFO)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
