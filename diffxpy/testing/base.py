@@ -1,27 +1,24 @@
 import abc
 import logging
 from typing import Union, Dict, Tuple, List, Set, Callable
-
 import pandas as pd
+import warnings
 
 import numpy as np
-# import scipy.sparse
-
-# import dask
 import xarray as xr
-
+import patsy
 try:
     import anndata
 except ImportError:
     anndata = None
 
-import patsy
 import batchglm.data as data_utils
-from batchglm.api.models.glm import Model as GeneralizedLinearModel
+from batchglm.models.glm_nb import Model as GeneralizedLinearModel
 
 from ..stats import stats
 from . import correction
 from ..models.batch_bfgs.optim import Estim_BFGS
+from diffxpy import pkg_constants
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +54,16 @@ class _Estimation(GeneralizedLinearModel, metaclass=abc.ABCMeta):
 
     @property
     @abc.abstractmethod
+    def constraints_loc(self) -> np.ndarray:
+        pass
+
+    @property
+    @abc.abstractmethod
+    def constraints_scale(self) -> np.ndarray:
+        pass
+
+    @property
+    @abc.abstractmethod
     def num_observations(self) -> int:
         pass
 
@@ -75,12 +82,9 @@ class _Estimation(GeneralizedLinearModel, metaclass=abc.ABCMeta):
     def observations(self) -> np.ndarray:
         pass
 
+    @property
     @abc.abstractmethod
-    def probs(self) -> np.ndarray:
-        pass
-
-    @abc.abstractmethod
-    def log_probs(self) -> np.ndarray:
+    def log_likelihood(self, **kwargs) -> np.ndarray:
         pass
 
     @property
@@ -90,7 +94,7 @@ class _Estimation(GeneralizedLinearModel, metaclass=abc.ABCMeta):
 
     @property
     @abc.abstractmethod
-    def gradient(self, **kwargs) -> np.ndarray:
+    def gradients(self, **kwargs) -> np.ndarray:
         pass
 
     @property
@@ -124,11 +128,16 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         self._pval = None
         self._qval = None
         self._mean = None
-        self._log_probs = None
+        self._log_likelihood = None
 
     @property
     @abc.abstractmethod
     def gene_ids(self) -> np.ndarray:
+        pass
+
+    @property
+    @abc.abstractmethod
+    def X(self):
         pass
 
     @abc.abstractmethod
@@ -169,10 +178,10 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         pass
 
     @property
-    def log_probs(self):
-        if self._log_probs is None:
-            self._log_probs = self._ll().compute()
-        return self._log_probs
+    def log_likelihood(self):
+        if self._log_likelihood is None:
+            self._log_likelihood = self._ll().compute()
+        return self._log_likelihood
 
     @property
     def mean(self):
@@ -226,7 +235,6 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         log10_qval_clean = np.clip(log10_qval_clean, log10_threshold, 0, log10_qval_clean)
         return log10_qval_clean
 
-    @property
     @abc.abstractmethod
     def summary(self, **kwargs) -> pd.DataFrame:
         pass
@@ -253,26 +261,82 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         return res
 
-    def plot_volcano(self, log10_p_threshold=-30, log2_fc_threshold=10):
+    def plot_volcano(
+            self,
+            corrected_pval=True,
+            log10_p_threshold=-30,
+            log2_fc_threshold=10,
+            alpha=0.05,
+            min_fc=1,
+            size=20,
+            show=True,
+            save=None
+    ):
         """
-        returns a volcano plot of p-value vs. log fold change
+        Returns a volcano plot of p-value vs. log fold change
+
+        :param corrected_pval: Whether to use multiple testing corrected
+            or raw p-values.
+        :param log10_p_threshold: lower bound of log10 p-values displayed in plot.
+        :param log2_fc_threshold: Negative lower and upper bound of
+            log2 fold change displayed in plot.
+        :param alpha: p/q-value lower bound at which a test is considered
+            non-significant. The corresponding points are colored in grey.
+        :param min_fc: Fold-change lower bound for visualization,
+            the points below the threshold are colored in grey.
+        :param size: Size of points.
+        :param save: Path+file name stem to save plots to.
+            File will be save+"_volcano.png". Does not save if save is None.
+        :param show: Whether to display plot.
+
 
         :return: Tuple of matplotlib (figure, axis)
         """
-        import matplotlib.pyplot as plt
         import seaborn as sns
+        import matplotlib.pyplot as plt
+        from matplotlib import gridspec
+        from matplotlib import rcParams
 
-        neg_log_pvals = - self.log10_pval_clean(log10_threshold=log10_p_threshold)
+        plt.ioff()
+
+        if corrected_pval == True:
+            neg_log_pvals = - self.log10_qval_clean(log10_threshold=log10_p_threshold)
+        else:
+            neg_log_pvals = - self.log10_pval_clean(log10_threshold=log10_p_threshold)
+
         logfc = np.reshape(self.log2_fold_change(), -1)
-        logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
+        # Clipping throws errors if not performed in actual data format (ndarray or DataArray):
+        if isinstance(logfc, xr.DataArray):
+            logfc = logfc.clip(-log2_fc_threshold, log2_fc_threshold)
+        else:
+            logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
 
         fig, ax = plt.subplots()
 
-        sns.scatterplot(y=neg_log_pvals, x=logfc, ax=ax)
+        is_significant = np.logical_and(
+            neg_log_pvals >= - np.log(alpha) / np.log(10),
+            np.abs(logfc) >= np.log(min_fc) / np.log(2)
+        )
 
-        ax.set(xlabel="log2FC", ylabel='-log10(pval)')
+        sns.scatterplot(y=neg_log_pvals, x=logfc, hue=is_significant, ax=ax,
+                        legend=False, s=size,
+                        palette={True: "orange", False: "black"})
 
-        return fig, ax
+        if corrected_pval == True:
+            ax.set(xlabel="log2FC", ylabel='-log10(corrected p-value)')
+        else:
+            ax.set(xlabel="log2FC", ylabel='-log10(p-value)')
+
+        # Save, show and return figure.
+        if save is not None:
+            plt.savefig(save + '_volcano.png')
+
+        if show:
+            plt.show()
+
+        plt.close(fig)
+
+        return ax
 
     def plot_diagnostics(self):
         """
@@ -292,8 +356,14 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
     All implementations of this class should return one p-value and one fold change per gene.
     """
 
-    def summary(self, qval_thres=None,
-                fc_upper_thres=None, fc_lower_thres=None, mean_thres=None, **kwargs) -> pd.DataFrame:
+    def summary(
+            self,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None,
+            **kwargs
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
@@ -341,25 +411,26 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         return np.asarray(self.full_estim.features)
 
     @property
+    def X(self):
+        return self.full_estim.X
+
+    @property
     def reduced_model_gradient(self):
-        return self.reduced_estim.gradient
+        return self.reduced_estim.gradients
 
     @property
     def full_model_gradient(self):
-        return self.full_estim.gradient
+        return self.full_estim.gradients
 
     def _test(self):
-        full = np.sum(self.full_estim.log_probs(), axis=0)
-        reduced = np.sum(self.reduced_estim.log_probs(), axis=0)
-
-        if np.any(full < reduced):
-            logger.warning("Test assumption failed: full model is (partially) less probable than reduced model!")
+        if np.any(self.full_estim.log_likelihood < self.reduced_estim.log_likelihood):
+            logger.warning("Test assumption failed: full model is (partially) less probable than reduced model")
 
         return stats.likelihood_ratio_test(
-            ll_full=full,
-            ll_reduced=reduced,
-            df_full=self.full_estim.design_loc.shape[-1] + self.full_estim.design_scale.shape[-1],
-            df_reduced=self.reduced_estim.design_loc.shape[-1] + self.reduced_estim.design_scale.shape[-1],
+            ll_full=self.full_estim.log_likelihood,
+            ll_reduced=self.reduced_estim.log_likelihood,
+            df_full=self.full_estim.constraints_loc.shape[1] + self.full_estim.constraints_scale.shape[1],
+            df_reduced=self.reduced_estim.constraints_loc.shape[1] + self.reduced_estim.constraints_scale.shape[1],
         )
 
     def _ave(self):
@@ -533,36 +604,25 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     """
 
     model_estim: _Estimation
-    sd_loc_totest: np.ndarray
     coef_loc_totest: np.ndarray
-    indep_coefs: np.ndarray
     theta_mle: np.ndarray
     theta_sd: np.ndarray
+    _error_codes: np.ndarray
+    _niter: np.ndarray
 
     def __init__(
             self,
             model_estim: _Estimation,
-            col_indices: np.ndarray,
-            indep_coefs: np.ndarray = None
+            col_indices: np.ndarray
     ):
         """
         :param model_estim:
-        :param cold_index: indices of indep_coefs to test
-        :param indep_coefs: indices of independent coefficients in coefficient vector
+        :param cold_index: indices of coefs to test
         """
         super().__init__()
+
         self.model_estim = model_estim
         self.coef_loc_totest = col_indices
-        # Note that self.indep_coefs are relevant if constraints are given
-        # and hessian is computed across independent coefficients only 
-        # whereas point estimators are given for all coefficients.
-        if indep_coefs is not None:
-            self.indep_coefs = indep_coefs
-            self.sd_loc_totest = np.where(self.indep_coefs == col_indices)[0]
-        else:
-            self.sd_loc_totest = self.coef_loc_totest
-        # p = self.pval
-        # q = self.qval
 
         try:
             if model_estim._error_codes is not None:
@@ -581,8 +641,12 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         return np.asarray(self.model_estim.features)
 
     @property
+    def X(self):
+        return self.model_estim.X
+
+    @property
     def model_gradient(self):
-        return self.model_estim.gradient
+        return self.model_estim.gradients
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -610,7 +674,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         :return: xr.DataArray
         """
-        return np.sum(self.model_estim.log_probs(), axis=0)
+        return self.model_estim.log_likelihood
 
     def _ave(self):
         """
@@ -618,7 +682,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         :return: xr.DataArray
         """
-        return np.mean(self.model_estim.X, axis=0)
+        return np.mean(self.X, axis=0)
 
     def _test(self):
         """
@@ -631,8 +695,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # with a normal distribution, for multiple parameters, a chi-square distribution is used.
         self.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
         if len(self.coef_loc_totest) == 1:
-            self.theta_mle = self.theta_mle[0]  # Make xarray one dimensinoal for stats.wald_test.
-            self.theta_sd = self.model_estim.fisher_inv[:, self.sd_loc_totest[0], self.sd_loc_totest[0]].values
+            self.theta_mle = self.theta_mle[0]  # Make xarray one dimensional for stats.wald_test.
+            self.theta_sd = self.model_estim.fisher_inv[:, self.coef_loc_totest[0], self.coef_loc_totest[0]].values
             self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd,
                                          where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
@@ -642,16 +706,13 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 theta0=0
             )
         else:
-            # We avoid inverting the covariance matrix (FIM) here by directly feeding
-            # its inverse, the negative hessian, to wald_test_chisq. Note that 
-            # the negative hessian is pre-computed within batchglm.
             self.theta_sd = np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1).copy()
             self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd,
                                          where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test_chisq(
                 theta_mle=self.theta_mle,
-                theta_invcovar=-self.model_estim.hessians[:, self.sd_loc_totest, self.sd_loc_totest],
+                theta_covar=self.model_estim.fisher_inv[:, self.coef_loc_totest, self.coef_loc_totest],
                 theta0=0
             )
 
@@ -668,8 +729,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         if len(self.theta_sd.shape) == 1:
             res["coef_sd"] = self.theta_sd
         # add in info from bfgs
-        if self.log_probs is not None:
-            res["ll"] = self.log_probs
+        if self.log_likelihood is not None:
+            res["ll"] = self.log_likelihood
         if self._error_codes is not None:
             res["err"] = self._error_codes
         if self._niter is not None:
@@ -721,7 +782,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
 
     def __init__(self, data, grouping, gene_ids):
         super().__init__()
-        self.data = data
+        self._X = data
         self.grouping = grouping
         self._gene_ids = np.asarray(gene_ids)
 
@@ -756,6 +817,10 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
     @property
     def gene_ids(self) -> np.ndarray:
         return self._gene_ids
+
+    @property
+    def X(self):
+        return self._X
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -794,7 +859,7 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
 
     def __init__(self, data, grouping, gene_names):
         super().__init__()
-        self.data = data
+        self._X = data
         self.grouping = grouping
         self._gene_names = np.asarray(gene_names)
 
@@ -808,6 +873,10 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
     @property
     def gene_ids(self) -> np.ndarray:
         return self._gene_names
+
+    @property
+    def X(self):
+        return self._X
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -842,7 +911,7 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
 
         grouping = self.grouping
         ttest = t_test(
-            data=self.data,
+            data=self.X,
             grouping=grouping,
             gene_names=self.gene_ids,
         )
@@ -955,6 +1024,10 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
     @property
     def gene_ids(self) -> np.ndarray:
         return self._gene_ids
+
+    @property
+    def X(self):
+        return None
 
     @property
     def tests(self):
@@ -1161,16 +1234,20 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         return pvals
 
     @property
-    def log_probs(self):
-        return np.sum(self.model_estim.log_probs(), axis=0)
-
-    @property
     def gene_ids(self) -> np.ndarray:
         return np.asarray(self.model_estim.features)
 
     @property
+    def X(self):
+        return self.model_estim.X
+
+    @property
+    def log_likelihood(self):
+        return np.sum(self.model_estim.log_probs(), axis=0)
+
+    @property
     def model_gradient(self):
-        return self.model_estim.gradient
+        return self.model_estim.gradients
 
     def _ave(self):
         """
@@ -1279,6 +1356,339 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
 
         return res
 
+class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
+    """
+    Pairwise unit_test between more than 2 groups per gene with lazy evaluation.
+
+    This class performs pairwise tests upon enquiry only and does not store them
+    and is therefore suited so very large group sets for which the lfc and
+    p-value matrices of the size [genes, groups, groups] are too big to fit into
+    memory.
+    """
+
+    model_estim: _Estimation
+    _theta_mle: np.ndarray
+    _theta_sd: np.ndarray
+
+    def __init__(self, model_estim: _Estimation, grouping, groups, correction_type="global"):
+        super().__init__(correction_type=correction_type)
+        self.model_estim = model_estim
+        self.grouping = grouping
+        if isinstance(groups, list):
+            self.groups = groups
+        else:
+            self.groups = groups.tolist()
+
+        # values of parameter estimates: coefficients x genes array with one coefficient per group
+        self._theta_mle = model_estim.par_link_loc
+        # standard deviation of estimates: coefficients x genes array with one coefficient per group
+        # theta_sd = sqrt(diagonal(fisher_inv))
+        self._theta_sd = np.sqrt(np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1)).T
+
+    def _correction(self, pvals, method="fdr_bh") -> np.ndarray:
+        """
+        Performs multiple testing corrections available in statsmodels.stats.multitest.multipletests().
+
+        This overwrites the parent function which uses self.pval which is not used in this
+        lazy implementation.
+
+        :param pvals: P-value array to correct.
+        :param method: Multiple testing correction method.
+            Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
+        """
+        if self._correction_type.lower() == "global":
+            pval_shape = pvals.shape
+            pvals = np.reshape(pvals, -1)
+            qvals = correction.correct(pvals=pvals, method=method)
+            qvals = np.reshape(qvals, pval_shape)
+        elif self._correction_type.lower() == "by_test":
+            qvals = np.apply_along_axis(
+                func1d=lambda p: correction.correct(pvals=p, method=method),
+                axis=-1,
+                arr=pvals,
+            )
+        else:
+            raise ValueError("method " + method + " not recognized in _correction()")
+
+        return qvals
+
+    def _test(self, **kwargs):
+        """
+        This function is not available in lazy results evaluation as it would
+        require all pairwise tests to be performed.
+        """
+        pass
+
+    def _test_pairs(self, groups0, groups1, **kwargs):
+        num_features = self.model_estim.X.shape[1]
+
+        pvals = np.tile(np.NaN, [len(groups0), len(groups1), num_features])
+
+        for i,g0 in enumerate(groups0):
+            for j,g1 in enumerate(groups1):
+                if g0 != g1:
+                    pvals[i, j] = stats.two_coef_z_test(
+                        theta_mle0=self._theta_mle[g0],
+                        theta_mle1=self._theta_mle[g1],
+                        theta_sd0=self._theta_sd[g0],
+                        theta_sd1=self._theta_sd[g1]
+                    )
+                else:
+                    pvals[i, j] = 1
+
+        return pvals
+
+    @property
+    def gene_ids(self) -> np.ndarray:
+        return np.asarray(self.model_estim.features)
+
+    @property
+    def X(self):
+        return self.model_estim.X
+
+    @property
+    def log_likelihood(self):
+        return np.sum(self.model_estim.log_probs(), axis=0)
+
+    @property
+    def model_gradient(self):
+        return self.model_estim.gradients
+
+    def _ave(self):
+        """
+        Returns a xr.DataArray containing the mean expression by gene
+
+        :return: xr.DataArray
+        """
+
+        return np.mean(self.model_estim.X, axis=0)
+
+    @property
+    def pval(self, **kwargs):
+        """
+        This function is not available in lazy results evaluation as it would
+        require all pairwise tests to be performed.
+        """
+        pass
+
+    @property
+    def qval(self, **kwargs):
+        """
+        This function is not available in lazy results evaluation as it would
+        require all pairwise tests to be performed.
+        """
+        pass
+
+    def log_fold_change(self, base=np.e, **kwargs):
+        """
+        This function is not available in lazy results evaluation as it would
+        require all pairwise tests to be performed.
+        """
+        pass
+
+    def summary(self, qval_thres=None, fc_upper_thres=None,
+                fc_lower_thres=None, mean_thres=None,
+                **kwargs) -> pd.DataFrame:
+        """
+        This function is not available in lazy results evaluation as it would
+        require all pairwise tests to be performed.
+        """
+        pass
+
+    def _check_groups(self, groups0, groups1):
+        if isinstance(groups0, list)==False:
+            groups0 = [groups0]
+        if isinstance(groups1, list)==False:
+            groups1 = [groups1]
+        for g in groups0:
+            if g not in self.groups:
+                raise ValueError('groups0 element '+str(g)+' not recognized')
+        for g in groups1:
+            if g not in self.groups:
+                raise ValueError('groups1 element '+str(g)+' not recognized')
+
+    def _groups_idx(self, groups):
+        if isinstance(groups, list)==False:
+            groups = [groups]
+        return np.array([self.groups.index(x) for x in groups])
+
+    def pval_pairs(self, groups0=None, groups1=None):
+        """
+        Return p-values for all pairwise comparisons of groups0 and groups1.
+
+        If you want to test one group (such as a control) against all other groups
+        (one test for each other group), give the control group id in groups0
+        and leave groups1=None, groups1 is then set to the full set of all groups.
+
+        :param groups0: First set of groups in pair-wise comparison.
+        :param groups1: Second set of groups in pair-wise comparison.
+        :return: P-values of pair-wise comparison.
+        """
+        if groups0 is None:
+            groups0 = self.groups
+        if groups1 is None:
+            groups1 = self.groups
+        self._check_groups(groups0, groups1)
+        groups0 = self._groups_idx(groups0)
+        groups1 = self._groups_idx(groups1)
+        return self._test_pairs(groups0=groups0, groups1=groups1)
+
+    def qval_pairs(self, groups0=None, groups1=None, method="fdr_bh", **kwargs):
+        """
+        Return multiple testing-corrected p-values for all
+        pairwise comparisons of groups0 and groups1.
+
+        If you want to test one group (such as a control) against all other groups
+        (one test for each other group), give the control group id in groups0
+        and leave groups1=None, groups1 is then set to the full set of all groups.
+
+        :param groups0: First set of groups in pair-wise comparison.
+        :param groups1: Second set of groups in pair-wise comparison.
+        :param method: Multiple testing correction method.
+            Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
+        :return: Multiple testing-corrected p-values of pair-wise comparison.
+        """
+        if groups0 is None:
+            groups0 = self.groups
+        if groups1 is None:
+            groups1 = self.groups
+        self._check_groups(groups0, groups1)
+        groups0 = self._groups_idx(groups0)
+        groups1 = self._groups_idx(groups1)
+        pval = self.pval_pair(groups0=groups0, groups1=groups1)
+        return self._correction(pval=pval, method=method, **kwargs)
+
+    def log_fold_change_pairs(self, groups0=None, groups1=None, base=np.e):
+        """
+        Return log-fold changes for all pairwise comparisons of groups0 and groups1.
+
+        If you want to test one group (such as a control) against all other groups
+        (one test for each other group), give the control group id in groups0
+        and leave groups1=None, groups1 is then set to the full set of all groups.
+
+        :param groups0: First set of groups in pair-wise comparison.
+        :param groups1: Second set of groups in pair-wise comparison.
+        :param base: Base of logarithm of log-fold change.
+        :return: P-values of pair-wise comparison.
+        """
+        if groups0 is None:
+            groups0 = self.groups
+        if groups1 is None:
+            groups1 = self.groups
+        self._check_groups(groups0, groups1)
+        groups0 = self._groups_idx(groups0)
+        groups1 = self._groups_idx(groups1)
+
+        num_features = self._theta_mle.shape[1]
+
+        logfc = np.zeros(shape=(len(groups0), len(groups1), num_features))
+        for i,g0 in enumerate(groups0):
+            for j,g1 in enumerate(groups1):
+                logfc[i,j,:] = self._theta_mle[g0,:].values - self._theta_mle[g1,:].values
+
+        if base == np.e:
+            return logfc
+        else:
+            return logfc / np.log(base)
+
+    def summary_pair(self, group0, group1,
+                     qval_thres=None, fc_upper_thres=None,
+                     fc_lower_thres=None, mean_thres=None,
+                     **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results of single pairwose comparison
+        into an output table.
+
+        :param group0: Firt group in pair-wise comparison.
+        :param group1: Second group in pair-wise comparison.
+        :return: pandas.DataFrame with the following columns:
+
+            - gene: the gene id's
+            - pval: the per-gene p-value of the selected test
+            - qval: the per-gene q-value of the selected test
+            - log2fc: the per-gene log2 fold change of the selected test
+            - mean: the mean expression of the gene across all groups
+        """
+        assert self.gene_ids is not None
+
+        if len(group0) != 1:
+            raise ValueError("group0 should only contain one entry in summary_pair()")
+        if len(group1) != 1:
+            raise ValueError("group1 should only contain one entry in summary_pair()")
+
+        pval = self.pval_pairs(groups0=group0, groups1=group1)
+        qval = self._correction(pvals=pval, **kwargs)
+        res = pd.DataFrame({
+            "gene": self.gene_ids,
+            "pval": pval.flatten(),
+            "qval": qval.flatten(),
+            "log2fc": self.log_fold_change_pairs(groups0=group0, groups1=group1, base=2).flatten(),
+            "mean": np.asarray(self.mean)
+        })
+
+        res = self._threshold_summary(
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
+            mean_thres=mean_thres
+        )
+
+        return res
+
+    def summary_pairs(self, groups0, groups1=None,
+                     qval_thres=None, fc_upper_thres=None,
+                     fc_lower_thres=None, mean_thres=None,
+                     **kwargs) -> pd.DataFrame:
+        """
+        Summarize differential expression results of a set of
+        pairwise comparisons into an output table.
+
+        :param groups0: First set of groups in pair-wise comparison.
+        :param groups1: Second set of groups in pair-wise comparison.
+        :return: pandas.DataFrame with the following columns:
+
+            - gene: the gene id's
+            - pval: the minimum per-gene p-value of all tests
+            - qval: the minimum per-gene q-value of all tests
+            - log2fc: the maximal/minimal (depending on which one is higher) log2 fold change of the genes
+            - mean: the mean expression of the gene across all groups
+        """
+        assert self.gene_ids is not None
+        if groups1 is None:
+            groups1 = self.groups
+
+        pval = self.pval_pairs(groups0=groups0, groups1=groups1)
+        qval = self._correction(pvals=pval, **kwargs)
+
+        # calculate maximum logFC of lower triangular fold change matrix
+        raw_logfc = self.log_fold_change_pairs(groups0=groups0, groups1=groups1, base=2)
+
+        # first flatten all dimensions up to the last 'gene' dimension
+        flat_logfc = raw_logfc.reshape(-1, raw_logfc.shape[-1])
+        # next, get argmax of flattened logfc and unravel the true indices from it
+        r, c = np.unravel_index(flat_logfc.argmax(0), raw_logfc.shape[:2])
+        # if logfc is maximal in the lower triangular matrix, multiply it with -1
+        logfc = raw_logfc[r, c, np.arange(raw_logfc.shape[-1])] * np.where(r <= c, 1, -1)
+
+        res = pd.DataFrame({
+            "gene": self.gene_ids,
+            "pval": np.min(pval, axis=(0,1)),
+            "qval": np.min(qval, axis=(0,1)),
+            "log2fc": np.asarray(logfc),
+            "mean": np.asarray(self.mean)
+        })
+
+        res = self._threshold_summary(
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
+            mean_thres=mean_thres
+        )
+
+        return res
+
 
 class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
     """
@@ -1309,6 +1719,10 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
     @property
     def gene_ids(self) -> np.ndarray:
         return self._gene_ids
+
+    @property
+    def X(self) -> np.ndarray:
+        return None
 
     def log_fold_change(self, base=np.e, **kwargs):
         if base == np.e:
@@ -1406,6 +1820,10 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
     def gene_ids(self) -> np.ndarray:
         return self._gene_ids
 
+    @property
+    def X(self) -> np.ndarray:
+        return None
+
     def log_fold_change(self, base=np.e, **kwargs):
         if base == np.e:
             return self._logfc
@@ -1449,6 +1867,457 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
         )
 
         return res
+
+
+class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
+    _de_test: _DifferentialExpressionTestSingle
+    _model_estim: _Estimation
+    _size_factors: np.ndarray
+    _continuous_coords: np.ndarray
+    _spline_coefs: list
+
+    def __init__(
+            self,
+            de_test: _DifferentialExpressionTestSingle,
+            model_estim: _Estimation,
+            size_factors: np.ndarray,
+            continuous_coords: str,
+            spline_coefs: list
+    ):
+        self._de_test = de_test
+        self._model_estim = model_estim
+        self._size_factors = size_factors
+        self._continuous_coords = continuous_coords
+        self._spline_coefs = spline_coefs
+
+    @property
+    def gene_ids(self) -> np.ndarray:
+        return self._de_test.gene_ids
+
+    @property
+    def X(self):
+        return self._de_test.X
+
+    @property
+    def pval(self) -> np.ndarray:
+        return self._de_test.pval
+
+    @property
+    def qval(self) -> np.ndarray:
+        return self._de_test.qval
+
+    @property
+    def mean(self) -> np.ndarray:
+        return self._de_test.mean
+
+    @property
+    def log_likelihood(self) -> np.ndarray:
+        return self._de_test.log_likelihood
+
+    def summary(self, nonnumeric=False, qval_thres=None, fc_upper_thres=None,
+                fc_lower_thres=None, mean_thres=None) -> pd.DataFrame:
+        """
+        Summarize differential expression results into an output table.
+
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        """
+        # Collect summary from differential test object.
+        res = self._de_test.summary()
+        # Overwrite fold change with fold change from temporal model.
+        # Note that log2_fold_change calls log_fold_change from this class
+        # and not from the self._de_test object,
+        # which is called by self._de_test.summary().
+        res['log2fc'] = self.log2_fold_change()
+
+        res = self._threshold_summary(
+            res=res,
+            qval_thres=qval_thres,
+            fc_upper_thres=fc_upper_thres,
+            fc_lower_thres=fc_lower_thres,
+            mean_thres=mean_thres
+        )
+
+        return res
+
+    def log_fold_change(self, base=np.e, genes=None, nonnumeric=False):
+        """
+        Return log_fold_change based on fitted expression values by gene.
+
+        The log_fold_change is defined as the log of the fold change
+        from the minimal to the maximal fitted value by gene.
+
+        :param base: Basis of logarithm.
+        :param genes: Genes for which to return maximum fitted value. Defaults
+            to all genes if None.
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :return: Log-fold change of fitted expression value by gene.
+        """
+        if genes is None:
+            genes = np.asarray(range(self.X.shape[1]))
+        else:
+            genes = self._idx_genes(genes)
+
+        fc = self.max(genes=genes, nonnumeric=nonnumeric) - \
+             self.min(genes=genes, nonnumeric=nonnumeric)
+        fc = np.nextafter(0, 1, out=fc, where=fc == 0)
+
+        return np.log(fc) / np.log(base)
+
+    def _filter_genes_str(self, genes: list):
+        """
+        Filter genes indexed by ID strings by list of genes given in data set.
+
+        :param genes: List of genes to filter.
+        :return: Filtered list of genes
+        """
+        genes_found = np.array([x in self.gene_ids for x in genes])
+        if any(genes_found == False):
+            logger.info("did not find some genes, omitting")
+            genes = genes[genes_found]
+        return genes
+
+    def _filter_genes_int(self, genes: list):
+        """
+        Filter genes indexed by integers by gene list length.
+
+        :param genes: List of genes to filter.
+        :return: Filtered list of genes
+        """
+        genes_found = np.array([x < self.X.shape[1] for x in genes])
+        if any(genes_found == False):
+            logger.info("did not find some genes, omitting")
+            genes = genes[genes_found]
+        return genes
+
+    def _idx_genes(self, genes):
+        if not isinstance(genes, list):
+            if isinstance(genes, np.ndarray):
+                genes = genes.tolist()
+            else:
+                genes = [genes]
+
+        if isinstance(genes[0], str):
+            genes = self._filter_genes_str(genes)
+            genes = np.array([self.gene_ids.index(x) for x in genes])
+        elif isinstance(genes[0], int) or isinstance(genes[0], np.int64):
+            genes = self._filter_genes_int(genes)
+        else:
+            raise ValueError("only string and integer elements allowed in genes")
+        return genes
+
+    def _spline_par_loc_idx(self, intercept=True):
+        """
+        Get indices of spline basis model parameters in
+        entire location parameter model parameter set.
+
+        :param intercept: Whether to include intercept.
+        :return: Indices of spline basis parameters of location model.
+        """
+        par_loc_names = self._model_estim.design_loc.coords['design_loc_params'].values.tolist()
+        idx = [par_loc_names.index(x) for x in self._spline_coefs]
+        if 'Intercept' in par_loc_names and intercept == True:
+            idx = np.concatenate([np.where([[x == 'Intercept' for x in par_loc_names]])[0], idx])
+        return idx
+
+    def _continuous_model(self, idx, nonnumeric=False):
+        """
+        Recover continuous fit for a gene.
+
+        :param idx: Index of genes to recover fit for.
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :return: Continuuos fit for each cell for given gene.
+        """
+        idx = np.asarray(idx)
+        if nonnumeric:
+            mu = np.matmul(self._model_estim.design_loc,
+                           self._model_estim.par_link_loc[:,idx])
+            if self._size_factors is not None:
+                mu = mu + self._size_factors
+        else:
+            idx_basis = self._spline_par_loc_idx(intercept=True)
+            mu = np.matmul(self._model_estim.design_loc[:,idx_basis],
+                           self._model_estim.par_link_loc[idx_basis, idx])
+
+        mu = np.exp(mu)
+        return mu
+
+    def max(self, genes, nonnumeric=False):
+        """
+        Return maximum fitted expression value by gene.
+
+        :param genes: Genes for which to return maximum fitted value.
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :return: Maximum fitted expression value by gene.
+        """
+        genes = self._idx_genes(genes)
+        return np.array([np.max(self._continuous_model(idx=i, nonnumeric=nonnumeric))
+                         for i in genes])
+
+    def min(self, genes, nonnumeric=False):
+        """
+        Return minimum fitted expression value by gene.
+
+        :param genes: Genes for which to return maximum fitted value.
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :return: Maximum fitted expression value by gene.
+        """
+        genes = self._idx_genes(genes)
+        return np.array([np.min(self._continuous_model(idx=i, nonnumeric=nonnumeric))
+                         for i in genes])
+
+    def argmax(self, genes, nonnumeric=False):
+        """
+        Return maximum fitted expression value by gene.
+
+        :param genes: Genes for which to return maximum fitted value.
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :return: Maximum fitted expression value by gene.
+        """
+        genes = self._idx_genes(genes)
+        idx = np.array([np.argmax(self._continuous_model(idx=i, nonnumeric=nonnumeric))
+                        for i in genes])
+        return self._continuous_coords[idx]
+
+    def argmin(self, genes, nonnumeric=False):
+        """
+        Return minimum fitted expression value by gene.
+
+        :param genes: Genes for which to return maximum fitted value.
+        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :return: Maximum fitted expression value by gene.
+        """
+        genes = self._idx_genes(genes)
+        idx = np.array([np.argmin(self._continuous_model(idx=i, nonnumeric=nonnumeric))
+                        for i in genes])
+        return self._continuous_coords[idx]
+
+    def plot_genes(
+            self,
+            genes,
+            hue=None,
+            size=1,
+            log=True,
+            nonnumeric=False,
+            save=None,
+            show=True,
+            ncols=2,
+            row_gap=0.3,
+            col_gap=0.25
+    ):
+        """
+        Plot observed data and spline fits of selected genes.
+
+        :param genes: Gene IDs to plot.
+        :param hue: Confounder to include in plot.
+        :param size: Point size.
+        :param nonnumeric:
+        :param save: Path+file name stem to save plots to.
+            File will be save+"_genes.png". Does not save if save is None.
+        :param show: Whether to display plot.
+        :param ncols: Number of columns in plot grid if multiple genes are plotted.
+        :param row_gap: Vertical gap between panel rows relative to panel height.
+        :param col_gap: Horizontal gap between panel columns relative to panel width.
+        :return: Matplotlib axis objects.
+        """
+
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        from matplotlib import gridspec
+        from matplotlib import rcParams
+
+        plt.ioff()
+
+        gene_idx = self._idx_genes(genes)
+
+        # Set up gridspec.
+        ncols = ncols if len(gene_idx) > ncols else len(gene_idx)
+        nrows = len(gene_idx) // ncols + (len(gene_idx) - (len(gene_idx) // ncols) * ncols)
+        gs = gridspec.GridSpec(
+            nrows=nrows,
+            ncols=ncols,
+            hspace=row_gap,
+            wspace=col_gap
+        )
+
+        # Define figure size based on panel number and grid.
+        fig = plt.figure(
+            figsize=(
+                ncols * rcParams['figure.figsize'][0],  # width in inches
+                nrows * rcParams['figure.figsize'][1] * (1 + row_gap)  # height in inches
+            )
+        )
+
+        # Build axis objects in loop.
+        axs = []
+        for i, g in enumerate(gene_idx):
+            ax = plt.subplot(gs[i])
+            axs.append(ax)
+
+            y = self.X[:, genes[0]]
+            yhat = self._continuous_model(idx=g, nonnumeric=nonnumeric)
+            if log:
+                y = np.log(y + 1)
+                yhat = np.log(yhat + 1)
+
+            sns.scatterplot(
+                x=self._continuous_coords,
+                y=y,
+                hue=hue,
+                size=size,
+                ax=ax,
+                legend=False
+            )
+            sns.lineplot(
+                x=self._continuous_coords,
+                y=yhat,
+                hue=hue,
+                ax=ax
+            )
+
+            ax.set_title(genes[i])
+            ax.set_xlabel("continuous")
+            if log:
+                ax.set_ylabel("log expression")
+            else:
+                ax.set_ylabel("expression")
+
+        # Save, show and return figure.
+        if save is not None:
+            plt.savefig(save+'_genes.png')
+
+        if show:
+            plt.show()
+
+        plt.close(fig)
+
+        return axs
+
+
+    def plot_heatmap(
+            self,
+            genes,
+            save=None,
+            show=True,
+            transform: str = "zscore",
+            nticks=10,
+            cmap: str = "YlGnBu",
+            width=10,
+            height_per_gene=0.5
+    ):
+        """
+        Plot observed data and spline fits of selected genes.
+
+        :param genes: Gene IDs to plot.
+        :param save: Path+file name stem to save plots to.
+            File will be save+"_genes.png". Does not save if save is None.
+        :param show: Whether to display plot.
+        :param transform: Gene-wise transform to use.
+        :param nticks: Number of x ticks.
+        :param cmap: matplotlib cmap.
+        :param width: Width of heatmap figure.
+        :param height_per_gene: Height of each row (gene) in heatmap figure.
+        :return: Matplotlib axis objects.
+        """
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+
+        plt.ioff()
+
+        gene_idx = self._idx_genes(genes)
+
+        # Define figure.
+        fig = plt.figure(figsize=(width, height_per_gene * len(gene_idx)))
+        ax = fig.add_subplot(111)
+
+        # Build heatmap matrix.
+        ## Add in data.
+        data = np.array([
+            self._continuous_model(idx=g, nonnumeric=False)
+            for i, g in enumerate(gene_idx)
+        ])
+        ## Order columns by continuous covariate.
+        idx_x_sorted = np.argsort(self._continuous_coords)
+        data = data[:, idx_x_sorted]
+        xcoord = self._continuous_coords[idx_x_sorted]
+
+        if transform.lower() == "log10":
+            data = np.nextafter(0, 1, out=data, where=data == 0)
+            data = np.log(data) / np.log(10)
+        elif transform.lower() == "zscore":
+            mu = np.mean(data, axis=0)
+            sd = np.std(data, axis=0)
+            sd = np.nextafter(0, 1, out=sd, where=sd == 0)
+            data = np.array([(x - mu[i]) / sd[i] for i, x in enumerate(data)])
+        elif transform.lower() == "none":
+            pass
+        else:
+            raise ValueError("transform not recognized in plot_heatmap()")
+
+        # Create heatmap.
+        sns.heatmap(data=data, cmap=cmap, ax=ax)
+
+        # Set up axis labels.
+        xtick_pos = np.asarray(np.round(np.linspace(
+            start=0,
+            stop=data.shape[1] - 1,
+            num=nticks,
+            endpoint=True
+        )), dtype=int)
+        xtick_lab = [str(np.round(xcoord[np.argmin(np.abs(xcoord - xcoord[i]))], 2))
+                     for i in xtick_pos]
+        ax.set_xticks(xtick_pos)
+        ax.set_xticklabels(xtick_lab)
+        ax.set_xlabel("continuous")
+        plt.yticks(np.arange(len(genes)), genes, rotation='horizontal')
+        ax.set_ylabel("genes")
+
+        # Save, show and return figure.
+        if save is not None:
+            plt.savefig(save + '_genes.png')
+
+        if show:
+            plt.show()
+
+        plt.close(fig)
+
+        return ax
+
+
+class DifferentialExpressionTestWaldCont(_DifferentialExpressionTestCont):
+    de_test: DifferentialExpressionTestWald
+
+    def __init__(
+            self,
+            de_test: DifferentialExpressionTestWald,
+            size_factors: np.ndarray,
+            continuous_coords: np.ndarray,
+            spline_coefs: list
+    ):
+        super().__init__(
+            de_test=de_test,
+            model_estim=de_test.model_estim,
+            size_factors=size_factors,
+            continuous_coords=continuous_coords,
+            spline_coefs=spline_coefs
+        )
+
+
+class DifferentialExpressionTestLRTCont(_DifferentialExpressionTestCont):
+    de_test: DifferentialExpressionTestLRT
+
+    def __init__(self,
+            de_test: DifferentialExpressionTestLRT,
+            size_factors: np.ndarray,
+            continuous_coords: np.ndarray,
+            spline_coefs: list
+    ):
+        super().__init__(
+            de_test=de_test,
+            model_estim=de_test.full_estim,
+            size_factors=size_factors,
+            continuous_coords=continuous_coords,
+            spline_coefs=spline_coefs
+        )
 
 
 def _parse_gene_names(data, gene_names):
@@ -1568,6 +2437,9 @@ def _fit(
         constraints_loc: np.ndarray = None,
         constraints_scale: np.ndarray = None,
         init_model=None,
+        init_a: Union[np.ndarray, str] = "AUTO",
+        init_b: Union[np.ndarray, str] = "AUTO",
+        as_numeric: Union[np.ndarray, list, Tuple] = [],
         gene_names=None,
         size_factors=None,
         batch_size: int = None,
@@ -1600,7 +2472,35 @@ def _fit(
         parameter is indicated by a -1 in this array, the independent parameters
         of that constraint (which may be dependent at an earlier constraint)
         are indicated by a 1.
-    :param size_factors: 1D array of transformed library size factors for each cell in the 
+    :param init_model: (optional) If provided, this model will be used to initialize this Estimator.
+    :param init_a: (Optional) Low-level initial values for a.
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize intercept with observed mean
+            * "init_model": initialize with another model (see `ìnit_model` parameter)
+            * "closed_form": try to initialize with closed form
+        - np.ndarray: direct initialization of 'a'
+    :param init_b: (Optional) Low-level initial values for b
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize with zeros
+            * "init_model": initialize with another model (see `ìnit_model` parameter)
+            * "closed_form": try to initialize with closed form
+        - np.ndarray: direct initialization of 'b'
+    :param as_numeric:
+        Which columns of sample_description were treated as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correspond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example. This is passed to Estimator so that this information
+        can be used for initialization.
+    :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
@@ -1629,6 +2529,16 @@ def _fit(
         Should be "float32" for single precision or "float64" for double precision.
     :param close_session: If True, will finalize the estimator. Otherwise, return the estimator itself.
     """
+    provide_optimizers = {
+        "gd": pkg_constants.BATCHGLM_OPTIM_GD,
+        "adam": pkg_constants.BATCHGLM_OPTIM_ADAM,
+        "adagrad": pkg_constants.BATCHGLM_OPTIM_ADAGRAD,
+        "rmsprop": pkg_constants.BATCHGLM_OPTIM_RMSPROP,
+        "nr": pkg_constants.BATCHGLM_OPTIM_NEWTON,
+        "irls": pkg_constants.BATCHGLM_OPTIM_IRLS
+    }
+    termination_type = pkg_constants.BATCHGLM_TERMINATION_TYPE
+
     if isinstance(training_strategy, str) and training_strategy.lower() == 'bfgs':
         lib_size = np.zeros(data.shape[0])
         if noise_model == "nb" or noise_model == "negative_binomial":
@@ -1640,83 +2550,87 @@ def _fit(
             raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
     else:
         if noise_model == "nb" or noise_model == "negative_binomial":
-            import batchglm.api.models.nb_glm as test_model
-
-            logger.info("Fitting model...")
-            logger.debug(" * Assembling input data...")
-            input_data = test_model.InputData.new(
-                data=data,
-                design_loc=design_loc,
-                design_scale=design_scale,
-                constraints_loc=constraints_loc,
-                constraints_scale=constraints_scale,
-                size_factors=size_factors,
-                feature_names=gene_names,
-            )
-
-            logger.debug(" * Set up Estimator...")
-            constructor_args = {}
-            if batch_size is not None:
-                constructor_args["batch_size"] = batch_size
-            if quick_scale is not None:
-                constructor_args["quick_scale"] = quick_scale
-            estim = test_model.Estimator(
-                input_data=input_data,
-                init_model=init_model,
-                dtype=dtype,
-                **constructor_args
-            )
-
-            logger.debug(" * Initializing Estimator...")
-            estim.initialize()
-
-            logger.debug(" * Run estimation...")
-            # training:
-            if callable(training_strategy):
-                # call training_strategy if it is a function
-                training_strategy(estim)
-            else:
-                estim.train_sequence(training_strategy)
-
-            if close_session:
-                logger.debug(" * Finalize estimation...")
-                model = estim.finalize()
-            else:
-                model = estim
-            logger.debug(" * Model fitting done.")
-
+            from batchglm.api.models.glm_nb import Estimator, InputData
         else:
             raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
+
+        logger.info("Fitting model...")
+        logger.debug(" * Assembling input data...")
+        input_data = InputData.new(
+            data=data,
+            design_loc=design_loc,
+            design_scale=design_scale,
+            constraints_loc=constraints_loc,
+            constraints_scale=constraints_scale,
+            size_factors=size_factors,
+            feature_names=gene_names,
+        )
+
+        logger.debug(" * Set up Estimator...")
+        constructor_args = {}
+        if batch_size is not None:
+            constructor_args["batch_size"] = batch_size
+        if quick_scale is not None:
+            constructor_args["quick_scale"] = quick_scale
+        estim = Estimator(
+            input_data=input_data,
+            init_model=init_model,
+            init_a=init_a,
+            init_b=init_b,
+            provide_optimizers=provide_optimizers,
+            termination_type=termination_type,
+            dtype=dtype,
+            **constructor_args
+        )
+
+        logger.debug(" * Initializing Estimator...")
+        estim.initialize()
+
+        logger.debug(" * Run estimation...")
+        # training:
+        if callable(training_strategy):
+            # call training_strategy if it is a function
+            training_strategy(estim)
+        else:
+            estim.train_sequence(training_strategy=training_strategy)
+
+        if close_session:
+            logger.debug(" * Finalize estimation...")
+            model = estim.finalize()
+        else:
+            model = estim
+        logger.debug(" * Model fitting done.")
 
     return model
 
 
 def lrt(
-        data,
-        reduced_formula: str = None,
-        full_formula: str = None,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         reduced_formula_loc: str = None,
         full_formula_loc: str = None,
-        reduced_formula_scale: str = None,
-        full_formula_scale: str = None,
+        reduced_formula_scale: str = "~1",
+        full_formula_scale: str = "~1",
+        as_numeric: Union[List[str], Tuple[str], str] = (),
+        init_a: Union[np.ndarray, str] = "AUTO",
+        init_b: Union[np.ndarray, str] = "AUTO",
         gene_names=None,
         sample_description: pd.DataFrame = None,
         noise_model="nb",
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
-        quick_scale: bool = None,
+        quick_scale: bool = False,
         dtype="float64",
         **kwargs
 ):
     """
     Perform log-likelihood ratio test for differential expression for each gene.
 
-    :param data: input data
-    :param reduced_formula: formula
-        Reduced model formula for location and scale parameter models.
-    :param full_formula: formula
-        Full model formula for location and scale parameter models.
+    Note that lrt() does not support constraints in its current form. Please
+    use wald() for constraints.
+
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param reduced_formula_loc: formula
         Reduced model formula for location and scale parameter models.
         If not specified, `reduced_formula` will be used instead.
@@ -1729,6 +2643,32 @@ def lrt(
     :param full_formula_scale: formula
         Full model formula for scale parameter model.
         If not specified, `reduced_formula_scale` will be used instead.
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
+    :param init_a: (Optional) Low-level initial values for a.
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize intercept with observed mean
+            * "init_model": initialize with another model (see `ìnit_model` parameter)
+            * "closed_form": try to initialize with closed form
+        - np.ndarray: direct initialization of 'a'
+    :param init_b: (Optional) Low-level initial values for b
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize with zeros
+            * "init_model": initialize with another model (see `ìnit_model` parameter)
+            * "closed_form": try to initialize with closed form
+        - np.ndarray: direct initialization of 'b'
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
@@ -1766,14 +2706,8 @@ def lrt(
     if len(kwargs) != 0:
         logger.info("additional kwargs: %s", str(kwargs))
 
-    if full_formula_loc is None:
-        full_formula_loc = full_formula
-    if reduced_formula_loc is None:
-        reduced_formula_loc = reduced_formula
-    if full_formula_scale is None:
-        full_formula_scale = full_formula
-    if reduced_formula_scale is None:
-        reduced_formula_scale = reduced_formula
+    if isinstance(as_numeric, str):
+        as_numeric = [as_numeric]
 
     gene_names = _parse_gene_names(data, gene_names)
     X = _parse_data(data, gene_names)
@@ -1781,19 +2715,36 @@ def lrt(
     size_factors = _parse_size_factors(size_factors=size_factors, data=X)
 
     full_design_loc = data_utils.design_matrix(
-        sample_description=sample_description, formula=full_formula_loc)
+        sample_description=sample_description,
+        formula=full_formula_loc,
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+    )
     reduced_design_loc = data_utils.design_matrix(
-        sample_description=sample_description, formula=reduced_formula_loc)
+        sample_description=sample_description,
+        formula=reduced_formula_loc,
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+    )
     full_design_scale = data_utils.design_matrix(
-        sample_description=sample_description, formula=full_formula_scale)
+        sample_description=sample_description,
+        formula=full_formula_scale,
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+    )
     reduced_design_scale = data_utils.design_matrix(
-        sample_description=sample_description, formula=reduced_formula_scale)
+        sample_description=sample_description,
+        formula=reduced_formula_scale,
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+    )
 
     reduced_model = _fit(
         noise_model=noise_model,
         data=X,
         design_loc=reduced_design_loc,
         design_scale=reduced_design_scale,
+        constraints_loc=None,
+        constraints_scale=None,
+        init_a=init_a,
+        init_b=init_b,
+        as_numeric=as_numeric,
         gene_names=gene_names,
         size_factors=size_factors,
         batch_size=batch_size,
@@ -1807,11 +2758,15 @@ def lrt(
         data=X,
         design_loc=full_design_loc,
         design_scale=full_design_scale,
+        constraints_loc=None,
+        constraints_scale=None,
         gene_names=gene_names,
+        init_a="init_model",
+        init_b="init_model",
+        as_numeric=as_numeric,
         init_model=reduced_model,
         size_factors=size_factors,
         batch_size=batch_size,
-        # batch_size=X.shape[0],  # workaround: batch_size=num_observations
         training_strategy=training_strategy,
         quick_scale=quick_scale,
         dtype=dtype,
@@ -1830,12 +2785,14 @@ def lrt(
 
 
 def wald(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         factor_loc_totest: Union[str, List[str]] = None,
-        coef_to_test: Union[str, List[str]] = None,  # e.g. coef_to_test="B"
-        formula: str = None,
+        coef_to_test: Union[str, List[str]] = None,
         formula_loc: str = None,
-        formula_scale: str = None,
+        formula_scale: str = "~1",
+        as_numeric: Union[List[str], Tuple[str], str] = (),
+        init_a: Union[np.ndarray, str] = "AUTO",
+        init_b: Union[np.ndarray, str] = "AUTO",
         gene_names: Union[str, np.ndarray] = None,
         sample_description: pd.DataFrame = None,
         dmat_loc: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
@@ -1846,15 +2803,16 @@ def wald(
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
-        quick_scale: bool = None,
+        quick_scale: bool = False,
         dtype="float64",
         **kwargs
 ):
     """
     Perform Wald test for differential expression for each gene.
 
-    :param data: input data
-    :param factor_loc_totest:
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
+    :param factor_loc_totest: str, list of strings
         List of factors of formula to test with Wald test.
         E.g. "condition" or ["batch", "condition"] if formula_loc would be "~ 1 + batch + condition"
     :param coef_to_test:
@@ -1870,6 +2828,32 @@ def wald(
     :param formula_scale: formula
         model formula for scale parameter model.
         If not specified, `formula` will be used instead.
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
+    :param init_a: (Optional) Low-level initial values for a.
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize intercept with observed mean
+            * "init_model": initialize with another model (see `ìnit_model` parameter)
+            * "closed_form": try to initialize with closed form
+        - np.ndarray: direct initialization of 'a'
+    :param init_b: (Optional) Low-level initial values for b
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize with zeros
+            * "init_model": initialize with another model (see `ìnit_model` parameter)
+            * "closed_form": try to initialize with closed form
+        - np.ndarray: direct initialization of 'b'
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     :param dmat_loc: Pre-built location model design matrix. 
@@ -1933,10 +2917,6 @@ def wald(
     if len(kwargs) != 0:
         logger.debug("additional kwargs: %s", str(kwargs))
 
-    if formula_loc is None:
-        formula_loc = formula
-    if formula_scale is None:
-        formula_scale = formula
     if dmat_loc is None and formula_loc is None:
         raise ValueError("Supply either dmat_loc or formula_loc or formula.")
     if dmat_scale is None and formula_scale is None:
@@ -1946,6 +2926,8 @@ def wald(
         factor_loc_totest = [factor_loc_totest]
     if isinstance(coef_to_test, str):
         coef_to_test = [coef_to_test]
+    if isinstance(as_numeric, str):
+        as_numeric = [as_numeric]
 
     # # Parse input data formats:
     gene_names = _parse_gene_names(data, gene_names)
@@ -1956,19 +2938,24 @@ def wald(
 
     if dmat_loc is None:
         design_loc = data_utils.design_matrix(
-            sample_description=sample_description, formula=formula_loc)
+            sample_description=sample_description,
+            formula=formula_loc,
+            as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        )
     else:
         design_loc = dmat_loc
 
     if dmat_scale is None:
         design_scale = data_utils.design_matrix(
-            sample_description=sample_description, formula=formula_scale)
+            sample_description=sample_description,
+            formula=formula_scale,
+            as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        )
     else:
         design_scale = dmat_scale
 
-    # Coefficients to test:
-    indep_coef_indices = None
-    col_indices = None
+    # Define indices of coefficients to test:
+    contraints_loc_temp = constraints_loc if constraints_loc is not None else np.eye(design_loc.shape[-1])
     if factor_loc_totest is not None:
         # Select coefficients to test via formula model:
         col_indices = np.concatenate([
@@ -1987,7 +2974,7 @@ def wald(
     elif coef_to_test is not None:
         # Directly select coefficients to test from design matrix (xarray):
         # Check that coefficients to test are not dependent parameters if constraints are given:
-        # TODO: design_loc is sometimes xarray and sometimes patsy when it arrives here, 
+        # TODO: design_loc is sometimes xarray and sometimes patsy when it arrives here,
         # should it not always be xarray?
         if isinstance(design_loc, patsy.design_info.DesignMatrix):
             col_indices = np.asarray([
@@ -1999,10 +2986,14 @@ def wald(
                 list(np.asarray(design_loc.coords['design_params'])).index(x)
                 for x in coef_to_test
             ])
-        if constraints_loc is not None:
-            dep_coef_indices = np.where(np.any(constraints_loc == -1, axis=0) == True)[0]
-            assert np.all([x not in dep_coef_indices for x in col_indices]), "cannot test dependent coefficient"
-            indep_coef_indices = np.where(np.any(constraints_loc == -1, axis=0) == False)[0]
+    else:
+        raise ValueError("either set factor_loc_totest or coef_to_test")
+    # Check that all tested coefficients are independent:
+    for x in col_indices:
+        if np.sum(contraints_loc_temp[x,:]) != 1:
+            raise ValueError("Constraints input is wrong: not all tested coefficients are unconstrained.")
+    # Adjust tested coefficients from dependent to independent (fitted) parameters:
+    col_indices = np.array([np.where(contraints_loc_temp[x,:] == 1)[0][0] for x in col_indices])
 
     ## Fit GLM:
     model = _fit(
@@ -2012,6 +3003,9 @@ def wald(
         design_scale=design_scale,
         constraints_loc=constraints_loc,
         constraints_scale=constraints_scale,
+        init_a=init_a,
+        init_b=init_b,
+        as_numeric=as_numeric,
         gene_names=gene_names,
         size_factors=size_factors,
         batch_size=batch_size,
@@ -2023,9 +3017,8 @@ def wald(
 
     ## Perform DE test:
     de_test = DifferentialExpressionTestWald(
-        model,
-        col_indices=col_indices,
-        indep_coefs=indep_coef_indices
+        model_estim=model,
+        col_indices=col_indices
     )
 
     return de_test
@@ -2046,7 +3039,7 @@ def _split_X(data, grouping):
 
 
 def t_test(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         grouping,
         gene_names=None,
         sample_description=None,
@@ -2056,7 +3049,8 @@ def t_test(
     Perform Welch's t-test for differential expression
     between two groups on adata object for each gene.
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -2088,7 +3082,8 @@ def wilcoxon(
     Perform Wilcoxon rank sum test for differential expression
     between two groups on adata object for each gene.
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -2110,8 +3105,9 @@ def wilcoxon(
 
 
 def two_sample(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         grouping: Union[str, np.ndarray, list],
+        as_numeric: Union[List[str], Tuple[str], str] = (),
         test=None,
         gene_names=None,
         sample_description=None,
@@ -2154,11 +3150,18 @@ def two_sample(
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
     :param test: str, statistical test to use. Possible options:
 
         - 'wald': default
@@ -2226,6 +3229,7 @@ def two_sample(
         de_test = wald(
             data=X,
             factor_loc_totest="grouping",
+            as_numeric=as_numeric,
             coef_to_test=None,
             formula_loc=formula_loc,
             formula_scale=formula_scale,
@@ -2252,6 +3256,7 @@ def two_sample(
             reduced_formula_loc=reduced_formula_loc,
             full_formula_scale=full_formula_scale,
             reduced_formula_scale=reduced_formula_scale,
+            as_numeric=as_numeric,
             gene_names=gene_names,
             sample_description=sample_description,
             noise_model=noise_model,
@@ -2283,9 +3288,11 @@ def two_sample(
 
 
 def pairwise(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         grouping: Union[str, np.ndarray, list],
+        as_numeric: Union[List[str], Tuple[str], str] = [],
         test: str = 'z-test',
+        lazy: bool = False,
         gene_names: str = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
@@ -2332,11 +3339,18 @@ def pairwise(
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
     :param test: str, statistical test to use. Possible options:
 
         - 'z-test': default
@@ -2344,6 +3358,12 @@ def pairwise(
         - 'lrt'
         - 't-test'
         - 'wilcoxon'
+    :param lazy: bool, whether to enable lazy results evaluation.
+        This is only possible if test=="ztest" and yields an output object which computes
+        p-values etc. only upon request of certain pairs. This makes sense if the entire
+        gene x groups x groups matrix which contains all pairwise p-values, q-values or
+        log-fold changes is very large and may not fit into memory, especially if only
+        a certain subset of the pairwise comparisons is desired anyway.
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
@@ -2387,6 +3407,9 @@ def pairwise(
     if len(kwargs) != 0:
         logger.info("additional kwargs: %s", str(kwargs))
 
+    if lazy and not (test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest'):
+        raise ValueError("lazy evaluation of pairwise tests only possible if test is z-test")
+
     # Do not store all models but only p-value and q-value matrix:
     # genes x groups x groups
     gene_names = _parse_gene_names(data, gene_names)
@@ -2397,7 +3420,10 @@ def pairwise(
 
     if test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest':
         # -1 in formula removes intercept
-        dmat = data_utils.design_matrix(sample_description, formula="~ 1 - 1 + grouping")
+        dmat = data_utils.design_matrix(
+            sample_description,
+            formula="~ 1 - 1 + grouping"
+        )
         model = _fit(
             noise_model=noise_model,
             data=X,
@@ -2412,28 +3438,20 @@ def pairwise(
             **kwargs
         )
 
-        # # values of parameter estimates: coefficients x genes array with one coefficient per group
-        # theta_mle = model.par_link_loc
-        # # standard deviation of estimates: coefficients x genes array with one coefficient per group
-        # # theta_sd = sqrt(diagonal(fisher_inv))
-        # theta_sd = np.sqrt(np.diagonal(model.fisher_inv, axis1=-2, axis2=-1)).T
-        #
-        # for i, g1 in enumerate(groups):
-        #     for j, g2 in enumerate(groups[(i + 1):]):
-        #         j = j + i + 1
-        #
-        #         pvals[i, j] = stats.two_coef_z_test(theta_mle0=theta_mle[i], theta_mle1=theta_mle[j],
-        #                                             theta_sd0=theta_sd[i], theta_sd1=theta_sd[j])
-        #         pvals[j, i] = pvals[i, j]
-        #         logfc[i, j] = theta_mle[j] - theta_mle[i]
-        #         logfc[j, i] = logfc[i, j]
-
-        de_test = DifferentialExpressionTestZTest(
-            model_estim=model,
-            grouping=grouping,
-            groups=np.unique(grouping),
-            correction_type=pval_correction
-        )
+        if lazy:
+            de_test = DifferentialExpressionTestZTestLazy(
+                model_estim=model,
+                grouping=grouping,
+                groups=np.unique(grouping),
+                correction_type=pval_correction
+            )
+        else:
+            de_test = DifferentialExpressionTestZTest(
+                model_estim=model,
+                grouping=grouping,
+                groups=np.unique(grouping),
+                correction_type=pval_correction
+            )
     else:
         groups = np.unique(grouping)
         pvals = np.tile(np.NaN, [len(groups), len(groups), X.shape[1]])
@@ -2454,6 +3472,7 @@ def pairwise(
                 de_test_temp = two_sample(
                     data=X[sel],
                     grouping=grouping[sel],
+                    as_numeric=as_numeric,
                     test=test,
                     gene_names=gene_names,
                     sample_description=sample_description.iloc[sel],
@@ -2487,8 +3506,9 @@ def pairwise(
 
 
 def versus_rest(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         grouping: Union[str, np.ndarray, list],
+        as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
         gene_names: str = None,
         sample_description: pd.DataFrame = None,
@@ -2537,11 +3557,18 @@ def versus_rest(
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
         - array of length `num_observations` containing group labels
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
     :param test: str, statistical test to use. Possible options:
 
         - 'wald'
@@ -2613,6 +3640,7 @@ def versus_rest(
         de_test_temp = two_sample(
             data=X,
             grouping=test_grouping,
+            as_numeric=as_numeric,
             test=test,
             gene_names=gene_names,
             sample_description=sample_description,
@@ -2643,7 +3671,7 @@ def versus_rest(
 
 
 def partition(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         partition: Union[str, np.ndarray, list],
         gene_names: str = None,
         sample_description: pd.DataFrame = None):
@@ -2657,7 +3685,8 @@ def partition(
 
     Wraps _Partition so that doc strings are nice.
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
@@ -2680,12 +3709,13 @@ class _Partition():
 
     def __init__(
             self,
-            data,
+            data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
             partition: Union[str, np.ndarray, list],
             gene_names: str = None,
             sample_description: pd.DataFrame = None):
         """
-        :param data: input data
+        :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
         :param partition: str, array
 
             - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -2703,6 +3733,7 @@ class _Partition():
     def two_sample(
             self,
             grouping: Union[str],
+            as_numeric: Union[List[str], Tuple[str], str] = (),
             test=None,
             noise_model: str = None,
             size_factors: np.ndarray = None,
@@ -2716,6 +3747,12 @@ class _Partition():
         :param grouping: str
 
             - column in data.obs/sample_description which contains the split of observations into the two groups.
+        :param as_numeric:
+            Which columns of sample_description to treat as numeric and
+            not as categorical. This yields columns in the design matrix
+            which do not correpond to one-hot encoded discrete factors.
+            This makes sense for number of genes, time, pseudotime or space
+            for example.
         :param test: str, statistical test to use. Possible options:
 
             - 'wald': default
@@ -2751,6 +3788,7 @@ class _Partition():
             DETestsSingle.append(two_sample(
                 data=self.X[idx, :],
                 grouping=grouping,
+                as_numeric=as_numeric,
                 test=test,
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
@@ -2823,12 +3861,11 @@ class _Partition():
 
     def lrt(
             self,
-            reduced_formula: str = None,
-            full_formula: str = None,
             reduced_formula_loc: str = None,
             full_formula_loc: str = None,
             reduced_formula_scale: str = None,
             full_formula_scale: str = None,
+            as_numeric: Union[List[str], Tuple[str], str] = (),
             noise_model="nb",
             size_factors: np.ndarray = None,
             batch_size: int = None,
@@ -2838,10 +3875,6 @@ class _Partition():
         """
         See annotation of de.test.lrt()
 
-        :param reduced_formula: formula
-            Reduced model formula for location and scale parameter models.
-        :param full_formula: formula
-            Full model formula for location and scale parameter models.
         :param reduced_formula_loc: formula
             Reduced model formula for location and scale parameter models.
             If not specified, `reduced_formula` will be used instead.
@@ -2854,6 +3887,12 @@ class _Partition():
         :param full_formula_scale: formula
             Full model formula for scale parameter model.
             If not specified, `reduced_formula_scale` will be used instead.
+        :param as_numeric:
+            Which columns of sample_description to treat as numeric and
+            not as categorical. This yields columns in the design matrix
+            which do not correpond to one-hot encoded discrete factors.
+            This makes sense for number of genes, time, pseudotime or space
+            for example.
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
@@ -2884,12 +3923,11 @@ class _Partition():
         for i, idx in enumerate(self.partition_idx):
             DETestsSingle.append(lrt(
                 data=self.X[idx, :],
-                reduced_formula=reduced_formula,
-                full_formula=full_formula,
                 reduced_formula_loc=reduced_formula_loc,
                 full_formula_loc=full_formula_loc,
                 reduced_formula_scale=reduced_formula_scale,
                 full_formula_scale=full_formula_scale,
+                as_numeric=as_numeric,
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
@@ -2908,9 +3946,9 @@ class _Partition():
             self,
             factor_loc_totest: str,
             coef_to_test: object = None,  # e.g. coef_to_test="B"
-            formula: str = None,
             formula_loc: str = None,
             formula_scale: str = None,
+            as_numeric: Union[List[str], Tuple[str], str] = (),
             noise_model: str = "nb",
             size_factors: np.ndarray = None,
             batch_size: int = None,
@@ -2921,8 +3959,6 @@ class _Partition():
         This function performs a wald test within each partition of a data set.
         See annotation of de.test.wald()
 
-        :param formula: formula
-            model formula for location and scale parameter models.
         :param formula_loc: formula
             model formula for location and scale parameter models.
             If not specified, `formula` will be used instead.
@@ -2934,6 +3970,12 @@ class _Partition():
             E.g. "condition" if formula_loc would be "~ 1 + batch + condition"
         :param coef_to_test: If there are more than two groups specified by `factor_loc_totest`,
             this parameter allows to specify the group which should be tested
+        :param as_numeric:
+            Which columns of sample_description to treat as numeric and
+            not as categorical. This yields columns in the design matrix
+            which do not correpond to one-hot encoded discrete factors.
+            This makes sense for number of genes, time, pseudotime or space
+            for example.
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
@@ -2965,10 +4007,10 @@ class _Partition():
             DETestsSingle.append(wald(
                 data=self.X[idx, :],
                 factor_loc_totest=factor_loc_totest,
-                coef_to_test=coef_to_test,  # e.g. coef_to_test="B"
-                formula=formula,
+                coef_to_test=coef_to_test,
                 formula_loc=formula_loc,
                 formula_scale=formula_scale,
+                as_numeric=as_numeric,
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
@@ -2982,3 +4024,294 @@ class _Partition():
             tests=DETestsSingle,
             ave=np.mean(self.X, axis=0),
             correction_type="by_test")
+
+
+def continuous_1d(
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
+        continuous: str,
+        df: int = 5,
+        factor_loc_totest: Union[str, List[str]] = None,
+        formula: str = None,
+        formula_loc: str = None,
+        formula_scale: str = None,
+        as_numeric: Union[List[str], Tuple[str], str] = (),
+        test: str = 'wald',
+        init_a: Union[np.ndarray, str] = "standard",
+        init_b: Union[np.ndarray, str] = "standard",
+        gene_names=None,
+        sample_description=None,
+        noise_model: str = 'nb',
+        size_factors: np.ndarray = None,
+        batch_size: int = None,
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "DEFAULT",
+        quick_scale: bool = None,
+        dtype="float64",
+        **kwargs
+) -> _DifferentialExpressionTestSingle:
+    r"""
+    Perform differential expression along continous covariate.
+
+    This function wraps the selected statistical test for
+    scenarios with continuous covariates and performs the necessary
+    spline basis transformation of the continuous covariate so that the
+    problem can be framed as a GLM.
+
+    Note that direct supply of dmats is not enabled as this function wraps
+    the building of an adjusted design matrix which contains the spline basis
+    covariates. Advanced users who want to control dmat can directly
+    perform these spline basis transforms outside of diffxpy and feed the
+    dmat directly to one of the test routines wald() or lrt().
+
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
+    :param continuous: str
+
+        - column in data.obs/sample_description which contains the continuous covariate.
+    :param df: int
+        Degrees of freedom of the spline model, i.e. the number of spline basis vectors.
+        df is equal to the number of coefficients in the GLM which are used to describe the
+        continuous depedency-
+    :param factor_loc_totest:
+        List of factors of formula to test with Wald test.
+        E.g. "condition" or ["batch", "condition"] if formula_loc would be "~ 1 + batch + condition"
+    :param formula: formula
+        Model formula for location and scale parameter models.
+        Refer to continuous covariate by the name givne in the parameter continuous,
+        this will be propagated across all coefficients which represent this covariate
+        in the spline basis space.
+    :param formula_loc: formula
+        Model formula for location and scale parameter models.
+        If not specified, `formula` will be used instead.
+        Refer to continuous covariate by the name givne in the parameter continuous,
+        this will be propagated across all coefficients which represent this covariate
+        in the spline basis space.
+    :param formula_scale: formula
+        model formula for scale parameter model.
+        If not specified, `formula` will be used instead.
+        Refer to continuous covariate by the name givne in the parameter continuous,
+        this will be propagated across all coefficients which represent this covariate
+        in the spline basis space.
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
+    :param test: str, statistical test to use. Possible options:
+
+        - 'wald': default
+        - 'lrt'
+    :param init_a: (Optional) Low-level initial values for a.
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize intercept with observed mean
+        - np.ndarray: direct initialization of 'a'
+    :param init_b: (Optional) Low-level initial values for b
+        Can be:
+
+        - str:
+            * "auto": automatically choose best initialization
+            * "random": initialize with random values
+            * "standard": initialize with zeros
+        - np.ndarray: direct initialization of 'b'
+    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param noise_model: str, noise model to use in model-based unit_test. Possible options:
+
+        - 'nb': default
+    :param size_factors: 1D array of transformed library size factors for each cell in the
+        same order as in data
+    :param batch_size: the batch size to use for the estimator
+    :param training_strategy: {str, function, list} training strategy to use. Can be:
+
+        - str: will use Estimator.TrainingStrategy[training_strategy] to train
+        - function: Can be used to implement custom training function will be called as
+          `training_strategy(estimator)`.
+        - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
+          method arguments.
+
+          Example:
+
+          .. code-block:: python
+
+              [
+                {"learning_rate": 0.5, },
+                {"learning_rate": 0.05, },
+              ]
+
+          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
+
+        Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
+    :param dtype: Allows specifying the precision which should be used to fit data.
+
+        Should be "float32" for single precision or "float64" for double precision.
+    :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
+    """
+    if formula is None and (formula_loc is None or formula_scale is None):
+        raise ValueError("supply either formula or fomula_loc and formula_scale")
+    if formula is not None and (formula_loc is not None or formula_scale is not None):
+        raise ValueError("supply either formula or fomula_loc and formula_scale")
+    # Check that continuous factor is contained in model formulas:
+    if formula is not None:
+        pass
+    # Set testing default to continuous covariate if not supplied:
+    if factor_loc_totest is None:
+        factor_loc_totest = [continuous]
+    elif isinstance(factor_loc_totest, str):
+        factor_loc_totest = [factor_loc_totest]
+    elif isinstance(factor_loc_totest, tuple):
+        factor_loc_totest = list(factor_loc_totest)
+
+    if isinstance(as_numeric, str):
+        as_numeric = [as_numeric]
+    if isinstance(as_numeric, tuple):
+        as_numeric = list(as_numeric)
+
+    X = _parse_data(data, gene_names)
+    gene_names = _parse_gene_names(data, gene_names)
+    sample_description = _parse_sample_description(data, sample_description)
+
+    # Check that continuous factor is contained in sample description
+    if continuous not in sample_description.columns:
+        raise ValueError('parameter continuous not found in sample_description')
+
+    # Perform spline basis transform.
+    spline_basis = patsy.highlevel.dmatrix("0+bs(" + continuous + ", df=" + str(df) + ")", sample_description)
+    spline_basis = pd.DataFrame(spline_basis)
+    new_coefs = [continuous + str(i) for i in range(spline_basis.shape[1])]
+    spline_basis.columns = new_coefs
+    formula_extension = '+'.join(new_coefs)
+
+    # Replace continuous factor in formulas by spline basis coefficients.
+    # Note that the brackets around formula_term_continuous propagate the sum
+    # across interaction terms.
+    formula_term_continuous = '(' + formula_extension + ')'
+    if formula is not None:
+        formula_new = formula.split(continuous)
+        formula_new = formula_term_continuous.join(formula_new)
+    else:
+        formula_new = None
+
+    if formula_loc is not None:
+        formula_loc_new = formula_loc.split(continuous)
+        formula_loc_new = formula_term_continuous.join(formula_loc_new)
+    else:
+        formula_loc_new = None
+
+    if formula_scale is not None:
+        formula_scale_new = formula_scale.split(continuous)
+        formula_scale_new = formula_term_continuous.join(formula_scale_new)
+    else:
+        formula_scale_new = None
+
+    # Add spline basis into sample description
+    for x in spline_basis.columns:
+        sample_description[x] = spline_basis[x].values
+
+    # Add spline basis to continuous covariate list
+    as_numeric.extend(new_coefs)
+
+    if test.lower() == 'wald':
+        if noise_model is None:
+            raise ValueError("Please specify noise_model")
+
+        # Adjust factors / coefficients to test:
+        # Note that the continuous covariate does not necessarily have to be tested,
+        # it could also be a condition effect or similar.
+        # TODO handle interactions
+        if continuous in factor_loc_totest:
+            # Create reduced set of factors to test which does not contain continuous:
+            factor_loc_totest_new = [x for x in factor_loc_totest if x != continuous]
+            # Add spline basis terms in instead of continuous term:
+            factor_loc_totest_new.extend(new_coefs)
+        else:
+            factor_loc_totest_new = factor_loc_totest
+
+        logger.debug("model formulas assembled in de.test.continuos():")
+        logger.debug("factor_loc_totest_new: " + ",".join(factor_loc_totest_new))
+        logger.debug("formula_loc_new: " + formula_loc_new)
+        logger.debug("formula_scale_new: " + formula_scale_new)
+
+        de_test = wald(
+            data=X,
+            factor_loc_totest=factor_loc_totest_new,
+            coef_to_test=None,
+            formula_loc=formula_loc_new,
+            formula_scale=formula_scale_new,
+            as_numeric=as_numeric,
+            init_a=init_a,
+            init_b=init_b,
+            gene_names=gene_names,
+            sample_description=sample_description,
+            noise_model=noise_model,
+            size_factors=size_factors,
+            batch_size=batch_size,
+            training_strategy=training_strategy,
+            quick_scale=quick_scale,
+            dtype=dtype,
+            **kwargs
+        )
+        de_test = DifferentialExpressionTestWaldCont(
+            de_test=de_test,
+            size_factors=size_factors,
+            continuous_coords=sample_description[continuous].values,
+            spline_coefs=new_coefs
+        )
+    elif test.lower() == 'lrt':
+        if noise_model is None:
+            raise ValueError("Please specify noise_model")
+        full_formula_loc = formula_loc_new
+        # Assemble reduced loc model:
+        formula_scale_new = formula_scale.split(continuous)
+        formula_scale_new = formula_term_continuous.join(formula_scale_new)
+        reduced_formula_loc = formula_scale.split('+')
+        # Take out terms in reduced location model which are to be tested:
+        reduced_formula_loc = [x for x in reduced_formula_loc if x not in factor_loc_totest]
+        reduced_formula_loc = '+'.join(reduced_formula_loc)
+        # Replace occurences of continuous term in reduced model:
+        reduced_formula_loc = reduced_formula_loc.split(continuous)
+        reduced_formula_loc = formula_term_continuous.join(reduced_formula_loc)
+
+        # Scale model is not tested:
+        full_formula_scale = formula_scale_new
+        reduced_formula_scale = formula_scale_new
+
+        logger.debug("model formulas assembled in de.test.continuous():")
+        logger.debug("full_formula_loc: " + full_formula_loc)
+        logger.debug("reduced_formula_loc: " + reduced_formula_loc)
+        logger.debug("full_formula_scale: " + full_formula_scale)
+        logger.debug("reduced_formula_scale: " + reduced_formula_scale)
+
+        de_test = lrt(
+            data=X,
+            full_formula_loc=full_formula_loc,
+            reduced_formula_loc=reduced_formula_loc,
+            full_formula_scale=full_formula_scale,
+            reduced_formula_scale=reduced_formula_scale,
+            as_numeric=as_numeric,
+            init_a=init_a,
+            init_b=init_b,
+            gene_names=gene_names,
+            sample_description=sample_description,
+            noise_model=noise_model,
+            size_factors=size_factors,
+            batch_size=batch_size,
+            training_strategy=training_strategy,
+            quick_scale=quick_scale,
+            dtype=dtype,
+            **kwargs
+        )
+        de_test = DifferentialExpressionTestLRTCont(
+            de_test=de_test,
+            size_factors=size_factors,
+            continuous_coords=sample_description[continuous].values,
+            spline_coefs=new_coefs
+        )
+    else:
+        raise ValueError('base.continuous(): Parameter `test` not recognized.')
+
+    return de_test

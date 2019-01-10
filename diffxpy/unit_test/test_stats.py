@@ -1,32 +1,12 @@
+import logging
 import unittest
-
 import numpy as np
 import scipy.stats as stats
+
 import diffxpy.api as de
 
 
 class TestStats(unittest.TestCase):
-    
-    # def test_all(self, n: int = 1000):
-    #     """
-    #     Test if all functions in de.stats generate a uniform p-value distribution
-    #     if they are given test statistics/data sampled from the null model. Prints the p-value
-    #     of the two-side Kolmgorov-Smirnov test for equality of the observed
-    #     p-value distriubution and a uniform distribution for each function in de.stats.
-    #
-    #     :param n: Number of tests to run.
-    #     """
-    #
-    #     print('KS-test pvalue for null model match of likelihood_ratio_test(): ' +
-    #           str(self.test_lrt(df=3, n=n)))
-    #     print('KS-test pvalue for null model match of wald(): ' +
-    #           str(self.test_wald(n=n)))
-    #     print('KS-test pvalue for null model match of z_test(): ' +
-    #           str(self.test_z_test(n=n)))
-    #     print('KS-test pvalue for null model match of wilcoxon(): ' +
-    #           str(self.test_wilcoxon(n=n, n_test=100)))
-    #     print('KS-test pvalue for null model match of t_test_raw(): ' +
-    #           str(self.test_t_test_raw(n=n, n_test=100)))
     
     def test_lrt(self, df: int = 3, n: int = 1000):
         """
@@ -38,6 +18,9 @@ class TestStats(unittest.TestCase):
         :param n: Number of tests to run.
         :param df: Difference in degrees of freedom between null and alternative model.
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
         
         # Draw chi-square distributed deviance which is the statistic 
         # distributed under the null hypothesis:
@@ -54,9 +37,11 @@ class TestStats(unittest.TestCase):
         
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(pvals, 'uniform').pvalue
-        
-        print('KS-test pvalue for null model match of likelihood_ratio_test(): %f' % pval_h0)
-        return pval_h0
+
+        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of likelihood_ratio_test(): %f' % pval_h0)
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+
+        return True
     
     def test_wald(self, n: int = 1000):
         """
@@ -67,6 +52,9 @@ class TestStats(unittest.TestCase):
 
         :param n: Number of tests to run.
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
         
         # Draw standard normal distributed estimate which is sampled
         # from the parameter posterior under the null model:
@@ -78,9 +66,11 @@ class TestStats(unittest.TestCase):
         
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(pvals, 'uniform').pvalue
-        
-        print('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-        return pval_h0
+
+        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+
+        return True
     
     def test_z_test(self, n: int = 1000):
         """
@@ -91,6 +81,9 @@ class TestStats(unittest.TestCase):
 
         :param n: Number of tests to run.
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
         
         # Draw parameter posteriors for each test:
         theta_mles = np.random.normal(loc=0, scale=1, size=n)
@@ -106,9 +99,11 @@ class TestStats(unittest.TestCase):
         
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(pvals, 'uniform').pvalue
-        
-        print('KS-test pvalue for null model match of z_test(): %f' % pval_h0)
-        return pval_h0
+
+        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of z_test(): %f' % pval_h0)
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+
+        return True
     
     def test_wilcoxon(self, n: int = 1000, n_test: int = 100):
         """
@@ -120,6 +115,9 @@ class TestStats(unittest.TestCase):
         :param n: Number of tests to run.
         :param n_test: Sample size of each group in each test.
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
         
         # Draw sample distribution parameters for each test:
         locs = np.random.normal(loc=0, scale=1, size=n)
@@ -134,9 +132,11 @@ class TestStats(unittest.TestCase):
         
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(pvals, 'uniform').pvalue
-        
-        print('KS-test pvalue for null model match of wilcoxon(): %f' % pval_h0)
-        return pval_h0
+
+        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wilcoxon(): %f' % pval_h0)
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+
+        return True
     
     def test_t_test_raw(self, n: int = 1000, n_test: int = 100):
         """
@@ -150,6 +150,9 @@ class TestStats(unittest.TestCase):
         :param n_test: int
             Sample size of each group in each test.
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
         
         # Draw sample distribution parameters for each test:
         locs = np.random.normal(loc=0, scale=1, size=n)
@@ -164,9 +167,11 @@ class TestStats(unittest.TestCase):
         
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(pvals, 'uniform').pvalue
-        
-        print('KS-test pvalue for null model match of t_test_raw(): %f' % pval_h0)
-        return pval_h0
+
+        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of t_test_raw(): %f' % pval_h0)
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+
+        return True
 
 
 if __name__ == '__main__':
