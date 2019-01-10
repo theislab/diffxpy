@@ -253,9 +253,59 @@ class TestSingleDE(unittest.TestCase):
 
         return sim
 
+    def test_wilcoxon_de(self, n_cells: int = 2000, n_genes: int = 100):
+        """
+        Test if de.test.t_test() generates a uniform p-value distribution
+        if it is given data simulated based on the null model.
+
+        :param n_cells: Number of cells to simulate (number of observations per test).
+        :param n_genes: Number of genes to simulate (number of tests).
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        sim = self._prepare_data(n_cells=n_cells, n_genes=n_genes)
+
+        test = de.test.wilcoxon(
+            data=sim.X,
+            grouping="condition",
+            sample_description=sim.sample_description,
+            dtype="float64"
+        )
+
+        self._eval(sim=sim, test=test)
+
+        return True
+
+    def test_t_test_de(self, n_cells: int = 2000, n_genes: int = 100):
+        """
+        Test if de.test.t_test() generates a uniform p-value distribution
+        if it is given data simulated based on the null model.
+
+        :param n_cells: Number of cells to simulate (number of observations per test).
+        :param n_genes: Number of genes to simulate (number of tests).
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        sim = self._prepare_data(n_cells=n_cells, n_genes=n_genes)
+
+        test = de.test.t_test(
+            data=sim.X,
+            grouping="condition",
+            sample_description=sim.sample_description,
+            dtype="float64"
+        )
+
+        self._eval(sim=sim, test=test)
+
+        return True
+
     def test_wald_de(self, n_cells: int = 2000, n_genes: int = 100):
         """
-        Test if de.lrt() generates a uniform p-value distribution
+        Test if de.test.wald() generates a uniform p-value distribution
         if it is given data simulated based on the null model.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
@@ -282,7 +332,7 @@ class TestSingleDE(unittest.TestCase):
 
     def test_lrt_de(self, n_cells: int = 2000, n_genes: int = 100):
         """
-        Test if de.lrt() generates a uniform p-value distribution
+        Test if de.test.lrt() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
         of the two-side Kolmgorov-Smirnov test for equality of the observed
         p-value distribution and a uniform distribution.

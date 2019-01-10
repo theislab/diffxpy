@@ -4190,11 +4190,6 @@ def continuous_1d(
     # Note that the brackets around formula_term_continuous propagate the sum
     # across interaction terms.
     formula_term_continuous = '(' + formula_extension + ')'
-    if formula is not None:
-        formula_new = formula.split(continuous)
-        formula_new = formula_term_continuous.join(formula_new)
-    else:
-        formula_new = None
 
     if formula_loc is not None:
         formula_loc_new = formula_loc.split(continuous)
