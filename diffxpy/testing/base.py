@@ -3861,8 +3861,6 @@ class _Partition():
 
     def lrt(
             self,
-            reduced_formula: str = None,
-            full_formula: str = None,
             reduced_formula_loc: str = None,
             full_formula_loc: str = None,
             reduced_formula_scale: str = None,
@@ -3877,10 +3875,6 @@ class _Partition():
         """
         See annotation of de.test.lrt()
 
-        :param reduced_formula: formula
-            Reduced model formula for location and scale parameter models.
-        :param full_formula: formula
-            Full model formula for location and scale parameter models.
         :param reduced_formula_loc: formula
             Reduced model formula for location and scale parameter models.
             If not specified, `reduced_formula` will be used instead.
@@ -3929,8 +3923,6 @@ class _Partition():
         for i, idx in enumerate(self.partition_idx):
             DETestsSingle.append(lrt(
                 data=self.X[idx, :],
-                reduced_formula=reduced_formula,
-                full_formula=full_formula,
                 reduced_formula_loc=reduced_formula_loc,
                 full_formula_loc=full_formula_loc,
                 reduced_formula_scale=reduced_formula_scale,
@@ -3954,7 +3946,6 @@ class _Partition():
             self,
             factor_loc_totest: str,
             coef_to_test: object = None,  # e.g. coef_to_test="B"
-            formula: str = None,
             formula_loc: str = None,
             formula_scale: str = None,
             as_numeric: Union[List[str], Tuple[str], str] = (),
@@ -3968,8 +3959,6 @@ class _Partition():
         This function performs a wald test within each partition of a data set.
         See annotation of de.test.wald()
 
-        :param formula: formula
-            model formula for location and scale parameter models.
         :param formula_loc: formula
             model formula for location and scale parameter models.
             If not specified, `formula` will be used instead.
@@ -4018,8 +4007,7 @@ class _Partition():
             DETestsSingle.append(wald(
                 data=self.X[idx, :],
                 factor_loc_totest=factor_loc_totest,
-                coef_to_test=coef_to_test,  # e.g. coef_to_test="B"
-                formula=formula,
+                coef_to_test=coef_to_test,
                 formula_loc=formula_loc,
                 formula_scale=formula_scale,
                 as_numeric=as_numeric,
