@@ -2605,7 +2605,7 @@ def _fit(
 
 
 def lrt(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         reduced_formula_loc: str = None,
         full_formula_loc: str = None,
         reduced_formula_scale: str = "~1",
@@ -2629,7 +2629,8 @@ def lrt(
     Note that lrt() does not support constraints in its current form. Please
     use wald() for constraints.
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param reduced_formula_loc: formula
         Reduced model formula for location and scale parameter models.
         If not specified, `reduced_formula` will be used instead.
@@ -2784,7 +2785,7 @@ def lrt(
 
 
 def wald(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         factor_loc_totest: Union[str, List[str]] = None,
         coef_to_test: Union[str, List[str]] = None,
         formula_loc: str = None,
@@ -2809,8 +2810,9 @@ def wald(
     """
     Perform Wald test for differential expression for each gene.
 
-    :param data: input data
-    :param factor_loc_totest:
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
+    :param factor_loc_totest: str, list of strings
         List of factors of formula to test with Wald test.
         E.g. "condition" or ["batch", "condition"] if formula_loc would be "~ 1 + batch + condition"
     :param coef_to_test:
@@ -3037,7 +3039,7 @@ def _split_X(data, grouping):
 
 
 def t_test(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         grouping,
         gene_names=None,
         sample_description=None,
@@ -3047,7 +3049,8 @@ def t_test(
     Perform Welch's t-test for differential expression
     between two groups on adata object for each gene.
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -3079,7 +3082,8 @@ def wilcoxon(
     Perform Wilcoxon rank sum test for differential expression
     between two groups on adata object for each gene.
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -3101,7 +3105,7 @@ def wilcoxon(
 
 
 def two_sample(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test=None,
@@ -3146,7 +3150,8 @@ def two_sample(
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -3283,7 +3288,7 @@ def two_sample(
 
 
 def pairwise(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = [],
         test: str = 'z-test',
@@ -3334,7 +3339,8 @@ def pairwise(
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -3500,7 +3506,7 @@ def pairwise(
 
 
 def versus_rest(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
@@ -3551,7 +3557,8 @@ def versus_rest(
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -3664,7 +3671,7 @@ def versus_rest(
 
 
 def partition(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         partition: Union[str, np.ndarray, list],
         gene_names: str = None,
         sample_description: pd.DataFrame = None):
@@ -3678,7 +3685,8 @@ def partition(
 
     Wraps _Partition so that doc strings are nice.
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
@@ -3701,12 +3709,13 @@ class _Partition():
 
     def __init__(
             self,
-            data,
+            data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
             partition: Union[str, np.ndarray, list],
             gene_names: str = None,
             sample_description: pd.DataFrame = None):
         """
-        :param data: input data
+        :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
         :param partition: str, array
 
             - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -4030,7 +4039,7 @@ class _Partition():
 
 
 def continuous_1d(
-        data,
+        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
         continuous: str,
         df: int = 5,
         factor_loc_totest: Union[str, List[str]] = None,
@@ -4065,7 +4074,8 @@ def continuous_1d(
     perform these spline basis transforms outside of diffxpy and feed the
     dmat directly to one of the test routines wald() or lrt().
 
-    :param data: input data
+    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        Input data
     :param continuous: str
 
         - column in data.obs/sample_description which contains the continuous covariate.
