@@ -2606,12 +2606,10 @@ def _fit(
 
 def lrt(
         data,
-        reduced_formula: str = None,
-        full_formula: str = None,
         reduced_formula_loc: str = None,
         full_formula_loc: str = None,
-        reduced_formula_scale: str = None,
-        full_formula_scale: str = None,
+        reduced_formula_scale: str = "~1",
+        full_formula_scale: str = "~1",
         as_numeric: Union[List[str], Tuple[str], str] = (),
         init_a: Union[np.ndarray, str] = "AUTO",
         init_b: Union[np.ndarray, str] = "AUTO",
@@ -2621,7 +2619,7 @@ def lrt(
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
-        quick_scale: bool = None,
+        quick_scale: bool = False,
         dtype="float64",
         **kwargs
 ):
@@ -2632,10 +2630,6 @@ def lrt(
     use wald() for constraints.
 
     :param data: input data
-    :param reduced_formula: formula
-        Reduced model formula for location and scale parameter models.
-    :param full_formula: formula
-        Full model formula for location and scale parameter models.
     :param reduced_formula_loc: formula
         Reduced model formula for location and scale parameter models.
         If not specified, `reduced_formula` will be used instead.
@@ -2710,15 +2704,6 @@ def lrt(
     """
     if len(kwargs) != 0:
         logger.info("additional kwargs: %s", str(kwargs))
-
-    if full_formula_loc is None:
-        full_formula_loc = full_formula
-    if reduced_formula_loc is None:
-        reduced_formula_loc = reduced_formula
-    if full_formula_scale is None:
-        full_formula_scale = full_formula
-    if reduced_formula_scale is None:
-        reduced_formula_scale = reduced_formula
 
     if isinstance(as_numeric, str):
         as_numeric = [as_numeric]
@@ -2817,7 +2802,7 @@ def wald(
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
-        quick_scale: bool = None,
+        quick_scale: bool = False,
         dtype="float64",
         **kwargs
 ):
