@@ -2535,7 +2535,9 @@ def _fit(
         "adagrad": pkg_constants.BATCHGLM_OPTIM_ADAGRAD,
         "rmsprop": pkg_constants.BATCHGLM_OPTIM_RMSPROP,
         "nr": pkg_constants.BATCHGLM_OPTIM_NEWTON,
-        "irls": pkg_constants.BATCHGLM_OPTIM_IRLS
+        "nr_tr": pkg_constants.BATCHGLM_OPTIM_NEWTON_TR,
+        "irls": pkg_constants.BATCHGLM_OPTIM_IRLS,
+        "irls_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_TR
     }
     termination_type = pkg_constants.BATCHGLM_TERMINATION_TYPE
 
