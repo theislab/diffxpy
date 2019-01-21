@@ -332,7 +332,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         highlight_ids_clean = [highlight_ids[i] for i in np.where(highlight_ids_found == True)[0]]
         highlight_ids_not_found = [highlight_ids[i] for i in np.where(highlight_ids_found == False)[0]]
         if len(highlight_ids_not_found) > 0:
-            logger.warning("not all highligh_ids were found in data set: ", ", ".join(highlight_ids_not_found))
+            logger.warning("not all highlight_ids were found in data set: ", ", ".join(highlight_ids_not_found))
 
         if len(highlight_ids_clean) > 0:
             neg_log_pvals_highlights = np.zeros([len(highlight_ids_clean)])
@@ -357,6 +357,101 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         # Save, show and return figure.
         if save is not None:
             plt.savefig(save + '_volcano.png')
+
+        if show:
+            plt.show()
+
+        plt.close(fig)
+
+        return ax
+
+    def plot_ma(
+            self,
+            corrected_pval=True,
+            alpha=0.05,
+            min_fc=1,
+            size=20,
+            highlight_ids: List = [],
+            highlight_size: float = 30,
+            highlight_col: str = "red",
+            show: bool = True,
+            save: Union[str, None] = None
+    ):
+        """
+        Returns an MA plot of mean expression vs. log fold change with significance
+        super-imposed.
+
+        :param corrected_pval: Whether to use multiple testing corrected
+            or raw p-values.
+        :param log2_fc_threshold: Negative lower and upper bound of
+            log2 fold change displayed in plot.
+        :param alpha: p/q-value lower bound at which a test is considered
+            non-significant. The corresponding points are colored in grey.
+        :param min_fc: Fold-change lower bound for visualization,
+            the points below the threshold are colored in grey.
+        :param size: Size of points.
+        :param highlight_ids: Genes to highlight in volcano plot.
+        :param highlight_ids: Size of points of genes to highlight in volcano plot.
+        :param highlight_ids: Color of points of genes to highlight in volcano plot.
+        :param save: Path+file name stem to save plots to.
+            File will be save+"_volcano.png". Does not save if save is None.
+        :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
+
+
+        :return: Tuple of matplotlib (figure, axis)
+        """
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        from matplotlib import gridspec
+        from matplotlib import rcParams
+
+        plt.ioff()
+
+        ave = np.log(self.mean, 1e-08)
+
+        logfc = np.reshape(self.log2_fold_change(), -1)
+        # Clipping throws errors if not performed in actual data format (ndarray or DataArray):
+        if isinstance(logfc, xr.DataArray):
+            logfc = logfc.clip(-log2_fc_threshold, log2_fc_threshold)
+        else:
+            logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
+
+        fig, ax = plt.subplots()
+
+        if corrected_pval:
+            is_significant = self.pval < alpha
+        else:
+            is_significant = self.qval < alpha
+
+        sns.scatterplot(y=logfc, x=ave, hue=is_significant, ax=ax,
+                        legend=False, s=size,
+                        palette={True: "orange", False: "black"})
+
+        highlight_ids_found = np.array([x in self.gene_ids for x in highlight_ids])
+        highlight_ids_clean = [highlight_ids[i] for i in np.where(highlight_ids_found == True)[0]]
+        highlight_ids_not_found = [highlight_ids[i] for i in np.where(highlight_ids_found == False)[0]]
+        if len(highlight_ids_not_found) > 0:
+            logger.warning("not all highlight_ids were found in data set: ", ", ".join(highlight_ids_not_found))
+
+        if len(highlight_ids_clean) > 0:
+            ave_highlights = np.zeros([len(highlight_ids_clean)])
+            logfc_highlights = np.zeros([len(highlight_ids_clean)])
+            is_highlight = np.zeros([len(highlight_ids_clean)])
+            for i,id in enumerate(highlight_ids_clean):
+                idx = np.where(self.gene_ids == id)[0]
+                ave_highlights[i] = ave[idx]
+                logfc_highlights[i] = logfc[idx]
+
+            sns.scatterplot(y=ave_highlights, x=logfc_highlights,
+                            hue=is_highlight, ax=ax,
+                            legend=False, s=highlight_size,
+                            palette={0: highlight_col})
+
+        ax.set(xlabel="log2FC", ylabel='log mean expression')
+
+        # Save, show and return figure.
+        if save is not None:
+            plt.savefig(save + '_ma_plot.png')
 
         if show:
             plt.show()
