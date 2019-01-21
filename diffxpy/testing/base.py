@@ -368,6 +368,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     def plot_ma(
             self,
             corrected_pval=True,
+            log2_fc_threshold=10,
             alpha=0.05,
             size=20,
             highlight_ids: List = [],
