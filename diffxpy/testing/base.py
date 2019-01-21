@@ -440,7 +440,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
                 ave_highlights[i] = ave[idx]
                 logfc_highlights[i] = logfc[idx]
 
-            sns.scatterplot(y=ave_highlights, x=logfc_highlights,
+            sns.scatterplot(y=logfc_highlights, x=ave_highlights,
                             hue=is_highlight, ax=ax,
                             legend=False, s=highlight_size,
                             palette={0: highlight_col})
