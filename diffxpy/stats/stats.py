@@ -37,7 +37,7 @@ def likelihood_ratio_test(
     return pvals
 
 
-def wilcoxon_test(
+def mann_whitney_u_test(
         x0: np.ndarray,
         x1: np.ndarray,
 ):
@@ -68,7 +68,8 @@ def wilcoxon_test(
         scipy.stats.mannwhitneyu(
             x=x0[:, i].flatten(),
             y=x1[:, i].flatten(),
-            alternative='two-sided'
+            use_continuity=True,
+            alternative="two-sided"
         ).pvalue for i in range(x0.shape[1])
     ])
     return pvals
@@ -152,7 +153,7 @@ def t_test_moments(
         out=s_delta
     )
 
-    t_statistic = np.abs((mu0 - mu1) / s_delta)
+    t_statistic = (mu0 - mu1) / s_delta
 
     divisor = (
             (np.square(var0 / n0) / (n0 - 1)) +
@@ -174,7 +175,7 @@ def t_test_moments(
         out=df
     )
 
-    pval = 2 * (1 - scipy.stats.t(df).cdf(t_statistic))
+    pval = 2 * scipy.stats.t.sf(np.abs(t_statistic), df)
     return pval
 
 

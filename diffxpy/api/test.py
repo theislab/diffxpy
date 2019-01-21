@@ -2,7 +2,7 @@ from diffxpy.testing.base import two_sample
 from diffxpy.testing.base import lrt
 from diffxpy.testing.base import wald
 from diffxpy.testing.base import t_test
-from diffxpy.testing.base import wilcoxon
+from diffxpy.testing.base import rank_test
 from diffxpy.testing.base import partition
 from diffxpy.testing.base import pairwise
 from diffxpy.testing.base import versus_rest

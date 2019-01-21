@@ -852,9 +852,9 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         return res
 
 
-class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
+class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
     """
-    Single wilcoxon rank sum test per gene.
+    Single rank test per gene (Mann-Whitney U test).
     """
 
     def __init__(self, data, grouping, gene_names):
@@ -866,7 +866,7 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
         x0, x1 = _split_X(data, grouping)
 
         self._mean = np.mean(data, axis=0)
-        self._pval = stats.wilcoxon_test(x0=x0.data, x1=x1.data)
+        self._pval = stats.mann_whitney_u_test(x0=x0.data, x1=x1.data)
         self._logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
         q = self.qval
 
@@ -921,7 +921,7 @@ class DifferentialExpressionTestWilcoxon(_DifferentialExpressionTestSingle):
 
         sns.scatterplot(x=ttest_pvals, y=self.pval, ax=ax)
 
-        ax.set(xlabel="t-test", ylabel='wilcoxon test')
+        ax.set(xlabel="t-test", ylabel='rank test')
 
         return fig, ax
 
@@ -3069,7 +3069,7 @@ def t_test(
     return de_test
 
 
-def wilcoxon(
+def rank_test(
         data,
         grouping,
         gene_names=None,
@@ -3077,7 +3077,7 @@ def wilcoxon(
         dtype="float32"
 ):
     """
-    Perform Wilcoxon rank sum test for differential expression
+    Perform Mann-Whitney rank test (Wilcoxon rank-sum test) for differential expression
     between two groups on adata object for each gene.
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
@@ -3093,7 +3093,7 @@ def wilcoxon(
     X: xr.DataArray = _parse_data(data, gene_names)
     grouping = _parse_grouping(data, sample_description, grouping)
 
-    de_test = DifferentialExpressionTestWilcoxon(
+    de_test = DifferentialExpressionTestRank(
         data=X.astype(dtype),
         grouping=grouping,
         gene_names=gene_names,
@@ -3273,7 +3273,7 @@ def two_sample(
             dtype=dtype
         )
     elif test.lower() == 'wilcoxon':
-        de_test = wilcoxon(
+        de_test = rank_test(
             data=X,
             gene_names=gene_names,
             grouping=grouping,
@@ -3844,7 +3844,7 @@ class _Partition():
         """
         DETestsSingle = []
         for i, idx in enumerate(self.partition_idx):
-            DETestsSingle.append(wilcoxon(
+            DETestsSingle.append(rank_test(
                 data=self.X[idx, :],
                 grouping=grouping,
                 gene_names=self.gene_names,
