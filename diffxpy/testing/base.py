@@ -369,7 +369,6 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             self,
             corrected_pval=True,
             alpha=0.05,
-            min_fc=1,
             size=20,
             highlight_ids: List = [],
             highlight_size: float = 30,
@@ -387,8 +386,6 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             log2 fold change displayed in plot.
         :param alpha: p/q-value lower bound at which a test is considered
             non-significant. The corresponding points are colored in grey.
-        :param min_fc: Fold-change lower bound for visualization,
-            the points below the threshold are colored in grey.
         :param size: Size of points.
         :param highlight_ids: Genes to highlight in volcano plot.
         :param highlight_ids: Size of points of genes to highlight in volcano plot.
@@ -407,7 +404,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         plt.ioff()
 
-        ave = np.log(self.mean, 1e-08)
+        ave = np.log(self.mean + 1e-08)
 
         logfc = np.reshape(self.log2_fold_change(), -1)
         # Clipping throws errors if not performed in actual data format (ndarray or DataArray):
