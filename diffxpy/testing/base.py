@@ -273,7 +273,8 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             highlight_size: float = 30,
             highlight_col: str = "red",
             show: bool = True,
-            save: Union[str, None] = None
+            save: Union[str, None] = None,
+            suffix: str = "_volcano.png"
     ):
         """
         Returns a volcano plot of p-value vs. log fold change
@@ -291,10 +292,10 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         :param highlight_ids: Genes to highlight in volcano plot.
         :param highlight_ids: Size of points of genes to highlight in volcano plot.
         :param highlight_ids: Color of points of genes to highlight in volcano plot.
-        :param save: Path+file name stem to save plots to.
-            File will be save+"_volcano.png". Does not save if save is None.
         :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
-
+        :param save: Path+file name stem to save plots to.
+            File will be save+suffix. Does not save if save is None.
+        :param suffix: Suffix for file name to save plot to. Also use this to set the file type.
 
         :return: Tuple of matplotlib (figure, axis)
         """
@@ -356,7 +357,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         # Save, show and return figure.
         if save is not None:
-            plt.savefig(save + '_volcano.png')
+            plt.savefig(save + suffix)
 
         if show:
             plt.show()
@@ -375,7 +376,8 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             highlight_size: float = 30,
             highlight_col: str = "red",
             show: bool = True,
-            save: Union[str, None] = None
+            save: Union[str, None] = None,
+            suffix: str = "_my_plot.png"
     ):
         """
         Returns an MA plot of mean expression vs. log fold change with significance
@@ -391,9 +393,10 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         :param highlight_ids: Genes to highlight in volcano plot.
         :param highlight_ids: Size of points of genes to highlight in volcano plot.
         :param highlight_ids: Color of points of genes to highlight in volcano plot.
-        :param save: Path+file name stem to save plots to.
-            File will be save+"_volcano.png". Does not save if save is None.
         :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
+        :param save: Path+file name stem to save plots to.
+            File will be save+suffix. Does not save if save is None.
+        :param suffix: Suffix for file name to save plot to. Also use this to set the file type.
 
 
         :return: Tuple of matplotlib (figure, axis)
@@ -449,7 +452,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         # Save, show and return figure.
         if save is not None:
-            plt.savefig(save + '_ma_plot.png')
+            plt.savefig(save + suffix)
 
         if show:
             plt.show()
