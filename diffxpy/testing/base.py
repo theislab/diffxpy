@@ -269,8 +269,11 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             alpha=0.05,
             min_fc=1,
             size=20,
-            show=True,
-            save=None
+            highlight_ids: List = [],
+            highlight_size: float = 30,
+            highlight_col: str = "red",
+            show: bool = True,
+            save: Union[str, None] = None
     ):
         """
         Returns a volcano plot of p-value vs. log fold change
@@ -285,9 +288,12 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         :param min_fc: Fold-change lower bound for visualization,
             the points below the threshold are colored in grey.
         :param size: Size of points.
+        :param highlight_ids: Genes to highlight in volcano plot.
+        :param highlight_ids: Size of points of genes to highlight in volcano plot.
+        :param highlight_ids: Color of points of genes to highlight in volcano plot.
         :param save: Path+file name stem to save plots to.
             File will be save+"_volcano.png". Does not save if save is None.
-        :param show: Whether to display plot.
+        :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
 
 
         :return: Tuple of matplotlib (figure, axis)
@@ -321,6 +327,27 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         sns.scatterplot(y=neg_log_pvals, x=logfc, hue=is_significant, ax=ax,
                         legend=False, s=size,
                         palette={True: "orange", False: "black"})
+
+        highlight_ids_found = np.array([x in self.gene_ids for x in highlight_ids])
+        highlight_ids_clean = [highlight_ids[i] for i in np.where(highlight_ids_found == True)[0]]
+        highlight_ids_not_found = [highlight_ids[i] for i in np.where(highlight_ids_found == False)[0]]
+        if len(highlight_ids_not_found) > 0:
+            logger.warning("not all highligh_ids were found in data set: ", ", ".join(highlight_ids_not_found))
+
+        if len(highlight_ids_clean) > 0:
+            neg_log_pvals_highlights = np.zeros([len(highlight_ids_clean)])
+            logfc_highlights = np.zeros([len(highlight_ids_clean)])
+            is_highlight = np.zeros([len(highlight_ids_clean)])
+            for i,id in enumerate(highlight_ids_clean):
+                idx = np.where(self.gene_ids == id)[0]
+                neg_log_pvals_highlights[i] = neg_log_pvals[idx]
+                logfc_highlights[i] = logfc[idx]
+
+            sns.scatterplot(y=neg_log_pvals_highlights, x=logfc_highlights,
+                            hue=is_highlight, ax=ax,
+                            legend=False, s=highlight_size,
+                            palette={0: highlight_col})
+
 
         if corrected_pval == True:
             ax.set(xlabel="log2FC", ylabel='-log10(corrected p-value)')
