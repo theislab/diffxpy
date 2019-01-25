@@ -933,14 +933,14 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             var_x1 > 0
         )
         idx_run = np.where(np.logical_and(self._ave_geq_zero == True, self._var_geq_zero == True))[0]
-        pval = np.zeros([self._gene_names.shape[0]]) + np.nan
+        pval = np.zeros([data.shape[1]]) + np.nan
         pval[idx_run] = stats.t_test_moments(
             mu0=mean_x0[idx_run],
             mu1=mean_x1[idx_run],
             var0=var_x0[idx_run],
             var1=var_x1[idx_run],
-            n0=x0.shape[0],
-            n1=x1.shape[0]
+            n0=idx_run.shape[0],
+            n1=idx_run.shape[0]
         )
         self._pval = pval
 
@@ -1019,7 +1019,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
         idx_run = np.where(np.logical_and(self._mean > 0, self._var_geq_zero == True))[0]
 
         # TODO: can this be done on sparse?
-        pval = np.zeros([self._gene_names.shape[0]]) + np.nan
+        pval = np.zeros([data.shape[1]]) + np.nan
         if isinstance(x0, xr.DataArray):
             pval[idx_run] = stats.mann_whitney_u_test(
                 x0=x0.data[:,idx_run],
