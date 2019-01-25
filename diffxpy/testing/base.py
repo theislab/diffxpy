@@ -1033,7 +1033,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
 
         self._pval = pval
 
-        self._logfc = np.log(mean_x0) - np.log(mean_x1).data
+        self._logfc = np.log(mean_x1) - np.log(mean_x0).data
         q = self.qval
 
     @property
