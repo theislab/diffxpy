@@ -5,6 +5,7 @@ import pandas as pd
 import warnings
 
 import numpy as np
+import scipy.sparse
 import xarray as xr
 import patsy
 try:
@@ -13,6 +14,7 @@ except ImportError:
     anndata = None
 
 import batchglm.data as data_utils
+from batchglm.xarray_sparse import SparseXArrayDataArray, SparseXArrayDataSet
 from batchglm.models.glm_nb import Model as GeneralizedLinearModel
 
 from ..stats import stats
@@ -167,7 +169,10 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         :param method: Multiple testing correction method.
             Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
         """
-        return correction.correct(pvals=self.pval, method=method)
+        if np.all(np.isnan(self.pval)):
+            return self.pval
+        else:
+            return correction.correct(pvals=self.pval, method=method)
 
     def _ave(self):
         """
@@ -186,7 +191,9 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     @property
     def mean(self):
         if self._mean is None:
-            self._mean = self._ave().compute()
+            self._mean = self._ave()
+            if isinstance(self._mean, xr.DataArray):  # Could also be np.ndarray coming out of XArraySparseDataArray
+                self._mean = self._mean.compute()
         return self._mean
 
     @property
@@ -509,9 +516,9 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
     """
 
     sample_description: pd.DataFrame
-    full_design_info: patsy.design_info
+    full_design_loc_info: patsy.design_info
     full_estim: _Estimation
-    reduced_design_info: patsy.design_info
+    reduced_design_loc_info: patsy.design_info
     reduced_estim: _Estimation
 
     def __init__(
@@ -524,9 +531,9 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
     ):
         super().__init__()
         self.sample_description = sample_description
-        self.full_design_info = full_design_loc_info
+        self.full_design_loc_info = full_design_loc_info
         self.full_estim = full_estim
-        self.reduced_design_info = reduced_design_loc_info
+        self.reduced_design_loc_info = reduced_design_loc_info
         self.reduced_estim = reduced_estim
 
     @property
@@ -580,7 +587,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         if not isinstance(factors, set):
             factors = set(factors)
 
-        di = self.full_design_info
+        di = self.full_design_loc_info
         sample_description = self.sample_description[[f.name() for f in di.subset(factors).factor_infos]]
         dmat = self.full_estim.design_loc
 
@@ -601,7 +608,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         # make the design matrix + sample description unique again
         dmat, sample_description = _dmat_unique(dmat, sample_description)
 
-        locations = self.full_estim.inverse_link_loc(dmat @ self.full_estim.par_link_loc)
+        locations = self.full_estim.inverse_link_loc(dmat.dot(self.full_estim.par_link_loc))
         locations = np.log(locations) / np.log(base)
 
         dist = np.expand_dims(locations, axis=0)
@@ -638,7 +645,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
         :return: either pandas.DataFrame or xarray.DataArray
         """
-        factors = set(self.full_design_info.term_names).difference(self.reduced_design_info.term_names)
+        factors = set(self.full_design_loc_info.term_names) - set(self.reduced_design_loc_info.term_names)
 
         if return_type == "dataframe":
             dists = self._log_fold_change(factors=factors, base=base)
@@ -663,13 +670,13 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         :return: pd.DataFrame
         """
 
-        di = self.full_design_info
+        di = self.full_design_loc_info
         sample_description = self.sample_description[[f.name() for f in di.factor_infos]]
         dmat = self.full_estim.design_loc
 
         dmat, sample_description = _dmat_unique(dmat, sample_description)
 
-        retval = self.full_estim.inverse_link_loc(dmat @ self.full_estim.par_link_loc)
+        retval = self.full_estim.inverse_link_loc(dmat.dot(self.full_estim.par_link_loc))
         retval = pd.DataFrame(retval, columns=self.full_estim.features)
         for col in sample_description:
             retval[col] = sample_description[col]
@@ -685,13 +692,13 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         :return: pd.DataFrame
         """
 
-        di = self.full_design_info
+        di = self.full_design_loc_info
         sample_description = self.sample_description[[f.name() for f in di.factor_infos]]
         dmat = self.full_estim.design_scale
 
         dmat, sample_description = _dmat_unique(dmat, sample_description)
 
-        retval = self.full_estim.inverse_link_scale(dmat @ self.full_estim.par_link_scale)
+        retval = self.full_estim.inverse_link_scale(dmat.doc(self.full_estim.par_link_scale))
         retval = pd.DataFrame(retval, columns=self.full_estim.features)
         for col in sample_description:
             retval[col] = sample_description[col]
@@ -785,11 +792,11 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # loc = dmat @ self.model_estim.par_link_loc[self.coef_loc_totest]
         # return loc[1] - loc[0]
         if len(self.coef_loc_totest) == 1:
-            return self.model_estim.par_link_loc[self.coef_loc_totest][0]
+            return self.model_estim.a_var[self.coef_loc_totest][0]
         else:
-            idx_max = np.argmax(np.abs(self.model_estim.par_link_loc[self.coef_loc_totest]), axis=0)
-            return self.model_estim.par_link_loc[self.coef_loc_totest][
-                idx_max, np.arange(self.model_estim.par_link_loc.shape[1])]
+            idx_max = np.argmax(np.abs(self.model_estim.a_var[self.coef_loc_totest]), axis=0)
+            return self.model_estim.a_var[self.coef_loc_totest][
+                idx_max, np.arange(self.model_estim.a_var.shape[1])]
 
     def _ll(self):
         """
@@ -805,7 +812,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         :return: xr.DataArray
         """
-        return np.mean(self.X, axis=0)
+        return self.X.mean(axis=0)
 
     def _test(self):
         """
@@ -816,7 +823,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # Check whether single- or multiple parameters are tested.
         # For a single parameter, the wald statistic distribution is approximated
         # with a normal distribution, for multiple parameters, a chi-square distribution is used.
-        self.theta_mle = self.model_estim.par_link_loc[self.coef_loc_totest]
+        self.theta_mle = self.model_estim.a_var[self.coef_loc_totest]
         if len(self.coef_loc_totest) == 1:
             self.theta_mle = self.theta_mle[0]  # Make xarray one dimensional for stats.wald_test.
             self.theta_sd = self.model_estim.fisher_inv[:, self.coef_loc_totest[0], self.coef_loc_totest[0]].values
@@ -912,21 +919,30 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         x0, x1 = _split_X(data, grouping)
 
         # Only compute p-values for genes with non-zero observations and non-zero group-wise variance.
-        self._mean = np.mean(data, axis=0)
+        mean_x0 = x0.mean(axis=0)
+        mean_x1 = x1.mean(axis=0)
+        mean_x0 = mean_x0.clip(np.nextafter(0, 1), np.inf)
+        mean_x1 = mean_x1.clip(np.nextafter(0, 1), np.inf)
+        # TODO: do not need mean again
+        self._mean = data.mean(axis=0)
         self._ave_geq_zero = np.asarray(self.mean).flatten() > 0
+        var_x0 = np.asarray(x0.var(axis=0)).flatten()
+        var_x1 = np.asarray(x1.var(axis=0)).flatten()
         self._var_geq_zero = np.logical_or(
-            np.asarray(np.var(x0, axis=0)).flatten() > 0,
-            np.asarray(np.var(x1, axis=0)).flatten() > 0
+            var_x0 > 0,
+            var_x1 > 0
         )
         idx_tt = np.where(np.logical_and(self._ave_geq_zero == True, self._var_geq_zero == True))[0]
         pval = np.zeros([self._gene_ids.shape[0]]) + np.nan
-        pval[idx_tt] = stats.t_test_raw(x0=x0[:, idx_tt], x1=x1[:, idx_tt])
+        pval[idx_tt] = stats.t_test_moments(
+            mu0=mean_x0[idx_tt],
+            mu1=mean_x1[idx_tt],
+            var0=var_x0[idx_tt],
+            var1=var_x1[idx_tt],
+            n0=x0.shape[0],
+            n1=x1.shape[0]
+        )
         self._pval = pval
-
-        mean_x0 = np.mean(x0, axis=0)
-        mean_x0 = mean_x0.clip(np.nextafter(0, 1), np.inf)
-        mean_x1 = np.mean(x1, axis=0)
-        mean_x1 = mean_x1.clip(np.nextafter(0, 1), np.inf)
 
         self._logfc = np.log(mean_x1) - np.log(mean_x0).data
         # Return 0 if LFC was non-zero and variances are zero,
@@ -988,9 +1004,22 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
 
         x0, x1 = _split_X(data, grouping)
 
-        self._mean = np.mean(data, axis=0)
-        self._pval = stats.mann_whitney_u_test(x0=x0.data, x1=x1.data)
-        self._logfc = np.log(np.mean(x1, axis=0)) - np.log(np.mean(x0, axis=0)).data
+        mean_x0 = x0.mean(axis=0)
+        mean_x1 = x1.mean(axis=0)
+        mean_x0 = mean_x0.clip(np.nextafter(0, 1), np.inf)
+        mean_x1 = mean_x1.clip(np.nextafter(0, 1), np.inf)
+        # TODO unnecessary mean computation
+        self._mean = data.mean(axis=0)
+        # TODO: can this be done on sparse?
+        if isinstance(x0, xr.DataArray):
+            self._pval = stats.mann_whitney_u_test(x0=x0.data, x1=x1.data)
+        else:
+            self._pval = stats.mann_whitney_u_test(
+                x0=np.asarray(x0.X.todense()),
+                x1=np.asarray(x1.X.todense())
+            )
+
+        self._logfc = np.log(mean_x0) - np.log(mean_x1).data
         q = self.qval
 
     @property
@@ -2445,7 +2474,7 @@ class DifferentialExpressionTestLRTCont(_DifferentialExpressionTestCont):
 
 def _parse_gene_names(data, gene_names):
     if gene_names is None:
-        if anndata is not None and isinstance(data, anndata.AnnData):
+        if anndata is not None and (isinstance(data, anndata.AnnData) or isinstance(data, anndata.base.Raw)):
             gene_names = data.var_names
         elif isinstance(data, xr.DataArray):
             gene_names = data["features"]
@@ -2481,8 +2510,14 @@ def _parse_sample_description(data, sample_description=None) -> pd.DataFrame:
                 "Please specify `sample_description` or provide `data` as xarray.Dataset or anndata.AnnData " +
                 "with corresponding sample annotations"
             )
-    assert data.shape[0] == sample_description.shape[
-        0], "data matrix and sample description must contain same number of cells"
+
+    if anndata is not None and isinstance(data, anndata.base.Raw):
+        # anndata.base.Raw does not have attribute shape.
+        assert data.X.shape[0] == sample_description.shape[0], \
+            "data matrix and sample description must contain same number of cells"
+    else:
+        assert data.shape[0] == sample_description.shape[0], \
+            "data matrix and sample description must contain same number of cells"
     return sample_description
 
 
@@ -2729,9 +2764,9 @@ def _fit(
 
 
 def lrt(
-        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
-        reduced_formula_loc: str = None,
-        full_formula_loc: str = None,
+        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        reduced_formula_loc: str,
+        full_formula_loc: str,
         reduced_formula_scale: str = "~1",
         full_formula_scale: str = "~1",
         as_numeric: Union[List[str], Tuple[str], str] = (),
@@ -2742,7 +2777,7 @@ def lrt(
         noise_model="nb",
         size_factors: np.ndarray = None,
         batch_size: int = None,
-        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "DEFAULT",
         quick_scale: bool = False,
         dtype="float64",
         **kwargs
@@ -2827,6 +2862,7 @@ def lrt(
         Should be "float32" for single precision or "float64" for double precision.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
+    # TODO test nestedness
     if len(kwargs) != 0:
         logger.info("additional kwargs: %s", str(kwargs))
 
@@ -2907,7 +2943,7 @@ def lrt(
 
 
 def wald(
-        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
+        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         factor_loc_totest: Union[str, List[str]] = None,
         coef_to_test: Union[str, List[str]] = None,
         formula_loc: str = None,
@@ -3154,13 +3190,13 @@ def _parse_grouping(data, sample_description, grouping):
 
 def _split_X(data, grouping):
     groups = np.unique(grouping)
-    x0 = data[grouping == groups[0], :]
-    x1 = data[grouping == groups[1], :]
+    x0 = data[np.where(grouping == groups[0])[0]]
+    x1 = data[np.where(grouping == groups[1])[0]]
     return x0, x1
 
 
 def t_test(
-        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
+        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         grouping,
         gene_names=None,
         sample_description=None,
@@ -3180,7 +3216,9 @@ def t_test(
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
     gene_names = _parse_gene_names(data, gene_names)
-    X: xr.DataArray = _parse_data(data, gene_names)
+    X = _parse_data(data, gene_names)
+    if isinstance(X, SparseXArrayDataSet):
+        X = X.X
     grouping = _parse_grouping(data, sample_description, grouping)
 
     de_test = DifferentialExpressionTestTT(
@@ -3193,7 +3231,7 @@ def t_test(
 
 
 def rank_test(
-        data,
+        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         grouping,
         gene_names=None,
         sample_description=None,
@@ -3213,7 +3251,9 @@ def rank_test(
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
     gene_names = _parse_gene_names(data, gene_names)
-    X: xr.DataArray = _parse_data(data, gene_names)
+    X = _parse_data(data, gene_names)
+    if isinstance(X, SparseXArrayDataSet):
+        X = X.X
     grouping = _parse_grouping(data, sample_description, grouping)
 
     de_test = DifferentialExpressionTestRank(
@@ -3226,7 +3266,7 @@ def rank_test(
 
 
 def two_sample(
-        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
+        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test=None,
@@ -3409,7 +3449,7 @@ def two_sample(
 
 
 def pairwise(
-        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
+        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = [],
         test: str = 'z-test',
@@ -3627,7 +3667,7 @@ def pairwise(
 
 
 def versus_rest(
-        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
+        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
@@ -3792,7 +3832,7 @@ def versus_rest(
 
 
 def partition(
-        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
+        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         partition: Union[str, np.ndarray, list],
         gene_names: str = None,
         sample_description: pd.DataFrame = None):
@@ -4147,7 +4187,7 @@ class _Partition():
 
 
 def continuous_1d(
-        data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
+        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         continuous: str,
         df: int = 5,
         factor_loc_totest: Union[str, List[str]] = None,

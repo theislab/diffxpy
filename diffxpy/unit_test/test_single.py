@@ -36,7 +36,7 @@ class TestSingleNull(unittest.TestCase):
         test = de.test.wald(
             data=sim.X,
             factor_loc_totest="condition",
-            formula="~ 1 + condition + batch",
+            formula_loc="~ 1 + condition + batch",
             sample_description=random_sample_description,
             batch_size=500,
             training_strategy="DEFAULT",
@@ -77,7 +77,7 @@ class TestSingleNull(unittest.TestCase):
         test = de.test.wald(
             data=sim.X,
             factor_loc_totest="condition",
-            formula="~ 1 + condition",
+            formula_loc="~ 1 + condition",
             sample_description=random_sample_description,
             training_strategy="DEFAULT",
             dtype="float64"
@@ -320,7 +320,7 @@ class TestSingleDE(unittest.TestCase):
         test = de.test.wald(
             data=sim.X,
             factor_loc_totest="condition",
-            formula="~ 1 + condition",
+            formula_loc="~ 1 + condition",
             sample_description=sim.sample_description,
             training_strategy="DEFAULT",
             dtype="float64"
