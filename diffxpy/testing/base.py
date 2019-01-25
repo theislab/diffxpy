@@ -1026,7 +1026,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
                 x1=x1.data[:,idx_run]
             )
         else:
-            pval = stats.mann_whitney_u_test(
+            pval[idx_run] = stats.mann_whitney_u_test(
                 x0=np.asarray(x0.X[:,idx_run].todense()),
                 x1=np.asarray(x1.X[:,idx_run].todense())
             )
