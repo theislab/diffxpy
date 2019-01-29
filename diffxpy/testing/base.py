@@ -2195,13 +2195,13 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         """
         idx = np.asarray(idx)
         if nonnumeric:
-            mu = np.matmul(self._model_estim.design_loc,
+            mu = np.matmul(self._model_estim.design_loc.values,
                            self._model_estim.par_link_loc[:,idx])
             if self._size_factors is not None:
                 mu = mu + self._size_factors
         else:
             idx_basis = self._spline_par_loc_idx(intercept=True)
-            mu = np.matmul(self._model_estim.design_loc[:,idx_basis],
+            mu = np.matmul(self._model_estim.design_loc[:,idx_basis].values,
                            self._model_estim.par_link_loc[idx_basis, idx])
 
         mu = np.exp(mu)
@@ -2710,7 +2710,6 @@ def _fit(
         "irls": pkg_constants.BATCHGLM_OPTIM_IRLS,
         "irls_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_TR
     }
-    termination_type = pkg_constants.BATCHGLM_TERMINATION_TYPE
 
     if isinstance(training_strategy, str) and training_strategy.lower() == 'bfgs':
         lib_size = np.zeros(data.shape[0])
@@ -2751,7 +2750,8 @@ def _fit(
             init_a=init_a,
             init_b=init_b,
             provide_optimizers=provide_optimizers,
-            termination_type=termination_type,
+            provide_batched=pkg_constants.BATCHGLM_PROVIDE_BATCHED,
+            termination_type=pkg_constants.BATCHGLM_TERMINATION_TYPE,
             dtype=dtype,
             **constructor_args
         )
