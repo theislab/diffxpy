@@ -948,9 +948,9 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         # Return 0 if LFC was non-zero and variances are zero,
         # this causes division by zero in the test statistic. This
         # is a highly significant result if one believes the variance estimate.
-        pval[np.logical_and(np.logical_and(self._var_geq_zero == False,
-                                           self._ave_geq_zero == True),
-                            self._logfc != 0)] = 0
+        pval[np.where(np.logical_and(np.logical_and(self._var_geq_zero == False,
+                                                    self._ave_geq_zero == True),
+                                     self._logfc != 0))] = 0
         q = self.qval
 
     @property
