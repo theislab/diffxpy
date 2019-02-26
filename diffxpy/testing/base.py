@@ -468,15 +468,6 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         return ax
 
-    def plot_diagnostics(self):
-        """
-        Directly plots a set of diagnostic diagrams
-        """
-        import matplotlib.pyplot as plt
-
-        volcano = self.plot_volcano()
-        plt.show()
-
 
 class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=abc.ABCMeta):
     """
@@ -901,14 +892,6 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         return fig, ax
 
-    def plot_diagnostics(self):
-        import matplotlib.pyplot as plt
-
-        volcano = self.plot_volcano()
-        plt.show()
-        ttest_comp = self.plot_vs_ttest()
-        plt.show()
-
 
 class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
     """
@@ -1100,14 +1083,6 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
         ax.set(xlabel="t-test", ylabel='rank test')
 
         return fig, ax
-
-    def plot_diagnostics(self):
-        import matplotlib.pyplot as plt
-
-        volcano = self.plot_volcano()
-        plt.show()
-        ttest_comp = self.plot_vs_ttest()
-        plt.show()
 
 
 class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=abc.ABCMeta):
