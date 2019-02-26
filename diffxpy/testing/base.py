@@ -876,7 +876,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         return res
 
-    def plot_vs_ttest(self):
+    def plot_vs_ttest(self, log10=False):
         import matplotlib.pyplot as plt
         import seaborn as sns
 
@@ -886,11 +886,16 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             grouping=grouping,
             gene_names=self.gene_ids,
         )
-        ttest_pvals = ttest.pval
+        if log10:
+            ttest_pvals = ttest.log10_pval_clean()
+            pvals = self.log10_pval_clean()
+        else:
+            ttest_pvals = ttest.pval
+            pvals = self.pval
 
         fig, ax = plt.subplots()
 
-        sns.scatterplot(x=ttest_pvals, y=self.pval, ax=ax)
+        sns.scatterplot(x=ttest_pvals, y=pvals, ax=ax)
 
         ax.set(xlabel="t-test", ylabel='wald test')
 
@@ -1071,7 +1076,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
 
         return res
 
-    def plot_vs_ttest(self):
+    def plot_vs_ttest(self, log10=False):
         import matplotlib.pyplot as plt
         import seaborn as sns
 
@@ -1081,11 +1086,16 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
             grouping=grouping,
             gene_names=self.gene_ids,
         )
-        ttest_pvals = ttest.pval
+        if log10:
+            ttest_pvals = ttest.log10_pval_clean()
+            pvals = self.log10_pval_clean()
+        else:
+            ttest_pvals = ttest.pval
+            pvals = self.pval
 
         fig, ax = plt.subplots()
 
-        sns.scatterplot(x=ttest_pvals, y=self.pval, ax=ax)
+        sns.scatterplot(x=ttest_pvals, y=pvals, ax=ax)
 
         ax.set(xlabel="t-test", ylabel='rank test')
 
