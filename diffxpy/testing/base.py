@@ -450,12 +450,12 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
                 ave_highlights[i] = ave[idx]
                 logfc_highlights[i] = logfc[idx]
 
-            sns.scatterplot(y=logfc_highlights, x=ave_highlights,
+            sns.scatterplot(x=ave_highlights, y=logfc_highlights,
                             hue=is_highlight, ax=ax,
                             legend=False, s=highlight_size,
                             palette={0: highlight_col})
 
-        ax.set(xlabel="log2FC", ylabel='log mean expression')
+        ax.set(xlabel="log mean expression", ylabel="log2FC")
 
         # Save, show and return figure.
         if save is not None:
@@ -465,6 +465,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             plt.show()
 
         plt.close(fig)
+        plt.ion()
 
         return ax
 
@@ -911,6 +912,8 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         mean_x1 = x1.mean(axis=0)
         mean_x0 = mean_x0.clip(np.nextafter(0, 1), np.inf)
         mean_x1 = mean_x1.clip(np.nextafter(0, 1), np.inf)
+        print(np.lomean_x0)
+        print(mean_x1)
         # TODO: do not need mean again
         self._mean = data.mean(axis=0)
         self._ave_geq_zero = np.asarray(self.mean).flatten() > 0
@@ -932,7 +935,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         )
         self._pval = pval
 
-        self._logfc = np.log(mean_x1) - np.log(mean_x0).data
+        self._logfc = np.log(mean_x1) - np.log(mean_x0)
         # Return 0 if LFC was non-zero and variances are zero,
         # this causes division by zero in the test statistic. This
         # is a highly significant result if one believes the variance estimate.
@@ -2693,7 +2696,9 @@ def _fit(
         "nr": pkg_constants.BATCHGLM_OPTIM_NEWTON,
         "nr_tr": pkg_constants.BATCHGLM_OPTIM_NEWTON_TR,
         "irls": pkg_constants.BATCHGLM_OPTIM_IRLS,
-        "irls_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_TR
+        "irls_gd": pkg_constants.BATCHGLM_OPTIM_IRLS_GD,
+        "irls_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_TR,
+        "irls_gd_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_GD_TR
     }
 
     if isinstance(training_strategy, str) and training_strategy.lower() == 'bfgs':
