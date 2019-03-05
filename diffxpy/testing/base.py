@@ -24,6 +24,8 @@ from diffxpy import pkg_constants
 
 logger = logging.getLogger(__name__)
 
+# Use this to suppress matrix subclass PendingDepreceationWarnings from numpy:
+np.warnings.filterwarnings("ignore")
 
 def _dmat_unique(dmat, sample_description):
     dmat, idx = np.unique(dmat, axis=0, return_index=True)
@@ -265,8 +267,8 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         """
         Reduce differential expression results into an output table with desired thresholds.
         """
-        assert fc_lower_thres > 0, "supply positive fc_lower_thres"
-        assert fc_upper_thres > 0, "supply positive fc_upper_thres"
+        assert fc_lower_thres > 0 if fc_lower_thres is not None else True, "supply positive fc_lower_thres"
+        assert fc_upper_thres > 0 if fc_upper_thres is not None else True, "supply positive fc_upper_thres"
 
         if qval_thres is not None:
             qvals = res['qval'].values
@@ -931,7 +933,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
     Single t-test test per gene.
     """
 
-    def __init__(self, data, grouping, gene_names):
+    def __init__(self, data, grouping, gene_names, is_logged):
         super().__init__()
         self._X = data
         self.grouping = grouping
@@ -942,8 +944,6 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         # Only compute p-values for genes with non-zero observations and non-zero group-wise variance.
         mean_x0 = x0.mean(axis=0).astype(dtype=np.float)
         mean_x1 = x1.mean(axis=0).astype(dtype=np.float)
-        mean_x0 = np.clip(mean_x0, np.nextafter(0, 1), np.inf)
-        mean_x1 = np.clip(mean_x1, np.nextafter(0, 1), np.inf)
         # Avoid unnecessary mean computation:
         self._mean = np.average(
             a=np.vstack([mean_x0, mean_x1]),
@@ -952,15 +952,14 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             axis=0,
             returned=False
         )
-        self._ave_geq_zero = np.asarray(self.mean).flatten() > 2 * np.nextafter(0, 1)
-        var_x0 = np.asarray(x0.var(axis=0)).flatten()
-        var_x1 = np.asarray(x1.var(axis=0)).flatten()
+        self._ave_nonzero = self._mean > -np.inf #!= 0
+        var_x0 = np.asarray(x0.var(axis=0)).flatten().astype(dtype=np.float)
+        var_x1 = np.asarray(x1.var(axis=0)).flatten().astype(dtype=np.float)
         self._var_geq_zero = np.logical_or(
-            var_x0 > 2 * np.nextafter(0, 1),
-            var_x1 > 2 * np.nextafter(0, 1)
+            var_x0 > 0,
+            var_x1 > 0
         )
-        idx_run = np.where(np.logical_and(self._ave_geq_zero == True,
-                                          self._var_geq_zero == True))[0]
+        idx_run = np.where(np.logical_and(self._ave_nonzero, self._var_geq_zero))[0]
         pval = np.zeros([data.shape[1]]) + np.nan
         pval[idx_run] = stats.t_test_moments(
             mu0=mean_x0[idx_run],
@@ -972,7 +971,10 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         )
         self._pval = pval
 
-        self._logfc = np.log(mean_x1) - np.log(mean_x0)
+        if is_logged:
+            self._logfc = mean_x1 - mean_x0
+        else:
+            self._logfc = np.log(mean_x1) - np.log(mean_x0)
         # Return 0 if LFC was non-zero and variances are zero,
         # this causes division by zero in the test statistic. This
         # is a highly significant result if one believes the variance estimate.
@@ -980,19 +982,19 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         # via DIFFXPY_TREAT_ZEROVAR_TT_AS_SIG.
         pval[np.where(np.logical_and(np.logical_and(
             self._var_geq_zero == False,
-            self._ave_geq_zero == True),
+            self._ave_nonzero == True),
             np.abs(self._logfc) < np.nextafter(0, 1)
         ))] = 0
-        if pkg_constants.DIFFXPY_TREAT_ZEROVAR_TT_AS_SIG:
+        if pkg_constants.DE_TREAT_ZEROVAR_TT_AS_SIG:
             pval[np.where(np.logical_and(np.logical_and(
                 self._var_geq_zero == False,
-                self._ave_geq_zero == True),
+                self._ave_nonzero == True),
                 np.abs(self._logfc) >= np.nextafter(0, 1)
             ))] = 1
         else:
             pval[np.where(np.logical_and(np.logical_and(
                 self._var_geq_zero == False,
-                self._ave_geq_zero == True),
+                self._ave_nonzero == True),
                 np.abs(self._logfc) >= np.nextafter(0, 1)
             ))] = 0
 
@@ -1020,7 +1022,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         Summarize differential expression results into an output table.
         """
         res = super().summary(**kwargs)
-        res["zero_mean"] = self._ave_geq_zero == False
+        res["zero_mean"] = self._ave_nonzero == False
         res["zero_variance"] = self._var_geq_zero == False
 
         res = self._threshold_summary(
@@ -1049,8 +1051,8 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
 
         mean_x0 = x0.mean(axis=0).astype(dtype=np.float)
         mean_x1 = x1.mean(axis=0).astype(dtype=np.float)
-        mean_x0 = mean_x0.clip(np.nextafter(0, 1), np.inf)
-        mean_x1 = mean_x1.clip(np.nextafter(0, 1), np.inf)
+        #mean_x0 = mean_x0.clip(np.nextafter(0, 1), np.inf) # CHECK THIS
+        #mean_x1 = mean_x1.clip(np.nextafter(0, 1), np.inf)
         # Avoid unnecessary mean computation:
         self._mean = np.average(
             a=np.vstack([mean_x0, mean_x1]),
@@ -1065,7 +1067,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
             var_x0 > 0,
             var_x1 > 0
         )
-        idx_run = np.where(np.logical_and(self._mean > 0, self._var_geq_zero == True))[0]
+        idx_run = np.where(np.logical_and(self._mean > 0, self._var_geq_zero))[0]
 
         # TODO: can this be done on sparse?
         pval = np.zeros([data.shape[1]]) + np.nan
@@ -1076,8 +1078,8 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
             )
         else:
             pval[idx_run] = stats.mann_whitney_u_test(
-                x0=np.asarray(x0.X[:,idx_run].todense()),
-                x1=np.asarray(x1.X[:,idx_run].todense())
+                x0=x0.X[:,idx_run].toarray(),
+                x1=x1.X[:,idx_run].toarray()
             )
 
         self._pval = pval
@@ -3262,6 +3264,7 @@ def t_test(
         grouping,
         gene_names=None,
         sample_description=None,
+        is_logged=False,
         dtype="float32"
 ):
     """
@@ -3276,6 +3279,9 @@ def t_test(
         - array of length `num_observations` containing group labels
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param is_logged:
+        Whether data is already logged. If True, log-fold changes are computed as fold changes on this data.
+        If False, log-fold changes are computed as log-fold changes on this data.
     """
     gene_names = _parse_gene_names(data, gene_names)
     X = _parse_data(data, gene_names)
@@ -3287,6 +3293,7 @@ def t_test(
         data=X.astype(dtype),
         grouping=grouping,
         gene_names=gene_names,
+        is_logged=is_logged
     )
 
     return de_test

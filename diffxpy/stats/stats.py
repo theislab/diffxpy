@@ -155,7 +155,7 @@ def t_test_moments(
         out=s_delta
     )
 
-    t_statistic = (mu0 - mu1) / s_delta
+    t_statistic = np.abs(mu0 - mu1) / s_delta
 
     divisor = (
             (np.square(var0 / n0) / (n0 - 1)) +
@@ -168,8 +168,7 @@ def t_test_moments(
         out=divisor
     )
 
-    with np.errstate(over='ignore'):
-        df = np.square((var0 / n0) + (var1 / n1)) / divisor
+    df = np.square((var0 / n0) + (var1 / n1)) / divisor
     np.clip(
         df,
         a_min=np.nextafter(0, np.inf, dtype=df.dtype),
@@ -177,7 +176,7 @@ def t_test_moments(
         out=df
     )
 
-    pval = 2 * scipy.stats.t.sf(np.abs(t_statistic), df)
+    pval = 2 * scipy.stats.t.sf(t_statistic, df)
     return pval
 
 

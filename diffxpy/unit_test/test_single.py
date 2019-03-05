@@ -48,7 +48,7 @@ class TestSingleNull(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
 
         return True
 
@@ -88,7 +88,7 @@ class TestSingleNull(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
 
         return True
 
@@ -130,7 +130,7 @@ class TestSingleNull(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of lrt(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
 
         return True
 
@@ -160,15 +160,17 @@ class TestSingleNull(unittest.TestCase):
             data=sim.X,
             grouping="condition",
             sample_description=random_sample_description,
+            is_logged=False,
             dtype="float64"
         )
         summary = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
+        print(test.pval)
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of t_test(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
 
         return True
 
@@ -206,7 +208,7 @@ class TestSingleNull(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wilcoxon(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
 
         return True
 
