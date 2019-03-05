@@ -218,8 +218,12 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         :param log10_threshold: minimal log10 p-value to return.
         :return: Cleaned log10 transformed p-values.
         """
-        pvals = np.reshape(self.pval, -1)
-        pvals = np.nextafter(0, 1, out=pvals, where=pvals == 0)
+        pvals = np.reshape(self.pval, -1).astype(dtype=np.float)
+        pvals = np.clip(
+            pvals,
+            np.nextafter(0, 1),
+            np.inf
+        )
         log10_pval_clean = np.log(pvals) / np.log(10)
         log10_pval_clean[np.isnan(log10_pval_clean)] = 1
         log10_pval_clean = np.clip(log10_pval_clean, log10_threshold, 0, log10_pval_clean)
@@ -235,8 +239,12 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         :param log10_threshold: minimal log10 q-value to return.
         :return: Cleaned log10 transformed q-values.
         """
-        qvals = np.reshape(self.qval, -1)
-        qvals = np.nextafter(0, 1, out=qvals, where=qvals == 0)
+        qvals = np.reshape(self.qval, -1).astype(dtype=np.float)
+        qvals = np.clip(
+            qvals,
+            np.nextafter(0, 1),
+            np.inf
+        )
         log10_qval_clean = np.log(qvals) / np.log(10)
         log10_qval_clean[np.isnan(log10_qval_clean)] = 1
         log10_qval_clean = np.clip(log10_qval_clean, log10_threshold, 0, log10_qval_clean)
@@ -246,13 +254,25 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     def summary(self, **kwargs) -> pd.DataFrame:
         pass
 
-    def _threshold_summary(self, res, qval_thres=None,
-                           fc_upper_thres=None, fc_lower_thres=None, mean_thres=None) -> pd.DataFrame:
+    def _threshold_summary(
+            self,
+            res,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None
+    ) -> pd.DataFrame:
         """
         Reduce differential expression results into an output table with desired thresholds.
         """
+        assert fc_lower_thres > 0, "supply positive fc_lower_thres"
+        assert fc_upper_thres > 0, "supply positive fc_upper_thres"
+
         if qval_thres is not None:
-            res = res.iloc[res['qval'].values <= qval_thres, :]
+            qvals = res['qval'].values
+            qval_include = np.isnan(qvals) == False
+            qval_include[qval_include] = qvals[qval_include] <= qval_thres
+            res = res.iloc[qval_include, :]
 
         if fc_upper_thres is not None and fc_lower_thres is None:
             res = res.iloc[res['log2fc'].values >= np.log(fc_upper_thres) / np.log(2), :]
@@ -377,6 +397,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             self,
             corrected_pval=True,
             log2_fc_threshold=10,
+            min_mean=1e-4,
             alpha=0.05,
             size=20,
             highlight_ids: List = [],
@@ -394,6 +415,9 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             or raw p-values.
         :param log2_fc_threshold: Negative lower and upper bound of
             log2 fold change displayed in plot.
+        :param min_mean:
+            Lower bound for mean expression of plot. All values below this threshold
+            are updated to this threshold.
         :param alpha: p/q-value lower bound at which a test is considered
             non-significant. The corresponding points are colored in grey.
         :param size: Size of points.
@@ -410,12 +434,16 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         """
         import seaborn as sns
         import matplotlib.pyplot as plt
-        from matplotlib import gridspec
-        from matplotlib import rcParams
+
+        assert min_mean >= 0, "min_mean must be positive"
 
         plt.ioff()
 
-        ave = np.log(self.mean + 1e-08)
+        ave = np.log(np.clip(
+            self.mean.astype(dtype=np.float),
+            np.max(np.array([np.nextafter(0, 1), min_mean])),
+            np.inf
+        ))
 
         logfc = np.reshape(self.log2_fold_change(), -1)
         # Clipping throws errors if not performed in actual data format (ndarray or DataArray):
@@ -427,9 +455,13 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         fig, ax = plt.subplots()
 
         if corrected_pval:
-            is_significant = self.pval < alpha
+            pvals = self.pval
+            pvals[np.isnan(pvals)] = 1
+            is_significant = pvals < alpha
         else:
-            is_significant = self.qval < alpha
+            qvals = self.qval
+            qvals[np.isnan(qvals)] = 1
+            is_significant = qvals < alpha
 
         sns.scatterplot(y=logfc, x=ave, hue=is_significant, ax=ax,
                         legend=False, s=size,
@@ -908,22 +940,27 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         x0, x1 = _split_X(data, grouping)
 
         # Only compute p-values for genes with non-zero observations and non-zero group-wise variance.
-        mean_x0 = x0.mean(axis=0)
-        mean_x1 = x1.mean(axis=0)
-        mean_x0 = mean_x0.clip(np.nextafter(0, 1), np.inf)
-        mean_x1 = mean_x1.clip(np.nextafter(0, 1), np.inf)
-        print(np.lomean_x0)
-        print(mean_x1)
-        # TODO: do not need mean again
-        self._mean = data.mean(axis=0)
-        self._ave_geq_zero = np.asarray(self.mean).flatten() > 0
+        mean_x0 = x0.mean(axis=0).astype(dtype=np.float)
+        mean_x1 = x1.mean(axis=0).astype(dtype=np.float)
+        mean_x0 = np.clip(mean_x0, np.nextafter(0, 1), np.inf)
+        mean_x1 = np.clip(mean_x1, np.nextafter(0, 1), np.inf)
+        # Avoid unnecessary mean computation:
+        self._mean = np.average(
+            a=np.vstack([mean_x0, mean_x1]),
+            weights=np.array([x0.shape[0] / (x0.shape[0] + x1.shape[0]),
+                              x1.shape[0] / (x0.shape[0] + x1.shape[0])]),
+            axis=0,
+            returned=False
+        )
+        self._ave_geq_zero = np.asarray(self.mean).flatten() > 2 * np.nextafter(0, 1)
         var_x0 = np.asarray(x0.var(axis=0)).flatten()
         var_x1 = np.asarray(x1.var(axis=0)).flatten()
         self._var_geq_zero = np.logical_or(
-            var_x0 > 0,
-            var_x1 > 0
+            var_x0 > 2 * np.nextafter(0, 1),
+            var_x1 > 2 * np.nextafter(0, 1)
         )
-        idx_run = np.where(np.logical_and(self._ave_geq_zero == True, self._var_geq_zero == True))[0]
+        idx_run = np.where(np.logical_and(self._ave_geq_zero == True,
+                                          self._var_geq_zero == True))[0]
         pval = np.zeros([data.shape[1]]) + np.nan
         pval[idx_run] = stats.t_test_moments(
             mu0=mean_x0[idx_run],
@@ -939,10 +976,25 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         # Return 0 if LFC was non-zero and variances are zero,
         # this causes division by zero in the test statistic. This
         # is a highly significant result if one believes the variance estimate.
-        pval[np.where(np.logical_and(np.logical_and(self._var_geq_zero == False,
-                                                    self._ave_geq_zero == True),
-                                     self._logfc != 0))] = 0
-        q = self.qval
+        # This is the default which can be changed and can be changed
+        # via DIFFXPY_TREAT_ZEROVAR_TT_AS_SIG.
+        pval[np.where(np.logical_and(np.logical_and(
+            self._var_geq_zero == False,
+            self._ave_geq_zero == True),
+            np.abs(self._logfc) < np.nextafter(0, 1)
+        ))] = 0
+        if pkg_constants.DIFFXPY_TREAT_ZEROVAR_TT_AS_SIG:
+            pval[np.where(np.logical_and(np.logical_and(
+                self._var_geq_zero == False,
+                self._ave_geq_zero == True),
+                np.abs(self._logfc) >= np.nextafter(0, 1)
+            ))] = 1
+        else:
+            pval[np.where(np.logical_and(np.logical_and(
+                self._var_geq_zero == False,
+                self._ave_geq_zero == True),
+                np.abs(self._logfc) >= np.nextafter(0, 1)
+            ))] = 0
 
     @property
     def gene_ids(self) -> np.ndarray:
@@ -995,12 +1047,18 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
 
         x0, x1 = _split_X(data, grouping)
 
-        mean_x0 = x0.mean(axis=0)
-        mean_x1 = x1.mean(axis=0)
+        mean_x0 = x0.mean(axis=0).astype(dtype=np.float)
+        mean_x1 = x1.mean(axis=0).astype(dtype=np.float)
         mean_x0 = mean_x0.clip(np.nextafter(0, 1), np.inf)
         mean_x1 = mean_x1.clip(np.nextafter(0, 1), np.inf)
-        # TODO unnecessary mean computation
-        self._mean = data.mean(axis=0)
+        # Avoid unnecessary mean computation:
+        self._mean = np.average(
+            a=np.vstack([mean_x0, mean_x1]),
+            weights=np.array([x0.shape[0] / (x0.shape[0] + x1.shape[0]),
+                              x1.shape[0] / (x0.shape[0] + x1.shape[0])]),
+            axis=0,
+            returned=False
+        )
         var_x0 = np.asarray(x0.var(axis=0)).flatten()
         var_x1 = np.asarray(x1.var(axis=0)).flatten()
         self._var_geq_zero = np.logical_or(
