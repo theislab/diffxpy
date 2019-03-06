@@ -233,7 +233,8 @@ def test(
         de_threshold=de_threshold,
         all_ids=all_ids,
         clean_ref=clean_ref,
-        upper=upper)
+        upper=upper
+    )
 
 
 class Enrich():
@@ -280,9 +281,10 @@ class Enrich():
         else:
             self._all_ids = set(self._gene_ids)
 
-        if upper == True:
+        if upper:
             self._gene_ids = [x.upper() for x in self._gene_ids]
             self._all_ids = set([x.upper() for x in self._all_ids])
+            self._significant_ids = set([x.upper() for x in self._significant_ids])
 
         # Generate diagnostic statistic of number of possible overlaps in total.
         print(str(len(set(self._all_ids).intersection(set(RefSets._genes)))) +
@@ -292,7 +294,7 @@ class Enrich():
         # Clean reference set to only contains ids that were observed in
         # current study if required.
         self.RefSets = RefSets
-        if clean_ref == True:
+        if clean_ref:
             self.RefSets.clean(self._all_ids)
         # Print if there are empty sets.
         idx_nonempty = np.where([len(x.genes) > 0 for x in self.RefSets.sets])[0]
@@ -356,7 +358,7 @@ class Enrich():
         """
         return self.RefSets.grepv_sets(x)
 
-    def set(id):
+    def set(self, id):
         """ 
         Return the set with a given set identifier.
         """
@@ -374,9 +376,11 @@ class Enrich():
         """
         return [self.RefSets._ids[i] for i in np.where(self.qval <= threshold)[0]]
 
-    def summary(self) -> pd.DataFrame:
+    def summary(self, sort=True) -> pd.DataFrame:
         """
         Summarize gene set enrichement analysis as an output table.
+
+        :param sort: Whether to sort table by p-value.
         """
         res = pd.DataFrame({
             "set": self.RefSets._ids,
@@ -388,5 +392,15 @@ class Enrich():
             "background": len(self._all_ids)
         })
         # Sort by p-value
-        res = res.iloc[np.argsort(res['pval'].values), :]
+        if sort:
+            res = res.iloc[np.argsort(res['pval'].values), :]
         return res
+
+    def set_summary(self, id: str):
+        """
+        Summarize gene set enrichement analysis for a given set.
+        :param id: Gene set to enquire.
+
+        :return: Slice of summary table.
+        """
+        return self.summary(sort=False).iloc[self.RefSets._ids.index(id),:]
