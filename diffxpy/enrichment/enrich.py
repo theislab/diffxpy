@@ -1,12 +1,15 @@
+import logging
 import numpy as np
 import pandas as pd
+from typing import Union
 
 from ..stats import stats
 from ..testing import correction
 from ..testing.base import _DifferentialExpressionTest
 
+logger = logging.getLogger(__name__)
 
-class RefSets():
+class RefSets:
     """
     Class for a list of gene sets.
 
@@ -18,7 +21,7 @@ class RefSets():
     .gmt files can be downloaded from http://software.broadinstitute.org/gsea/msigdb/collections.jsp for example.
     """
 
-    class _Set():
+    class _Set:
         """ 
         Class for a single gene set.
         """
@@ -182,18 +185,19 @@ class RefSets():
             for x in self.sets:
                 x.intersect = x.genes.intersection(enq_set)
         else:
-            x.intersect = self.get_set(id).genes.intersection(enq_set)
+            x.intersect = self.get_set(id).genes.intersection(enq_set)  # bug
 
 
 def test(
-        RefSets: RefSets,
-        DETest: _DifferentialExpressionTest = None,
-        pval: np.array = None,
-        gene_ids: list = None,
+        ref: RefSets,
+        det: Union[_DifferentialExpressionTest, None] = None,
+        pval: Union[np.array, None] = None,
+        gene_ids: Union[list, None] = None,
         de_threshold=0.05,
+        incl_all_zero=False,
         all_ids=None,
-        clean_ref=True,
-        upper=False
+        clean_ref=False,
+        capital=True
 ):
     """ Perform gene set enrichment.
 
@@ -214,7 +218,9 @@ def test(
         which can be matched against the identifieres in the sets in RefSets.
     :param de_threshold:
         Significance threshold at which a differential test (a multiple-testing 
-        corrected p-value) is called siginficant. This 
+        corrected p-value) is called siginficant. T
+    :param incl_all_zero:
+        Wehther to include genes in gene universe which were all zero.
     :param all_ids:
         Set of all gene identifiers, this is used as the background set in the
         hypergeometric test. Only supply this if not all genes were tested
@@ -222,44 +228,51 @@ def test(
     :param clean_ref:
         Whether or not to only retain gene identifiers in RefSets that occur in 
         the background set of identifiers supplied here through all_ids.
-    :param upper:
+    :param capital:
         Make all gene IDs captial.
     """
     return Enrich(
-        RefSets=RefSets,
-        DETest=DETest,
+        ref=ref,
+        det=det,
         pval=pval,
         gene_ids=gene_ids,
         de_threshold=de_threshold,
+        incl_all_zero=incl_all_zero,
         all_ids=all_ids,
         clean_ref=clean_ref,
-        upper=upper
+        capital=capital
     )
 
 
-class Enrich():
+class Enrich:
     """
     """
 
     def __init__(
             self,
-            RefSets: RefSets,
-            DETest: _DifferentialExpressionTest = None,
-            pval: np.array = None,
-            gene_ids: list = None,
-            de_threshold=0.05,
-            all_ids=None,
-            clean_ref=True,
-            upper=False
+            ref: RefSets,
+            det: Union[_DifferentialExpressionTest, None],
+            pval: Union[np.array, None],
+            gene_ids: Union[list, None],
+            de_threshold,
+            incl_all_zero,
+            all_ids,
+            clean_ref,
+            capital
     ):
         self._n_overlaps = None
         self._pval_enrich = None
         self._qval_enrich = None
         # Load multiple-testing-corrected differential expression
         # p-values from differential expression output.
-        if DETest is not None:
-            self._qval_de = DETest.qval
-            self._gene_ids = DETest.gene_ids
+        if det is not None:
+            if incl_all_zero:
+                self._qval_de = det.qval
+                self._gene_ids = det.gene_ids
+            else:
+                idx_not_all_zero = np.where(np.logical_not(det.summary()["zero_mean"].values))[0]
+                self._qval_de = det.qval[idx_not_all_zero]
+                self._gene_ids = det.gene_ids[idx_not_all_zero]
         elif pval is not None and gene_ids is not None:
             self._qval_de = np.asarray(pval)
             self._gene_ids = gene_ids
@@ -269,8 +282,11 @@ class Enrich():
         # Select significant genes based on user defined threshold.
         if any([x is np.nan for x in self._gene_ids]):
             idx_notnan = np.where([x is not np.nan for x in self._gene_ids])[0]
-            print('Discarded ' + str(len(self._gene_ids) - len(idx_notnan)) + ' nan gene ids, leaving ' +
-                  str(len(idx_notnan)) + ' genes.')
+            logger.info(
+                " Discarded %i nan gene ids, leaving %i genes.",
+                len(self._gene_ids) - len(idx_notnan),
+                len(idx_notnan)
+            )
             self._qval_de = self._qval_de[idx_notnan]
             self._gene_ids = self._gene_ids[idx_notnan]
 
@@ -281,26 +297,31 @@ class Enrich():
         else:
             self._all_ids = set(self._gene_ids)
 
-        if upper:
+        if capital:
             self._gene_ids = [x.upper() for x in self._gene_ids]
             self._all_ids = set([x.upper() for x in self._all_ids])
             self._significant_ids = set([x.upper() for x in self._significant_ids])
 
         # Generate diagnostic statistic of number of possible overlaps in total.
-        print(str(len(set(self._all_ids).intersection(set(RefSets._genes)))) +
-              ' overlaps found between refset (' + str(len(RefSets._genes)) +
-              ') and provided gene list (' + str(len(self._all_ids)) + ').')
-        self.missing_genes = list(set(RefSets._genes).difference(set(self._all_ids)))
+        logger.info(
+            " %i overlaps found between refset (%i) and provided gene list (%i).",
+            len(set(self._all_ids).intersection(set(ref._genes))),
+            len(ref._genes),
+            len(self._all_ids)
+        )
+        self.missing_genes = list(set(ref._genes).difference(set(self._all_ids)))
         # Clean reference set to only contains ids that were observed in
         # current study if required.
-        self.RefSets = RefSets
+        self.RefSets = ref
         if clean_ref:
             self.RefSets.clean(self._all_ids)
         # Print if there are empty sets.
         idx_nonempty = np.where([len(x.genes) > 0 for x in self.RefSets.sets])[0]
         if len(self.RefSets.sets) - len(idx_nonempty) > 0:
-            print('Found ' + str(len(self.RefSets.sets) - len(idx_nonempty)) +
-                  ' empty sets, removing those.')
+            logger.info(
+                " Found %i empty sets, removing those.",
+                len(self.RefSets.sets) - len(idx_nonempty)
+            )
             self.RefSets = self.RefSets.subset(idx=idx_nonempty)
         elif len(idx_nonempty) == 0:
             raise ValueError('all RefSets were empty')
@@ -403,4 +424,4 @@ class Enrich():
 
         :return: Slice of summary table.
         """
-        return self.summary(sort=False).iloc[self.RefSets._ids.index(id),:]
+        return self.summary(sort=False).iloc[self.RefSets._ids.index(id), :]

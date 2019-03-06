@@ -952,7 +952,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             axis=0,
             returned=False
         )
-        self._ave_nonzero = self._mean > -np.inf #!= 0
+        self._ave_nonzero = self._mean != 0  # omit all-zero features
         var_x0 = np.asarray(x0.var(axis=0)).flatten().astype(dtype=np.float)
         var_x1 = np.asarray(x1.var(axis=0)).flatten().astype(dtype=np.float)
         self._var_geq_zero = np.logical_or(
@@ -966,8 +966,8 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             mu1=mean_x1[idx_run],
             var0=var_x0[idx_run],
             var1=var_x1[idx_run],
-            n0=idx_run.shape[0],
-            n1=idx_run.shape[0]
+            n0=x0.shape[0],
+            n1=x1.shape[0]
         )
         self._pval = pval
 
@@ -1010,10 +1010,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         """
         Returns one fold change per gene
         """
-        if base == np.e:
-            return self._logfc
-        else:
-            return self._logfc / np.log(base)
+        return self._logfc / np.log(base)
 
     def summary(self, qval_thres=None, fc_upper_thres=None,
                 fc_lower_thres=None, mean_thres=None,
@@ -1041,7 +1038,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
     Single rank test per gene (Mann-Whitney U test).
     """
 
-    def __init__(self, data, grouping, gene_names):
+    def __init__(self, data, grouping, gene_names, is_logged):
         super().__init__()
         self._X = data
         self.grouping = grouping
@@ -1051,8 +1048,6 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
 
         mean_x0 = x0.mean(axis=0).astype(dtype=np.float)
         mean_x1 = x1.mean(axis=0).astype(dtype=np.float)
-        #mean_x0 = mean_x0.clip(np.nextafter(0, 1), np.inf) # CHECK THIS
-        #mean_x1 = mean_x1.clip(np.nextafter(0, 1), np.inf)
         # Avoid unnecessary mean computation:
         self._mean = np.average(
             a=np.vstack([mean_x0, mean_x1]),
@@ -1061,31 +1056,33 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
             axis=0,
             returned=False
         )
-        var_x0 = np.asarray(x0.var(axis=0)).flatten()
-        var_x1 = np.asarray(x1.var(axis=0)).flatten()
+        var_x0 = np.asarray(x0.var(axis=0)).flatten().astype(dtype=np.float)
+        var_x1 = np.asarray(x1.var(axis=0)).flatten().astype(dtype=np.float)
         self._var_geq_zero = np.logical_or(
             var_x0 > 0,
             var_x1 > 0
         )
-        idx_run = np.where(np.logical_and(self._mean > 0, self._var_geq_zero))[0]
+        idx_run = np.where(np.logical_and(self._mean != 0, self._var_geq_zero))[0]
 
         # TODO: can this be done on sparse?
         pval = np.zeros([data.shape[1]]) + np.nan
         if isinstance(x0, xr.DataArray):
             pval[idx_run] = stats.mann_whitney_u_test(
-                x0=x0.data[:,idx_run],
-                x1=x1.data[:,idx_run]
+                x0=x0.data[:, idx_run],
+                x1=x1.data[:, idx_run]
             )
         else:
             pval[idx_run] = stats.mann_whitney_u_test(
-                x0=x0.X[:,idx_run].toarray(),
-                x1=x1.X[:,idx_run].toarray()
+                x0=x0.X[:, idx_run].toarray(),
+                x1=x1.X[:, idx_run].toarray()
             )
 
         self._pval = pval
 
-        self._logfc = np.log(mean_x1) - np.log(mean_x0).data
-        q = self.qval
+        if is_logged:
+            self._logfc = mean_x1 - mean_x0
+        else:
+            self._logfc = np.log(mean_x1) - np.log(mean_x0)
 
     @property
     def gene_ids(self) -> np.ndarray:

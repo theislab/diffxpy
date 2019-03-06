@@ -342,6 +342,9 @@ def hypergeom_test(
     :param background: int
         Size of background set.
     """
-    pvals = np.array([1 - scipy.stats.hypergeom(M=background, n=references[i], N=enquiry).cdf(x - 1) for i, x in
-                      enumerate(intersections)])
-    return (pvals)
+    pvals = np.array([1 - scipy.stats.hypergeom(
+        M=background,
+        n=references[i],
+        N=enquiry
+    ).cdf(x - 1) for i, x in enumerate(intersections)])
+    return pvals
