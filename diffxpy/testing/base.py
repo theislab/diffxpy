@@ -14,7 +14,7 @@ except ImportError:
     anndata = None
 
 import batchglm.data as data_utils
-from batchglm.xarray_sparse import SparseXArrayDataArray, SparseXArrayDataSet
+from batchglm.xarray_sparse import SparseXArrayDataSet
 from batchglm.models.glm_nb import Model as GeneralizedLinearModel
 
 from ..stats import stats
