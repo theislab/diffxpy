@@ -3301,6 +3301,7 @@ def rank_test(
         grouping,
         gene_names=None,
         sample_description=None,
+        is_logged=False,
         dtype="float32"
 ):
     """
@@ -3315,6 +3316,9 @@ def rank_test(
         - array of length `num_observations` containing group labels
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param is_logged:
+        Whether data is already logged. If True, log-fold changes are computed as fold changes on this data.
+        If False, log-fold changes are computed as log-fold changes on this data.
     """
     gene_names = _parse_gene_names(data, gene_names)
     X = _parse_data(data, gene_names)
@@ -3326,6 +3330,7 @@ def rank_test(
         data=X.astype(dtype),
         grouping=grouping,
         gene_names=gene_names,
+        is_logged=is_logged
     )
 
     return de_test
