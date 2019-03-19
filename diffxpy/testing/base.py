@@ -2798,7 +2798,6 @@ def _fit(
             init_b=init_b,
             provide_optimizers=provide_optimizers,
             provide_batched=pkg_constants.BATCHGLM_PROVIDE_BATCHED,
-            termination_type=pkg_constants.BATCHGLM_TERMINATION_TYPE,
             dtype=dtype,
             **constructor_args
         )
