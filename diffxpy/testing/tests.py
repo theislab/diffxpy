@@ -170,6 +170,8 @@ def _fit(
             init_b=init_b,
             provide_optimizers=provide_optimizers,
             provide_batched=pkg_constants.BATCHGLM_PROVIDE_BATCHED,
+            provide_fim=pkg_constants.BATCHGLM_PROVIDE_FIM,
+            provide_hessian=pkg_constants.BATCHGLM_PROVIDE_HESSIAN,
             dtype=dtype,
             **constructor_args
         )

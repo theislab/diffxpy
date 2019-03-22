@@ -2302,7 +2302,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             show=True,
             ncols=2,
             row_gap=0.3,
-            col_gap=0.25
+            col_gap=0.25,
+            return_axs=False
     ):
         """
         Plot observed data and spline fits of selected genes.
@@ -2317,6 +2318,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :param ncols: Number of columns in plot grid if multiple genes are plotted.
         :param row_gap: Vertical gap between panel rows relative to panel height.
         :param col_gap: Horizontal gap between panel columns relative to panel width.
+        :param return_axs: Whether to return axis objects of plots.
         :return: Matplotlib axis objects.
         """
 
@@ -2390,8 +2392,10 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
 
         plt.close(fig)
 
-        return axs
-
+        if return_axs:
+            return axs
+        else:
+            return
 
     def plot_heatmap(
             self,
@@ -2402,7 +2406,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             nticks=10,
             cmap: str = "YlGnBu",
             width=10,
-            height_per_gene=0.5
+            height_per_gene=0.5,
+            return_axs=False
     ):
         """
         Plot observed data and spline fits of selected genes.
@@ -2416,6 +2421,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :param cmap: matplotlib cmap.
         :param width: Width of heatmap figure.
         :param height_per_gene: Height of each row (gene) in heatmap figure.
+        :param return_axs: Whether to return axis objects of plots.
         :return: Matplotlib axis objects.
         """
         import seaborn as sns
@@ -2480,7 +2486,10 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
 
         plt.close(fig)
 
-        return ax
+        if return_axs:
+            return axs
+        else:
+            return
 
 
 class DifferentialExpressionTestWaldCont(_DifferentialExpressionTestCont):
