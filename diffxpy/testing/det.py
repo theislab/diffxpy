@@ -7,7 +7,7 @@ import numpy as np
 import xarray as xr
 import patsy
 
-from diffxpy.testing.tests import _split_X, t_test
+from .utils import split_X, dmat_unique
 
 try:
     import anndata
@@ -20,16 +20,7 @@ from ..stats import stats
 from . import correction
 from diffxpy import pkg_constants
 
-logger = logging.getLogger(__name__)
-
-# Use this to suppress matrix subclass PendingDepreceationWarnings from numpy:
-np.warnings.filterwarnings("ignore")
-
-def _dmat_unique(dmat, sample_description):
-    dmat, idx = np.unique(dmat, axis=0, return_index=True)
-    sample_description = sample_description.iloc[idx].reset_index(drop=True)
-
-    return dmat, sample_description
+logger = logging.getLogger("diffxpy")
 
 
 class _Estimation(GeneralizedLinearModel, metaclass=abc.ABCMeta):
@@ -614,7 +605,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         dmat = self.full_estim.design_loc
 
         # make rows unique
-        dmat, sample_description = _dmat_unique(dmat, sample_description)
+        dmat, sample_description = dmat_unique(dmat, sample_description)
 
         # factors = factors.intersection(di.term_names)
 
@@ -628,7 +619,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         dmat[:, neg_sel] = 0
 
         # make the design matrix + sample description unique again
-        dmat, sample_description = _dmat_unique(dmat, sample_description)
+        dmat, sample_description = dmat_unique(dmat, sample_description)
 
         locations = self.full_estim.inverse_link_loc(dmat.dot(self.full_estim.par_link_loc))
         locations = np.log(locations) / np.log(base)
@@ -696,7 +687,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         sample_description = self.sample_description[[f.name() for f in di.factor_infos]]
         dmat = self.full_estim.design_loc
 
-        dmat, sample_description = _dmat_unique(dmat, sample_description)
+        dmat, sample_description = dmat_unique(dmat, sample_description)
 
         retval = self.full_estim.inverse_link_loc(dmat.dot(self.full_estim.par_link_loc))
         retval = pd.DataFrame(retval, columns=self.full_estim.features)
@@ -718,7 +709,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         sample_description = self.sample_description[[f.name() for f in di.factor_infos]]
         dmat = self.full_estim.design_scale
 
-        dmat, sample_description = _dmat_unique(dmat, sample_description)
+        dmat, sample_description = dmat_unique(dmat, sample_description)
 
         retval = self.full_estim.inverse_link_scale(dmat.doc(self.full_estim.par_link_scale))
         retval = pd.DataFrame(retval, columns=self.full_estim.features)
@@ -901,6 +892,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     def plot_vs_ttest(self, log10=False):
         import matplotlib.pyplot as plt
         import seaborn as sns
+        from .tests import t_test
 
         grouping = np.asarray(self.model_estim.design_loc[:, self.coef_loc_totest])
         ttest = t_test(
@@ -935,7 +927,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         self.grouping = grouping
         self._gene_names = np.asarray(gene_names)
 
-        x0, x1 = _split_X(data, grouping)
+        x0, x1 = split_X(data, grouping)
 
         # Only compute p-values for genes with non-zero observations and non-zero group-wise variance.
         mean_x0 = x0.mean(axis=0).astype(dtype=np.float)
@@ -1040,7 +1032,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
         self.grouping = grouping
         self._gene_names = np.asarray(gene_names)
 
-        x0, x1 = _split_X(data, grouping)
+        x0, x1 = split_X(data, grouping)
 
         mean_x0 = x0.mean(axis=0).astype(dtype=np.float)
         mean_x1 = x1.mean(axis=0).astype(dtype=np.float)
@@ -1118,6 +1110,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
     def plot_vs_ttest(self, log10=False):
         import matplotlib.pyplot as plt
         import seaborn as sns
+        from .tests import t_test
 
         grouping = self.grouping
         ttest = t_test(
