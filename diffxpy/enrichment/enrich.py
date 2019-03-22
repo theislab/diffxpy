@@ -5,7 +5,7 @@ from typing import Union
 
 from ..stats import stats
 from ..testing import correction
-from ..testing.base import _DifferentialExpressionTest
+from ..testing.det import _DifferentialExpressionTest
 
 logger = logging.getLogger(__name__)
 

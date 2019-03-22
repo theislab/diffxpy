@@ -1,11 +1,2 @@
-from diffxpy.testing.base import two_sample
-from diffxpy.testing.base import lrt
-from diffxpy.testing.base import wald
-from diffxpy.testing.base import t_test
-from diffxpy.testing.base import rank_test
-from diffxpy.testing.base import partition
-from diffxpy.testing.base import pairwise
-from diffxpy.testing.base import versus_rest
-from diffxpy.testing.base import continuous_1d
-from diffxpy.testing.base import design_matrix
-from diffxpy.testing.base import coef_names
+from diffxpy.testing.tests import design_matrix, coef_names, lrt, wald, t_test, rank_test, two_sample, pairwise, \
+    versus_rest, partition, continuous_1d
