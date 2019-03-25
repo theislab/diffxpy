@@ -223,7 +223,7 @@ def lrt(
     use wald() for constraints.
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data
+        Input data matrix (observations x features) or (cells x genes).
     :param reduced_formula_loc: formula
         Reduced model formula for location and scale parameter models.
         If not specified, `reduced_formula` will be used instead.
@@ -403,7 +403,7 @@ def wald(
     Perform Wald test for differential expression for each gene.
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data
+        Input data matrix (observations x features) or (cells x genes).
     :param factor_loc_totest: str, list of strings
         List of factors of formula to test with Wald test.
         E.g. "condition" or ["batch", "condition"] if formula_loc would be "~ 1 + batch + condition"
@@ -530,6 +530,17 @@ def wald(
             formula=formula_loc,
             as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
         )
+        # Check that closed-form is not used if numeric predictors are used and model is not "norm".
+        if isinstance(init_a, str):
+            if np.any([True if x in as_numeric else False for x in sample_description.columns.values]):
+                if noise_model.lower() not in ["normal", "norm"]:
+                    if init_a == "closed_form":
+                        init_a = "standard"
+                        logger.warning("Setting init_a to standard as numeric predictors were supplied.")
+                        logger.warning("Closed-form initialisation is not possible" +
+                                       " for noise model %s with numeric predictors." % noise_model)
+                    elif init_a == "AUTO":
+                        init_a = "standard"
     else:
         design_loc = dmat_loc
 
@@ -539,6 +550,16 @@ def wald(
             formula=formula_scale,
             as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
         )
+        # Check that closed-form is not used if numeric predictors are used and model is not "norm".
+        if isinstance(init_b, str):
+            if np.any([True if x in as_numeric else False for x in sample_description.columns.values]):
+                if init_b == "closed_form":
+                    init_b = "standard"
+                    logger.warning("Setting init_b to standard as numeric predictors were supplied.")
+                    logger.warning("Closed-form initialisation is not possible" +
+                                   " for noise model %s with numeric predictors." % noise_model)
+                elif init_b == "AUTO":
+                    init_b = "standard"
     else:
         design_scale = dmat_scale
 
@@ -622,7 +643,7 @@ def t_test(
     between two groups on adata object for each gene.
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data
+        Input data matrix (observations x features) or (cells x genes).
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -662,7 +683,7 @@ def rank_test(
     between two groups on adata object for each gene.
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data
+        Input data matrix (observations x features) or (cells x genes).
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -736,7 +757,7 @@ def two_sample(
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data
+        Input data matrix (observations x features) or (cells x genes).
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -925,7 +946,7 @@ def pairwise(
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data
+        Input data matrix (observations x features) or (cells x genes).
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -1143,7 +1164,7 @@ def versus_rest(
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data
+        Input data matrix (observations x features) or (cells x genes).
     :param grouping: str, array
 
         - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -1271,7 +1292,7 @@ def partition(
     Wraps _Partition so that doc strings are nice.
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data
+        Input data matrix (observations x features) or (cells x genes).
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
@@ -1300,7 +1321,7 @@ class _Partition():
             sample_description: pd.DataFrame = None):
         """
         :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data
+            Input data matrix (observations x features) or (cells x genes).
         :param partition: str, array
 
             - column in data.obs/sample_description which contains the split of observations into the two groups.
@@ -1615,9 +1636,8 @@ def continuous_1d(
         continuous: str,
         df: int = 5,
         factor_loc_totest: Union[str, List[str]] = None,
-        formula: str = None,
         formula_loc: str = None,
-        formula_scale: str = None,
+        formula_scale: str = "~1",
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
         init_a: Union[np.ndarray, str] = "standard",
@@ -1647,7 +1667,7 @@ def continuous_1d(
     dmat directly to one of the test routines wald() or lrt().
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data
+        Input data matrix (observations x features) or (cells x genes).
     :param continuous: str
 
         - column in data.obs/sample_description which contains the continuous covariate.
@@ -1690,7 +1710,6 @@ def continuous_1d(
 
         - str:
             * "auto": automatically choose best initialization
-            * "random": initialize with random values
             * "standard": initialize intercept with observed mean
         - np.ndarray: direct initialization of 'a'
     :param init_b: (Optional) Low-level initial values for b
@@ -1698,7 +1717,6 @@ def continuous_1d(
 
         - str:
             * "auto": automatically choose best initialization
-            * "random": initialize with random values
             * "standard": initialize with zeros
         - np.ndarray: direct initialization of 'b'
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
@@ -1735,13 +1753,8 @@ def continuous_1d(
         Should be "float32" for single precision or "float64" for double precision.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
-    if formula is None and (formula_loc is None or formula_scale is None):
-        raise ValueError("supply either formula or fomula_loc and formula_scale")
-    if formula is not None and (formula_loc is not None or formula_scale is not None):
-        raise ValueError("supply either formula or fomula_loc and formula_scale")
-    # Check that continuous factor is contained in model formulas:
-    if formula is not None:
-        pass
+    if formula_loc is  None:
+        raise ValueError("supply fomula_loc")
     # Set testing default to continuous covariate if not supplied:
     if factor_loc_totest is None:
         factor_loc_totest = [continuous]
