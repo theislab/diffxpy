@@ -5,3 +5,4 @@ from . import test
 from . import enrich
 from . import stats
 from . import utils
+from .. import pkg_constants

@@ -3,7 +3,6 @@ import logging
 
 import numpy as np
 import pandas as pd
-import scipy.stats as stats
 import scipy.sparse
 import anndata
 
@@ -11,22 +10,53 @@ from batchglm.api.models.glm_nb import Simulator
 import diffxpy.api as de
 
 
-class TestDataTypes(unittest.TestCase):
+class TestDataTypesSingle(unittest.TestCase):
 
-    def test_sparse_anndata(self, n_cells: int = 2000, n_genes: int = 100):
-        """
-        Test if de.wald() generates a uniform p-value distribution
-        if it is given data simulated based on the null model. Returns the p-value
-        of the two-side Kolmgorov-Smirnov test for equality of the observed
-        p-value distribution and a uniform distribution.
+    def _test_wald(self, data, sample_description, gene_names=None):
+        test = de.test.wald(
+            data=data,
+            factor_loc_totest="condition",
+            formula_loc="~ 1 + condition",
+            sample_description=sample_description,
+            gene_names=gene_names,
+            quick_scale=True,
+            training_strategy="DEFAULT",
+            dtype="float64"
+        )
+        summary = test.summary()
 
-        :param n_cells: Number of cells to simulate (number of observations per test).
-        :param n_genes: Number of genes to simulate (number of tests).
-        """
-        logging.getLogger("tensorflow").setLevel(logging.ERROR)
-        logging.getLogger("batchglm").setLevel(logging.WARNING)
-        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+    def _test_lrt(self, data, sample_description, gene_names=None):
+        test = de.test.lrt(
+            data=data,
+            full_formula_loc="~ 1 + condition",
+            reduced_formula_loc="~ 1",
+            sample_description=sample_description,
+            gene_names=gene_names,
+            quick_scale=True,
+            training_strategy="DEFAULT",
+            dtype="float64"
+        )
+        summary = test.summary()
 
+    def _test_t_test(self, data, sample_description, gene_names=None):
+        test = de.test.t_test(
+            data=data,
+            grouping="condition",
+            sample_description=sample_description,
+            gene_names=gene_names
+        )
+        summary = test.summary()
+
+    def _test_rank(self, data, sample_description, gene_names=None):
+        test = de.test.rank_test(
+            data=data,
+            grouping="condition",
+            sample_description=sample_description,
+            gene_names=gene_names
+        )
+        summary = test.summary()
+
+    def simulate(self, n_cells: int = 20, n_genes: int = 2):
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
@@ -34,28 +64,87 @@ class TestDataTypes(unittest.TestCase):
         random_sample_description = pd.DataFrame({
             "condition": np.random.randint(2, size=sim.num_observations)
         })
+        return sim.X ,random_sample_description
 
-        adata = anndata.AnnData(scipy.sparse.csr_matrix(sim.X.values))
-        # X = adata.X
-        test = de.test.wald(
-            data=adata,
-            factor_loc_totest="condition",
-            formula="~ 1 + condition",
-            sample_description=random_sample_description,
-            quick_scale=True,
-            training_strategy="DEFAULT",
-            dtype="float64"
-        )
-        summary = test.summary()
+    def _test_numpy(self, sparse):
+        data, sample_description = self.simulate()
+        gene_names = data.features
+        data = data.values
+        if sparse:
+            data = scipy.sparse.csr_matrix(data)
 
-        # Compare p-value distribution under null model against uniform distribution.
-        pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
+        self._test_wald(data=data, sample_description=sample_description, gene_names=gene_names)
+        #self._test_lrt(data=data, sample_description=sample_description, gene_names=gene_names)
+        self._test_t_test(data=data, sample_description=sample_description, gene_names=gene_names)
+        self._test_rank(data=data, sample_description=sample_description, gene_names=gene_names)
 
-        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+    def _test_xarray(self):
+        data, sample_description = self.simulate()
+
+        self._test_wald(data=data, sample_description=sample_description)
+        #self._test_lrt(data=data, sample_description=sample_description)
+        self._test_t_test(data=data, sample_description=sample_description)
+        self._test_rank(data=data, sample_description=sample_description)
+
+    def _test_anndata(self, sparse):
+        data, sample_description = self.simulate()
+        gene_names = [str(x) for x in data.features.values]
+        data = data.values
+        if sparse:
+            data = scipy.sparse.csr_matrix(data)
+
+        data = anndata.AnnData(data)
+        data.var_names = gene_names
+        self._test_wald(data=data, sample_description=sample_description)
+        #self._test_lrt(data=data, sample_description=sample_description)
+        self._test_t_test(data=data, sample_description=sample_description)
+        self._test_rank(data=data, sample_description=sample_description)
+
+    def _test_anndata_raw(self, sparse):
+        data, sample_description = self.simulate()
+        gene_names = [str(x) for x in data.features.values]
+        data = data.values
+        if sparse:
+            data = scipy.sparse.csr_matrix(data)
+
+        data = anndata.AnnData(data)
+        data.var_names = gene_names
+        data.raw = data
+        self._test_wald(data=data.raw, sample_description=sample_description)
+        #self._test_lrt(data=data.raw, sample_description=sample_description)
+        self._test_t_test(data=data, sample_description=sample_description)
+        self._test_rank(data=data, sample_description=sample_description)
+
+    def test_numpy(self):
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        self._test_numpy(sparse=False)
+        self._test_numpy(sparse=True)
 
         return True
 
+    def test_xarray(self):
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        self._test_xarray()
+
+        return True
+
+    def test_anndata(self):
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        self._test_anndata(sparse=False)
+        self._test_anndata(sparse=True)
+        self._test_anndata_raw(sparse=False)
+        self._test_anndata_raw(sparse=True)
+
+        return True
 
 if __name__ == '__main__':
     unittest.main()

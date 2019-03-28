@@ -128,7 +128,7 @@ class TestStats(unittest.TestCase):
         x1 = np.vstack([np.random.normal(loc=locs[i], scale=scales[i], size=n_test) for i in range(n)]).T
         
         # Compute p-value distribution under null model.
-        pvals = de.stats.wilcoxon_test(x0=x0, x1=x1)
+        pvals = de.stats.mann_whitney_u_test(x0=x0, x1=x1)
         
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(pvals, 'uniform').pvalue

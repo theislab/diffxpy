@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 
-from batchglm.api.models.glm_nb import Simulator
 import diffxpy.api as de
 
 
@@ -23,6 +22,7 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
+        from batchglm.api.models.glm_nb import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -65,6 +65,7 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
+        from batchglm.api.models.glm_nb import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -107,6 +108,7 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
+        from batchglm.api.models.glm_nb import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -133,7 +135,7 @@ class TestVsRest(unittest.TestCase):
 
         return True
 
-    def test_null_distribution_ttest(self, n_cells: int = 2000, n_genes: int = 10000, n_groups: int = 2):
+    def test_null_distribution_ttest(self, n_cells: int = 2000, n_genes: int = 100, n_groups: int = 2):
         """
         Test if de.test_wald_loc() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -146,6 +148,7 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
+        from batchglm.api.models.glm_norm import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 
-from batchglm.api.models.glm_nb import Simulator, Estimator, InputData
+from batchglm.api.models.glm_nb import Simulator
 import diffxpy.api as de
 
 
@@ -247,18 +247,21 @@ class TestPairwiseDE(unittest.TestCase):
         )
         summary = test.summary()
 
+        frac_nonde_sig = np.mean(
+            np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), :num_non_de] < 0.05) /
+            (2 * num_non_de)
+        )
+        frac_de_sig = np.mean(
+            np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), num_non_de:] < 0.05) /
+            (2 * (n_genes - num_non_de))
+        )
         logging.getLogger("diffxpy").info('fraction of non-DE genes with q-value < 0.05: %.1f%%' %
-              float(100 * np.mean(
-                  np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), :num_non_de] < 0.05) /
-                  (2 * num_non_de)
-              )))
+                                          str(np.round(100. * frac_nonde_sig, 3)))
         logging.getLogger("diffxpy").info('fraction of DE genes with q-value < 0.05: %.1f%%' %
-              float(100 * np.mean(
-                  np.sum(test.qval[~np.eye(test.pval.shape[0]).astype(bool), num_non_de:] < 0.05) /
-                  (2 * (n_genes - num_non_de))
-              )))
+                                          str(np.round(100. * frac_de_sig, 3)))
 
-        # TODO asserts
+        assert frac_de_sig > 0.5, "too many DE"
+        assert frac_nonde_sig < 0.5, "too many non-DE"
         return True
 
 

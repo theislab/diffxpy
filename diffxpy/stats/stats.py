@@ -1,7 +1,9 @@
+from typing import Union
+
 import numpy as np
 import numpy.linalg
 import scipy.stats
-from typing import Union
+import xarray as xr
 
 
 def likelihood_ratio_test(
@@ -37,7 +39,7 @@ def likelihood_ratio_test(
     return pvals
 
 
-def wilcoxon_test(
+def mann_whitney_u_test(
         x0: np.ndarray,
         x1: np.ndarray,
 ):
@@ -68,7 +70,8 @@ def wilcoxon_test(
         scipy.stats.mannwhitneyu(
             x=x0[:, i].flatten(),
             y=x1[:, i].flatten(),
-            alternative='two-sided'
+            use_continuity=True,
+            alternative="two-sided"
         ).pvalue for i in range(x0.shape[1])
     ])
     return pvals
@@ -152,7 +155,7 @@ def t_test_moments(
         out=s_delta
     )
 
-    t_statistic = np.abs((mu0 - mu1) / s_delta)
+    t_statistic = np.abs(mu0 - mu1) / s_delta
 
     divisor = (
             (np.square(var0 / n0) / (n0 - 1)) +
@@ -165,8 +168,7 @@ def t_test_moments(
         out=divisor
     )
 
-    with np.errstate(over='ignore'):
-        df = np.square((var0 / n0) + (var1 / n1)) / divisor
+    df = np.square((var0 / n0) + (var1 / n1)) / divisor
     np.clip(
         df,
         a_min=np.nextafter(0, np.inf, dtype=df.dtype),
@@ -174,7 +176,7 @@ def t_test_moments(
         out=df
     )
 
-    pval = 2 * (1 - scipy.stats.t(df).cdf(t_statistic))
+    pval = 2 * scipy.stats.t.sf(t_statistic, df)
     return pval
 
 
@@ -261,6 +263,9 @@ def wald_test_chisq(
             raise ValueError('stats.wald_test(): theta_mle and theta0 have to contain the same number of entries')
 
     theta_diff = theta_mle - theta0
+    # Convert to nd.array to avoid gufunc error.
+    if isinstance(theta_diff, xr.DataArray):
+        theta_diff = theta_diff.values
     wald_statistic = np.array([
         np.matmul(
             np.matmul(
@@ -337,6 +342,9 @@ def hypergeom_test(
     :param background: int
         Size of background set.
     """
-    pvals = np.array([1 - scipy.stats.hypergeom(M=background, n=references[i], N=enquiry).cdf(x - 1) for i, x in
-                      enumerate(intersections)])
-    return (pvals)
+    pvals = np.array([1 - scipy.stats.hypergeom(
+        M=background,
+        n=references[i],
+        N=enquiry
+    ).cdf(x - 1) for i, x in enumerate(intersections)])
+    return pvals
