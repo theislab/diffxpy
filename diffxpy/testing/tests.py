@@ -1293,6 +1293,7 @@ def partition(
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
         Input data matrix (observations x features) or (cells x genes).
+
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
@@ -1470,7 +1471,7 @@ class _Partition():
             reduced_formula_loc: str = None,
             full_formula_loc: str = None,
             reduced_formula_scale: str = None,
-            full_formula_scale: str = None,
+            full_formula_scale: str = "~1",
             as_numeric: Union[List[str], Tuple[str], str] = (),
             noise_model="nb",
             size_factors: np.ndarray = None,
@@ -1552,7 +1553,7 @@ class _Partition():
             factor_loc_totest: str,
             coef_to_test: object = None,  # e.g. coef_to_test="B"
             formula_loc: str = None,
-            formula_scale: str = None,
+            formula_scale: str = "~1",
             as_numeric: Union[List[str], Tuple[str], str] = (),
             noise_model: str = "nb",
             size_factors: np.ndarray = None,
