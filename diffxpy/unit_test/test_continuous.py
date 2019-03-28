@@ -80,7 +80,7 @@ class TestContinuous(unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
-        logging.getLogger("tensorflow").setLevel(logging.INFO)
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
