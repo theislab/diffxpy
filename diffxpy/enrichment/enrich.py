@@ -253,7 +253,7 @@ class Enrich:
             ref: RefSets,
             det: Union[_DifferentialExpressionTest, None],
             pval: Union[np.array, None],
-            gene_ids: Union[list, None],
+            gene_ids: Union[list, np.ndarray, None],
             de_threshold,
             incl_all_zero,
             all_ids,
@@ -263,6 +263,8 @@ class Enrich:
         self._n_overlaps = None
         self._pval_enrich = None
         self._qval_enrich = None
+        if isinstance(gene_ids, np.ndarray):
+            gene_ids = gene_ids.tolist()
         # Load multiple-testing-corrected differential expression
         # p-values from differential expression output.
         if det is not None:

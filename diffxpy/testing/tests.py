@@ -206,7 +206,7 @@ def lrt(
         as_numeric: Union[List[str], Tuple[str], str] = (),
         init_a: Union[np.ndarray, str] = "AUTO",
         init_b: Union[np.ndarray, str] = "AUTO",
-        gene_names=None,
+        gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         noise_model="nb",
         size_factors: np.ndarray = None,
@@ -385,7 +385,7 @@ def wald(
         as_numeric: Union[List[str], Tuple[str], str] = (),
         init_a: Union[np.ndarray, str] = "AUTO",
         init_b: Union[np.ndarray, str] = "AUTO",
-        gene_names: Union[str, np.ndarray] = None,
+        gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         dmat_loc: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
         dmat_scale: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
@@ -673,7 +673,7 @@ def t_test(
 def rank_test(
         data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         grouping,
-        gene_names=None,
+        gene_names: Union[np.ndarray, list] = None,
         sample_description=None,
         is_logged=False,
         dtype="float64"
@@ -715,7 +715,7 @@ def two_sample(
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test=None,
-        gene_names=None,
+        gene_names: Union[np.ndarray, list] = None,
         sample_description=None,
         noise_model: str = None,
         size_factors: np.ndarray = None,
@@ -899,7 +899,7 @@ def pairwise(
         as_numeric: Union[List[str], Tuple[str], str] = [],
         test: str = 'z-test',
         lazy: bool = False,
-        gene_names: str = None,
+        gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
         pval_correction: str = "global",
@@ -1116,7 +1116,7 @@ def versus_rest(
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
-        gene_names: str = None,
+        gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
         pval_correction: str = "global",
@@ -1279,7 +1279,7 @@ def versus_rest(
 def partition(
         data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         partition: Union[str, np.ndarray, list],
-        gene_names: str = None,
+        gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None):
     r"""
     Perform differential expression test for each group. This class handles
@@ -1318,7 +1318,7 @@ class _Partition():
             self,
             data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
             partition: Union[str, np.ndarray, list],
-            gene_names: str = None,
+            gene_names: Union[np.ndarray, list] = None,
             sample_description: pd.DataFrame = None):
         """
         :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
@@ -1422,6 +1422,7 @@ class _Partition():
         :param grouping: str
 
             - column in data.obs/sample_description which contains the split of observations into the two groups.
+        :param dtype:
         """
         DETestsSingle = []
         for i, idx in enumerate(self.partition_idx):
@@ -1450,6 +1451,7 @@ class _Partition():
 
             - column in data.obs/sample_description which contains the split of observations into the two groups.
             - array of length `num_observations` containing group labels
+        :param dtype:
         """
         DETestsSingle = []
         for i, idx in enumerate(self.partition_idx):
@@ -1643,7 +1645,7 @@ def continuous_1d(
         test: str = 'wald',
         init_a: Union[np.ndarray, str] = "standard",
         init_b: Union[np.ndarray, str] = "standard",
-        gene_names=None,
+        gene_names: Union[np.ndarray, list] = None,
         sample_description=None,
         noise_model: str = 'nb',
         size_factors: np.ndarray = None,
