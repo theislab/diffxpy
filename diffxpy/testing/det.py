@@ -261,7 +261,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         if qval_thres is not None:
             qvals = res['qval'].values
-            qval_include = np.isnan(qvals) == False
+            qval_include = np.logical_not(np.isnan(qvals))
             qval_include[qval_include] = qvals[qval_include] <= qval_thres
             res = res.iloc[qval_include, :]
 
@@ -287,7 +287,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             alpha=0.05,
             min_fc=1,
             size=20,
-            highlight_ids: List = [],
+            highlight_ids: Union[List, Tuple] = (),
             highlight_size: float = 30,
             highlight_col: str = "red",
             show: bool = True,
@@ -308,8 +308,8 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             the points below the threshold are colored in grey.
         :param size: Size of points.
         :param highlight_ids: Genes to highlight in volcano plot.
-        :param highlight_ids: Size of points of genes to highlight in volcano plot.
-        :param highlight_ids: Color of points of genes to highlight in volcano plot.
+        :param highlight_size: Size of points of genes to highlight in volcano plot.
+        :param highlight_col: Color of points of genes to highlight in volcano plot.
         :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
         :param save: Path+file name stem to save plots to.
             File will be save+suffix. Does not save if save is None.
@@ -322,7 +322,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         plt.ioff()
 
-        if corrected_pval == True:
+        if corrected_pval:
             neg_log_pvals = - self.log10_qval_clean(log10_threshold=log10_p_threshold)
         else:
             neg_log_pvals = - self.log10_pval_clean(log10_threshold=log10_p_threshold)
@@ -346,8 +346,8 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
                         palette={True: "orange", False: "black"})
 
         highlight_ids_found = np.array([x in self.gene_ids for x in highlight_ids])
-        highlight_ids_clean = [highlight_ids[i] for i in np.where(highlight_ids_found == True)[0]]
-        highlight_ids_not_found = [highlight_ids[i] for i in np.where(highlight_ids_found == False)[0]]
+        highlight_ids_clean = [highlight_ids[i] for i in np.where(highlight_ids_found)[0]]
+        highlight_ids_not_found = [highlight_ids[i] for i in np.where(np.logical_not(highlight_ids_found))[0]]
         if len(highlight_ids_not_found) > 0:
             logger.warning("not all highlight_ids were found in data set: ", ", ".join(highlight_ids_not_found))
 
@@ -355,8 +355,8 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             neg_log_pvals_highlights = np.zeros([len(highlight_ids_clean)])
             logfc_highlights = np.zeros([len(highlight_ids_clean)])
             is_highlight = np.zeros([len(highlight_ids_clean)])
-            for i,id in enumerate(highlight_ids_clean):
-                idx = np.where(self.gene_ids == id)[0]
+            for i, id_i in enumerate(highlight_ids_clean):
+                idx = np.where(self.gene_ids == id_i)[0]
                 neg_log_pvals_highlights[i] = neg_log_pvals[idx]
                 logfc_highlights[i] = logfc[idx]
 
@@ -365,8 +365,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
                             legend=False, s=highlight_size,
                             palette={0: highlight_col})
 
-
-        if corrected_pval == True:
+        if corrected_pval:
             ax.set(xlabel="log2FC", ylabel='-log10(corrected p-value)')
         else:
             ax.set(xlabel="log2FC", ylabel='-log10(p-value)')
@@ -389,7 +388,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             min_mean=1e-4,
             alpha=0.05,
             size=20,
-            highlight_ids: List = [],
+            highlight_ids: Union[List, Tuple] = (),
             highlight_size: float = 30,
             highlight_col: str = "red",
             show: bool = True,
@@ -411,8 +410,8 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             non-significant. The corresponding points are colored in grey.
         :param size: Size of points.
         :param highlight_ids: Genes to highlight in volcano plot.
-        :param highlight_ids: Size of points of genes to highlight in volcano plot.
-        :param highlight_ids: Color of points of genes to highlight in volcano plot.
+        :param highlight_size: Size of points of genes to highlight in volcano plot.
+        :param highlight_col: Color of points of genes to highlight in volcano plot.
         :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
         :param save: Path+file name stem to save plots to.
             File will be save+suffix. Does not save if save is None.
@@ -457,8 +456,8 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
                         palette={True: "orange", False: "black"})
 
         highlight_ids_found = np.array([x in self.gene_ids for x in highlight_ids])
-        highlight_ids_clean = [highlight_ids[i] for i in np.where(highlight_ids_found == True)[0]]
-        highlight_ids_not_found = [highlight_ids[i] for i in np.where(highlight_ids_found == False)[0]]
+        highlight_ids_clean = [highlight_ids[i] for i in np.where(highlight_ids_found)[0]]
+        highlight_ids_not_found = [highlight_ids[i] for i in np.where(np.logical_not(highlight_ids_found))[0]]
         if len(highlight_ids_not_found) > 0:
             logger.warning("not all highlight_ids were found in data set: ", ", ".join(highlight_ids_not_found))
 
@@ -466,8 +465,8 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             ave_highlights = np.zeros([len(highlight_ids_clean)])
             logfc_highlights = np.zeros([len(highlight_ids_clean)])
             is_highlight = np.zeros([len(highlight_ids_clean)])
-            for i,id in enumerate(highlight_ids_clean):
-                idx = np.where(self.gene_ids == id)[0]
+            for i, id_i in enumerate(highlight_ids_clean):
+                idx = np.where(self.gene_ids == id_i)[0]
                 ave_highlights[i] = ave[idx]
                 logfc_highlights[i] = logfc[idx]
 
@@ -761,7 +760,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     ):
         """
         :param model_estim:
-        :param cold_index: indices of coefs to test
+        :param col_indices: indices of coefs to test
         """
         super().__init__()
 
@@ -970,20 +969,20 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         # This is the default which can be changed and can be changed
         # via DIFFXPY_TREAT_ZEROVAR_TT_AS_SIG.
         pval[np.where(np.logical_and(np.logical_and(
-            self._var_geq_zero == False,
-            self._ave_nonzero == True),
+            np.logical_not(self._var_geq_zero),
+            self._ave_nonzero),
             np.abs(self._logfc) < np.nextafter(0, 1)
         ))] = 0
         if pkg_constants.DE_TREAT_ZEROVAR_TT_AS_SIG:
             pval[np.where(np.logical_and(np.logical_and(
-                self._var_geq_zero == False,
-                self._ave_nonzero == True),
+                np.logical_not(self._var_geq_zero),
+                self._ave_nonzero),
                 np.abs(self._logfc) >= np.nextafter(0, 1)
             ))] = 1
         else:
             pval[np.where(np.logical_and(np.logical_and(
-                self._var_geq_zero == False,
-                self._ave_nonzero == True),
+                np.logical_not(self._var_geq_zero),
+                self._ave_nonzero),
                 np.abs(self._logfc) >= np.nextafter(0, 1)
             ))] = 0
 
@@ -1001,9 +1000,13 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         """
         return self._logfc / np.log(base)
 
-    def summary(self, qval_thres=None, fc_upper_thres=None,
-                fc_lower_thres=None, mean_thres=None,
-                **kwargs) -> pd.DataFrame:
+    def summary(
+            self, qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None,
+            **kwargs
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
@@ -1161,7 +1164,7 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
             return qvals
         elif self._correction_type.lower() == "by_test":
             qvals = np.apply_along_axis(
-                func1d=lambda pvals: correction.correct(pvals=pvals, method=method),
+                func1d=lambda pv: correction.correct(pvals=pv, method=method),
                 axis=-1,
                 arr=self.pval,
             )
@@ -1220,7 +1223,7 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         self.groups = list(np.asarray(groups))
         self._tests = tests
 
-        q = self.qval
+        _ = self.qval
 
     @property
     def gene_ids(self) -> np.ndarray:
@@ -1332,9 +1335,14 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         self._check_groups(group1, group2)
         return self.log_fold_change(base=base)[self.groups.index(group1), self.groups.index(group2), :]
 
-    def summary(self, qval_thres=None, fc_upper_thres=None,
-                fc_lower_thres=None, mean_thres=None,
-                **kwargs) -> pd.DataFrame:
+    def summary(
+            self,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None,
+            **kwargs
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
@@ -1350,10 +1358,16 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
 
         return res
 
-    def summary_pair(self, group1, group2,
-                     qval_thres=None, fc_upper_thres=None,
-                     fc_lower_thres=None, mean_thres=None,
-                     **kwargs) -> pd.DataFrame:
+    def summary_pair(
+            self,
+            group1,
+            group2,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None,
+            **kwargs
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
 
@@ -1411,8 +1425,8 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         self._logfc = None
 
         # Call tests in constructor.
-        p = self.pval
-        q = self.qval
+        _ = self.pval
+        _ = self.qval
 
     def _test(self, **kwargs):
         groups = self.groups
@@ -1504,9 +1518,13 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         self._check_groups(group1, group2)
         return self.log_fold_change(base=base)[self.groups.index(group1), self.groups.index(group2), :]
 
-    def summary(self, qval_thres=None, fc_upper_thres=None,
-                fc_lower_thres=None, mean_thres=None,
-                **kwargs) -> pd.DataFrame:
+    def summary(
+            self, qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None,
+            **kwargs
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
         """
@@ -1522,10 +1540,15 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
 
         return res
 
-    def summary_pair(self, group1, group2,
-                     qval_thres=None, fc_upper_thres=None,
-                     fc_lower_thres=None, mean_thres=None,
-                     **kwargs) -> pd.DataFrame:
+    def summary_pair(
+            self,
+            group1,
+            group2,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
 
@@ -1620,7 +1643,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         """
         pass
 
-    def _test_pairs(self, groups0, groups1, **kwargs):
+    def _test_pairs(self, groups0, groups1):
         num_features = self.model_estim.X.shape[1]
 
         pvals = np.tile(np.NaN, [len(groups0), len(groups1), num_features])
@@ -1709,7 +1732,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
                 raise ValueError('groups1 element '+str(g)+' not recognized')
 
     def _groups_idx(self, groups):
-        if isinstance(groups, list)==False:
+        if not isinstance(groups, list):
             groups = [groups]
         return np.array([self.groups.index(x) for x in groups])
 
@@ -1783,19 +1806,25 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         num_features = self._theta_mle.shape[1]
 
         logfc = np.zeros(shape=(len(groups0), len(groups1), num_features))
-        for i,g0 in enumerate(groups0):
-            for j,g1 in enumerate(groups1):
-                logfc[i,j,:] = self._theta_mle[g0,:].values - self._theta_mle[g1,:].values
+        for i, g0 in enumerate(groups0):
+            for j, g1 in enumerate(groups1):
+                logfc[i, j, :] = self._theta_mle[g0, :].values - self._theta_mle[g1, :].values
 
         if base == np.e:
             return logfc
         else:
             return logfc / np.log(base)
 
-    def summary_pair(self, group0, group1,
-                     qval_thres=None, fc_upper_thres=None,
-                     fc_lower_thres=None, mean_thres=None,
-                     **kwargs) -> pd.DataFrame:
+    def summary_pair(
+            self,
+            group0,
+            group1,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None,
+            **kwargs
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results of single pairwose comparison
         into an output table.
@@ -1837,10 +1866,16 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
 
         return res
 
-    def summary_pairs(self, groups0, groups1=None,
-                     qval_thres=None, fc_upper_thres=None,
-                     fc_lower_thres=None, mean_thres=None,
-                     **kwargs) -> pd.DataFrame:
+    def summary_pairs(
+            self,
+            groups0,
+            groups1=None,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None,
+            **kwargs
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results of a set of
         pairwise comparisons into an output table.
@@ -1874,8 +1909,8 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
 
         res = pd.DataFrame({
             "gene": self.gene_ids,
-            "pval": np.min(pval, axis=(0,1)),
-            "qval": np.min(qval, axis=(0,1)),
+            "pval": np.min(pval, axis=(0, 1)),
+            "qval": np.min(qval, axis=(0, 1)),
             "log2fc": np.asarray(logfc),
             "mean": np.asarray(self.mean)
         })
@@ -1922,7 +1957,7 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
         return self._gene_ids
 
     @property
-    def X(self) -> np.ndarray:
+    def X(self) -> Union[np.ndarray, None]:
         return None
 
     def log_fold_change(self, base=np.e, **kwargs):
@@ -1965,10 +2000,14 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
 
         return res
 
-    def summary_group(self, group,
-                      qval_thres=None, fc_upper_thres=None,
-                      fc_lower_thres=None, mean_thres=None,
-                      **kwargs) -> pd.DataFrame:
+    def summary_group(
+            self,
+            group,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
 
@@ -2015,7 +2054,7 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
         self._logfc = np.expand_dims(np.vstack([x.log_fold_change() for x in tests]), axis=0)
         self._mean = ave
 
-        q = self.qval
+        _ = self.qval
 
     @property
     def gene_ids(self) -> np.ndarray:
@@ -2158,8 +2197,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         else:
             genes = self._idx_genes(genes)
 
-        fc = self.max(genes=genes, nonnumeric=nonnumeric) - \
-             self.min(genes=genes, nonnumeric=nonnumeric)
+        fc = self.max(genes=genes, nonnumeric=nonnumeric) - self.min(genes=genes, nonnumeric=nonnumeric)
         fc = np.nextafter(0, 1, out=fc, where=fc == 0)
 
         return np.log(fc) / np.log(base)
@@ -2231,7 +2269,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         idx = np.asarray(idx)
         if nonnumeric:
             mu = np.matmul(self._model_estim.design_loc.values,
-                           self._model_estim.par_link_loc[:,idx])
+                           self._model_estim.par_link_loc[:, idx])
             if self._size_factors is not None:
                 mu = mu + self._size_factors
         else:
@@ -2437,12 +2475,12 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         ax = fig.add_subplot(111)
 
         # Build heatmap matrix.
-        ## Add in data.
+        # Add in data.
         data = np.array([
             self._continuous_model(idx=g, nonnumeric=False)
             for i, g in enumerate(gene_idx)
         ])
-        ## Order columns by continuous covariate.
+        # Order columns by continuous covariate.
         idx_x_sorted = np.argsort(self._continuous_coords)
         data = data[:, idx_x_sorted]
         xcoord = self._continuous_coords[idx_x_sorted]
@@ -2515,7 +2553,8 @@ class DifferentialExpressionTestWaldCont(_DifferentialExpressionTestCont):
 class DifferentialExpressionTestLRTCont(_DifferentialExpressionTestCont):
     de_test: DifferentialExpressionTestLRT
 
-    def __init__(self,
+    def __init__(
+            self,
             de_test: DifferentialExpressionTestLRT,
             size_factors: np.ndarray,
             continuous_coords: np.ndarray,
