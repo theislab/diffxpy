@@ -23,9 +23,9 @@ matplotlib.use('agg')
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent))
-import diffxpy  # noqa
+import diffxpy
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("diffxpy")
 
 # -- General configuration ------------------------------------------------
 
@@ -67,7 +67,7 @@ intersphinx_mapping = dict(
 templates_path = ['_templates']
 
 project = 'diffxpy'
-author = 'Florian R. Hölzlwimmer, David S. Fischer'
+author = 'David S. Fischer, Florian R. Hölzlwimmer'
 
 source_suffix = '.rst'
 master_doc = 'index'
@@ -129,7 +129,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'diffxpy.tex', 'diffxpy Documentation',
-     'Florian R. Hölzlwimmer, David S. Fischer', 'manual'),
+     'David S. Fischer, Florian R. Hölzlwimmer', 'manual'),
 ]
 
 # -- Options for manual page output ------------------------------------------

@@ -27,7 +27,7 @@ diffxpy provies infrastructure for likelihood ratio tests, Wald tests, t-tests a
    test.wald
    test.lrt
    test.t_test
-   test.wilcoxon
+   test.rank_test
 
 Multiple tests per gene
 ~~~~~~~~~~~~~~~~~~~~~~~

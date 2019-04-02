@@ -699,7 +699,7 @@ def two_sample(
         data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
-        test: str = None,
+        test: str = "t-test",
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
@@ -797,10 +797,6 @@ def two_sample(
     if groups.size < 2:
         raise ValueError("Less than two groups detected:\n\t%s", groups)
 
-    # Set default test:
-    if test is None:
-        test = 'wald'
-
     if test.lower() == 'wald':
         if noise_model is None:
             raise ValueError("Please specify noise_model")
@@ -862,7 +858,7 @@ def two_sample(
             dtype=dtype
         )
     else:
-        raise ValueError('base.two_sample(): Parameter `test="%s"` not recognized.' % test)
+        raise ValueError('two_sample(): Parameter `test="%s"` not recognized.' % test)
 
     return de_test
 

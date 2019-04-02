@@ -21,7 +21,7 @@ setup(
         'scipy',
         'pandas',
         'patsy>=0.5.0',
-        'batchglm>=0.4.0',
+        'batchglm>=0.6.0',
         'xarray',
         'statsmodels',
     ],
@@ -29,10 +29,6 @@ setup(
         'optional': [
             'anndata',
         ],
-        # 'scanpy_deps': [
-        #     "scanpy",
-        #     "anndata"
-        # ],
         'plotting_deps': [
             "seaborn",
             "matplotlib"
