@@ -9,7 +9,7 @@ Differential testing
 Single tests per gene
 ~~~~~~~~~~~~~~~~~~~~~
 
-How to perform likelihood-ratio tests `lrt <https://nbviewer.jupyter.org/github/theislab//diffxpy_tutorials/tree/master/diffxpy_tutorials/test/single/likelihood_ratio_test.ipynb>`__.
+How to perform likelihood-ratio tests `lrt <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/single/likelihood_ratio_test.ipynb>`__.
 
 How to perform Wald tests for a single parameter `wald <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/single/wald_test.ipynb>`__.
 
