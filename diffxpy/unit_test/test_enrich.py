@@ -30,7 +30,6 @@ class TestEnrich(unittest.TestCase):
             training_strategy="DEFAULT",
             dtype="float64"
         )
-        print(test.gene_ids)
 
         # Set up reference gene sets.
         rs = de.enrich.RefSets()
