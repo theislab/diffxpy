@@ -10,7 +10,7 @@ import diffxpy.api as de
 
 class TestSingleNull(unittest.TestCase):
 
-    def test_null_distribution_wald(self, n_cells: int = 2000, n_genes: int = 100):
+    def test_null_distribution_wald(self, n_cells: int = 2000, n_genes: int = 200):
         """
         Test if de.wald() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -52,7 +52,7 @@ class TestSingleNull(unittest.TestCase):
 
         return True
 
-    def test_null_distribution_wald_multi(self, n_cells: int = 2000, n_genes: int = 100):
+    def test_null_distribution_wald_multi(self, n_cells: int = 2000, n_genes: int = 200):
         """
         Test if de.wald() (multivariate mode) generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -92,7 +92,7 @@ class TestSingleNull(unittest.TestCase):
 
         return True
 
-    def test_null_distribution_lrt(self, n_cells: int = 2000, n_genes: int = 100):
+    def test_null_distribution_lrt(self, n_cells: int = 2000, n_genes: int = 200):
         """
         Test if de.lrt() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -134,7 +134,7 @@ class TestSingleNull(unittest.TestCase):
 
         return True
 
-    def test_null_distribution_ttest(self, n_cells: int = 2000, n_genes: int = 100):
+    def test_null_distribution_ttest(self, n_cells: int = 2000, n_genes: int = 200):
         """
         Test if de.t_test() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -173,7 +173,7 @@ class TestSingleNull(unittest.TestCase):
 
         return True
 
-    def test_null_distribution_wilcoxon(self, n_cells: int = 2000, n_genes: int = 100):
+    def test_null_distribution_wilcoxon(self, n_cells: int = 2000, n_genes: int = 200):
         """
         Test if de.wilcoxon() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value

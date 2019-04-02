@@ -517,7 +517,7 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
             "pval": self.pval,
             "qval": self.qval,
             "log2fc": self.log2_fold_change(),
-            "mean": self.mean
+            "mean": self.mean,
             "zero_mean": self.mean == 0
         })
 
@@ -2488,7 +2488,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         plt.close(fig)
 
         if return_axs:
-            return axs
+            return ax
         else:
             return
 
