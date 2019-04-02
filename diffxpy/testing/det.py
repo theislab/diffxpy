@@ -518,6 +518,7 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
             "qval": self.qval,
             "log2fc": self.log2_fold_change(),
             "mean": self.mean
+            "zero_mean": self.mean == 0
         })
 
         return res
@@ -1007,8 +1008,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         Summarize differential expression results into an output table.
         """
         res = super().summary(**kwargs)
-        res["zero_mean"] = self._ave_nonzero == False
-        res["zero_variance"] = self._var_geq_zero == False
+        res["zero_variance"] = np.logical_not(self._var_geq_zero)
 
         res = self._threshold_summary(
             res=res,
@@ -1096,6 +1096,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
         Summarize differential expression results into an output table.
         """
         res = super().summary(**kwargs)
+        res["zero_variance"] = np.logical_not(self._var_geq_zero)
 
         res = self._threshold_summary(
             res=res,
