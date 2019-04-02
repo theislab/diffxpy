@@ -479,17 +479,6 @@ def wald(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-
-          Example:
-
-          .. code-block:: python
-
-              [
-                {"learning_rate": 0.5, },
-                {"learning_rate": 0.05, },
-              ]
-
-          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
@@ -731,7 +720,7 @@ def two_sample(
     The exact unit_test are as follows (assuming the group labels
     are saved in a column named "group"):
 
-    - lrt(log-likelihood ratio test):
+    - "lrt" - (log-likelihood ratio test):
         Requires the fitting of 2 generalized linear models (full and reduced).
         The models are automatically assembled as follows, use the de.test.lrt()
         function if you would like to perform a different test.
@@ -740,15 +729,15 @@ def two_sample(
             * full model scale parameter: ~ 1 + group
             * reduced model location parameter: ~ 1
             * reduced model scale parameter: ~ 1 + group
-    - Wald test:
+    - "wald" - Wald test:
         Requires the fitting of 1 generalized linear models.
         model location parameter: ~ 1 + group
         model scale parameter: ~ 1 + group
         Test the group coefficient of the location parameter model against 0.
-    - t-test:
+    - "t-test" - Welch's t-test:
         Doesn't require fitting of generalized linear models.
         Welch's t-test between both observation groups.
-    - wilcoxon:
+    - "rank" - Wilcoxon rank sum (Mann-Whitney U) test:
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
@@ -769,15 +758,15 @@ def two_sample(
         - 'wald': default
         - 'lrt'
         - 't-test'
-        - 'wilcoxon'
+        - 'rank'
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param size_factors: 1D array of transformed library size factors for each cell in the
+        same order as in data
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
-    :param size_factors: 1D array of transformed library size factors for each cell in the
-        same order as in data
-    :param batch_size: the batch size to use for the estimator
+    :param batch_size: The batch size to use for the estimator.
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -785,17 +774,6 @@ def two_sample(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-
-          Example:
-
-          .. code-block:: python
-
-              [
-                {"learning_rate": 0.5, },
-                {"learning_rate": 0.05, },
-              ]
-
-          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
@@ -804,8 +782,8 @@ def two_sample(
         Should be "float32" for single precision or "float64" for double precision.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
-    if test in ['t-test', 'wilcoxon'] and noise_model is not None:
-        raise ValueError('base.two_sample(): Do not specify `noise_model` if using test t-test or wilcoxon: ' +
+    if test in ['t-test', 'rank'] and noise_model is not None:
+        raise ValueError('base.two_sample(): Do not specify `noise_model` if using test t-test or rank_test: ' +
                          'The t-test is based on a gaussian noise model and wilcoxon is model free.')
 
     gene_names = parse_gene_names(data, gene_names)
@@ -849,9 +827,9 @@ def two_sample(
         if noise_model is None:
             raise ValueError("Please specify noise_model")
         full_formula_loc = '~ 1 + grouping'
-        full_formula_scale = '~ 1 + grouping'
+        full_formula_scale = '~ 1'
         reduced_formula_loc = '~ 1'
-        reduced_formula_scale = '~ 1 + grouping'
+        reduced_formula_scale = '~ 1'
         de_test = lrt(
             data=X,
             full_formula_loc=full_formula_loc,
@@ -876,7 +854,7 @@ def two_sample(
             grouping=grouping,
             dtype=dtype
         )
-    elif test.lower() == 'wilcoxon':
+    elif test.lower() == 'rank':
         de_test = rank_test(
             data=X,
             gene_names=gene_names,
@@ -898,12 +876,12 @@ def pairwise(
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
-        pval_correction: str = "global",
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
         dtype="float64",
+        pval_correction: str = "global",
         keep_full_test_objs: bool = False,
         **kwargs
 ):
@@ -922,22 +900,22 @@ def pairwise(
     on the subset of the data that only contains observations of a given
     pair of groups:
 
-    - lrt(log-likelihood ratio test):
+    - "lrt" -log-likelihood ratio test:
         Requires the fitting of 2 generalized linear models (full and reduced).
 
         * full model location parameter: ~ 1 + group
         * full model scale parameter: ~ 1 + group
         * reduced model location parameter: ~ 1
         * reduced model scale parameter: ~ 1 + group
-    - Wald test:
+    - "wald" - Wald test:
         Requires the fitting of 1 generalized linear models.
         model location parameter: ~ 1 + group
         model scale parameter: ~ 1 + group
         Test the group coefficient of the location parameter model against 0.
-    - t-test:
+    - "t-test" - Welch's t-test:
         Doesn't require fitting of generalized linear models.
         Welch's t-test between both observation groups.
-    - wilcoxon:
+    - "rank" - Wilcoxon rank sum (Mann-Whitney U) test:
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
@@ -959,7 +937,7 @@ def pairwise(
         - 'wald'
         - 'lrt'
         - 't-test'
-        - 'wilcoxon'
+        - 'rank'
     :param lazy: bool, whether to enable lazy results evaluation.
         This is only possible if test=="ztest" and yields an output object which computes
         p-values etc. only upon request of certain pairs. This makes sense if the entire
@@ -968,17 +946,12 @@ def pairwise(
         a certain subset of the pairwise comparisons is desired anyway.
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param size_factors: 1D array of transformed library size factors for each cell in the
+        same order as in data
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
-    :param pval_correction: Choose between global and test-wise correction.
-        Can be:
-
-        - "global": correct all p-values in one operation
-        - "by_test": correct the p-values of each test individually
-    :param size_factors: 1D array of transformed library size factors for each cell in the
-        same order as in data
-    :param batch_size: the batch size to use for the estimator
+    :param batch_size: The batch size to use for the estimator.
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -986,23 +959,17 @@ def pairwise(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-
-          Example:
-
-          .. code-block:: python
-
-              [
-                {"learning_rate": 0.5, },
-                {"learning_rate": 0.05, },
-              ]
-
-          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
     :param dtype: Allows specifying the precision which should be used to fit data.
 
         Should be "float32" for single precision or "float64" for double precision.
+    :param pval_correction: Choose between global and test-wise correction.
+        Can be:
+
+        - "global": correct all p-values in one operation
+        - "by_test": correct the p-values of each test individually
     :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test"
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
@@ -1115,12 +1082,12 @@ def versus_rest(
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
-        pval_correction: str = "global",
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
         dtype="float64",
+        pval_correction: str = "global",
         keep_full_test_objs: bool = False,
         **kwargs
 ):
@@ -1140,22 +1107,22 @@ def versus_rest(
     is one group and the remaining groups are allocated to the second reference
     group):
 
-    - lrt(log-likelihood ratio test):
+    - "lrt" - log-likelihood ratio test):
         Requires the fitting of 2 generalized linear models (full and reduced).
 
         * full model location parameter: ~ 1 + group
         * full model scale parameter: ~ 1 + group
         * reduced model location parameter: ~ 1
         * reduced model scale parameter: ~ 1 + group
-    - Wald test:
+    - "wald" - Wald test:
         Requires the fitting of 1 generalized linear models.
         model location parameter: ~ 1 + group
         model scale parameter: ~ 1 + group
         Test the group coefficient of the location parameter model against 0.
-    - t-test:
+    - "t-test" - Welch's t-test:
         Doesn't require fitting of generalized linear models.
         Welch's t-test between both observation groups.
-    - wilcoxon:
+    - "rank" - Wilcoxon rank sum (Mann-Whitney U) test:
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
@@ -1171,17 +1138,14 @@ def versus_rest(
         which do not correpond to one-hot encoded discrete factors.
         This makes sense for number of genes, time, pseudotime or space
         for example.
-    :param test: str, statistical test to use. Possible options:
+    :param test: str, statistical test to use. Possible options (see function description):
 
         - 'wald'
         - 'lrt'
         - 't-test'
-        - 'wilcoxon'
+        - 'rank'
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
-    :param noise_model: str, noise model to use in model-based unit_test. Possible options:
-
-        - 'nb': default
     :param pval_correction: Choose between global and test-wise correction.
         Can be:
 
@@ -1189,7 +1153,10 @@ def versus_rest(
         - "by_test": correct the p-values of each test individually
     :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data
-    :param batch_size: the batch size to use for the estimator
+    :param noise_model: str, noise model to use in model-based unit_test. Possible options:
+
+        - 'nb': default
+    :param batch_size: The batch size to use for the estimator.
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1197,24 +1164,17 @@ def versus_rest(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-
-          Example:
-
-          .. code-block:: python
-
-              [
-                {"learning_rate": 0.5, },
-                {"learning_rate": 0.05, },
-              ]
-
-          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
-        Useful in scenarios where fitting the exact `scale` is not
+        Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
     :param dtype: Allows specifying the precision which should be used to fit data.
 
         Should be "float32" for single precision or "float64" for double precision.
-    :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test"
+    :param pval_correction: Choose between global and test-wise correction.
+        Can be:
+
+        - "global": correct all p-values in one operation
+        - "by_test": correct the p-values of each test individually
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
@@ -1350,7 +1310,9 @@ class _Partition:
             **kwargs
     ) -> _DifferentialExpressionTestMulti:
         """
-        See annotation of de.test.two_sample()
+        Performs a two-sample test within each partition of a data set.
+
+        See also annotation of de.test.two_sample()
 
         :param grouping: str
 
@@ -1366,7 +1328,7 @@ class _Partition:
             - 'wald': default
             - 'lrt'
             - 't-test'
-            - 'wilcoxon'
+            - 'rank'
         :param size_factors: 1D array of transformed library size factors for each cell in the
             same order as in data
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
@@ -1410,7 +1372,9 @@ class _Partition:
             dtype="float64"
     ):
         """
-        See annotation of de.test.t_test()
+        Performs a Welch's t-test within each partition of a data set.
+
+        See also annotation of de.test.t_test()
 
         :param grouping: str
 
@@ -1442,7 +1406,9 @@ class _Partition:
             dtype="float64"
     ):
         """
-        See annotation of de.test.wilcoxon()
+        Performs a Wilcoxon rank sum test within each partition of a data set.
+
+        See also annotation of de.test.rank_test()
 
         :param grouping: str, array
 
@@ -1481,7 +1447,9 @@ class _Partition:
             **kwargs
     ):
         """
-        See annotation of de.test.lrt()
+        Performs a likelihood-ratio test within each partition of a data set.
+
+        See also annotation of de.test.lrt()
 
         :param full_formula_loc: formula
             Full model formula for location parameter model.
@@ -1577,8 +1545,9 @@ class _Partition:
             **kwargs
     ):
         """
-        This function performs a wald test within each partition of a data set.
-        See annotation of de.test.wald()
+        Performs a wald test within each partition of a data set.
+
+        See also annotation of de.test.wald()
 
         :param factor_loc_totest: str, list of strings
             List of factors of formula to test with Wald test.
