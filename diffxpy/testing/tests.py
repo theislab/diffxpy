@@ -1439,7 +1439,7 @@ class _Partition():
             ave=np.mean(self.X, axis=0),
             correction_type="by_test")
 
-    def wilcoxon(
+    def rank_test(
             self,
             grouping: Union[str],
             dtype="float64"
