@@ -65,8 +65,7 @@ class _TestSingleDE:
     def _test_rank_de(
             self,
             n_cells: int,
-            n_genes: int,
-            noise_model: str
+            n_genes: int
     ):
         """
         :param n_cells: Number of cells to simulate (number of observations per test).
@@ -79,7 +78,7 @@ class _TestSingleDE:
         sim = self._prepare_data(
             n_cells=n_cells,
             n_genes=n_genes,
-            noise_model=noise_model
+            noise_model="norm"
         )
 
         test = de.test.rank_test(
