@@ -294,7 +294,7 @@ def lrt(
     """
     # TODO test nestedness
     if len(kwargs) != 0:
-        logger.info("additional kwargs: %s", str(kwargs))
+        logging.getLogger("diffxpy").info("additional kwargs: %s", str(kwargs))
 
     if isinstance(as_numeric, str):
         as_numeric = [as_numeric]
@@ -486,7 +486,7 @@ def wald(
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
-        logger.debug("additional kwargs: %s", str(kwargs))
+        logging.getLogger("diffxpy").debug("additional kwargs: %s", str(kwargs))
 
     if dmat_loc is None and formula_loc is None:
         raise ValueError("Supply either dmat_loc or formula_loc or formula.")
@@ -519,9 +519,11 @@ def wald(
                 if noise_model.lower() not in ["normal", "norm"]:
                     if init_a == "closed_form":
                         init_a = "standard"
-                        logger.warning("Setting init_a to standard as numeric predictors were supplied.")
-                        logger.warning("Closed-form initialisation is not possible" +
-                                       " for noise model %s with numeric predictors." % noise_model)
+                        logging.getLogger("diffxpy").warning(
+                            "Setting init_a to standard as numeric predictors were supplied.")
+                        logging.getLogger("diffxpy").warning(
+                            "Closed-form initialisation is not possible" +
+                            " for noise model %s with numeric predictors." % noise_model)
                     elif init_a == "AUTO":
                         init_a = "standard"
     else:
@@ -538,9 +540,11 @@ def wald(
             if np.any([True if x in as_numeric else False for x in sample_description.columns.values]):
                 if init_b == "closed_form":
                     init_b = "standard"
-                    logger.warning("Setting init_b to standard as numeric predictors were supplied.")
-                    logger.warning("Closed-form initialisation is not possible" +
-                                   " for noise model %s with numeric predictors." % noise_model)
+                    logging.getLogger("diffxpy").warning(
+                        "Setting init_b to standard as numeric predictors were supplied.")
+                    logging.getLogger("diffxpy").warning(
+                        "Closed-form initialisation is not possible" +
+                        " for noise model %s with numeric predictors." % noise_model)
                 elif init_b == "AUTO":
                     init_b = "standard"
     else:
@@ -607,7 +611,8 @@ def wald(
 
     de_test = DifferentialExpressionTestWald(
         model_estim=model,
-        col_indices=col_indices
+        col_indices=col_indices,
+        noise_model=noise_model
     )
 
     return de_test
@@ -968,7 +973,7 @@ def pairwise(
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
-        logger.info("additional kwargs: %s", str(kwargs))
+        logging.getLogger("diffxpy").info("additional kwargs: %s", str(kwargs))
 
     if lazy and not (test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest'):
         raise ValueError("lazy evaluation of pairwise tests only possible if test is z-test")
@@ -1172,7 +1177,7 @@ def versus_rest(
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
-        logger.info("additional kwargs: %s", str(kwargs))
+        logging.getLogger("diffxpy").info("additional kwargs: %s", str(kwargs))
 
     # Do not store all models but only p-value and q-value matrix:
     # genes x groups
@@ -1811,10 +1816,10 @@ def continuous_1d(
         else:
             factor_loc_totest_new = factor_loc_totest
 
-        logger.debug("model formulas assembled in de.test.continuos():")
-        logger.debug("factor_loc_totest_new: " + ",".join(factor_loc_totest_new))
-        logger.debug("formula_loc_new: " + formula_loc_new)
-        logger.debug("formula_scale_new: " + formula_scale_new)
+        logging.getLogger("diffxpy").debug("model formulas assembled in de.test.continuos():")
+        logging.getLogger("diffxpy").debug("factor_loc_totest_new: " + ",".join(factor_loc_totest_new))
+        logging.getLogger("diffxpy").debug("formula_loc_new: " + formula_loc_new)
+        logging.getLogger("diffxpy").debug("formula_scale_new: " + formula_scale_new)
 
         de_test = wald(
             data=X,
@@ -1837,6 +1842,7 @@ def continuous_1d(
         )
         de_test = DifferentialExpressionTestWaldCont(
             de_test=de_test,
+            noise_model=noise_model,
             size_factors=size_factors,
             continuous_coords=sample_description[continuous].values,
             spline_coefs=new_coefs
@@ -1860,11 +1866,11 @@ def continuous_1d(
         full_formula_scale = formula_scale_new
         reduced_formula_scale = formula_scale_new
 
-        logger.debug("model formulas assembled in de.test.continuous():")
-        logger.debug("full_formula_loc: " + full_formula_loc)
-        logger.debug("reduced_formula_loc: " + reduced_formula_loc)
-        logger.debug("full_formula_scale: " + full_formula_scale)
-        logger.debug("reduced_formula_scale: " + reduced_formula_scale)
+        logging.getLogger("diffxpy").debug("model formulas assembled in de.test.continuous():")
+        logging.getLogger("diffxpy").debug("full_formula_loc: " + full_formula_loc)
+        logging.getLogger("diffxpy").debug("reduced_formula_loc: " + reduced_formula_loc)
+        logging.getLogger("diffxpy").debug("full_formula_scale: " + full_formula_scale)
+        logging.getLogger("diffxpy").debug("reduced_formula_scale: " + reduced_formula_scale)
 
         de_test = lrt(
             data=X,

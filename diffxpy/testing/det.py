@@ -292,7 +292,8 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             highlight_col: str = "red",
             show: bool = True,
             save: Union[str, None] = None,
-            suffix: str = "_volcano.png"
+            suffix: str = "_volcano.png",
+            return_axs: bool = False
     ):
         """
         Returns a volcano plot of p-value vs. log fold change
@@ -314,6 +315,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         :param save: Path+file name stem to save plots to.
             File will be save+suffix. Does not save if save is None.
         :param suffix: Suffix for file name to save plot to. Also use this to set the file type.
+        :param return_axs: Whether to return axis objects.
 
         :return: Tuple of matplotlib (figure, axis)
         """
@@ -379,7 +381,10 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         plt.close(fig)
 
-        return ax
+        if return_axs:
+            return ax
+        else:
+            return
 
     def plot_ma(
             self,
@@ -393,7 +398,8 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             highlight_col: str = "red",
             show: bool = True,
             save: Union[str, None] = None,
-            suffix: str = "_my_plot.png"
+            suffix: str = "_ma_plot.png",
+            return_axs: bool = False
     ):
         """
         Returns an MA plot of mean expression vs. log fold change with significance
@@ -416,7 +422,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         :param save: Path+file name stem to save plots to.
             File will be save+suffix. Does not save if save is None.
         :param suffix: Suffix for file name to save plot to. Also use this to set the file type.
-
+        :param return_axs: Whether to return axis objects.
 
         :return: Tuple of matplotlib (figure, axis)
         """
@@ -487,7 +493,10 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         plt.close(fig)
         plt.ion()
 
-        return ax
+        if return_axs:
+            return ax
+        else:
+            return
 
 
 class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=abc.ABCMeta):
@@ -756,7 +765,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     def __init__(
             self,
             model_estim: _Estimation,
-            col_indices: np.ndarray
+            col_indices: np.ndarray,
+            noise_model: str,
     ):
         """
         :param model_estim:
@@ -766,6 +776,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         self.model_estim = model_estim
         self.coef_loc_totest = col_indices
+        self.noise_model = noise_model
 
         try:
             if model_estim._error_codes is not None:
@@ -889,7 +900,18 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         return res
 
-    def plot_vs_ttest(self, log10=False):
+    def plot_vs_ttest(
+            self,
+            log10=False,
+            return_axs: bool = False
+    ):
+        """
+
+        :param log10:
+        :param return_axs: Whether to return axis objects.
+
+        :return:
+        """
         import matplotlib.pyplot as plt
         import seaborn as sns
         from .tests import t_test
@@ -913,7 +935,139 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         ax.set(xlabel="t-test", ylabel='wald test')
 
-        return fig, ax
+        if return_axs:
+            return ax
+        else:
+            return
+
+    def plot_comparison_ols(
+            self,
+            size=20,
+            show: bool = True,
+            save: Union[str, None] = None,
+            suffix: str = "_ols_comparison.png",
+            ncols=5,
+            row_gap=0.3,
+            col_gap=0.25,
+            return_axs: bool = False
+    ):
+        """
+        Plot location model coefficients of inferred model against those obtained from an OLS model.
+
+        Red line shown is the identity line.
+
+        :param size: Size of points.
+        :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
+        :param save: Path+file name stem to save plots to.
+            File will be save+suffix. Does not save if save is None.
+        :param suffix: Suffix for file name to save plot to. Also use this to set the file type.
+        :param ncols: Number of columns in plot grid if multiple genes are plotted.
+        :param row_gap: Vertical gap between panel rows relative to panel height.
+        :param col_gap: Horizontal gap between panel columns relative to panel width.
+        :param return_axs: Whether to return axis objects.
+
+        :return: Matplotlib axis objects.
+        """
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        from matplotlib import gridspec
+        from matplotlib import rcParams
+        from batchglm.api.models.glm_norm import Estimator, InputData
+
+        # Run OLS model fit to have comparison coefficients.
+        input_data_ols = InputData.new(
+            data=self.model_estim.input_data.data,
+            design_loc=self.model_estim.input_data.design_loc,
+            design_scale=self.model_estim.input_data.design_scale[:, [0]],
+            constraints_loc=self.model_estim.input_data.constraints_loc,
+            constraints_scale=self.model_estim.input_data.constraints_scale[[0], [0]],
+            size_factors=self.model_estim.input_data.size_factors,
+            feature_names=self.model_estim.input_data.features,
+        )
+        estim_ols = Estimator(
+            input_data=input_data_ols,
+            init_model=None,
+            init_a="standard",
+            init_b="standard",
+            dtype=self.model_estim.a_var.dtype
+        )
+        estim_ols.initialize()
+        store_ols = estim_ols.finalize()
+
+        # Prepare parameter summary of both model fits.
+        par_loc = input_data_ols.data.coords["design_loc_params"].values
+        if self.noise_model == "nb":
+            # Translate coefficients from OLS fit to be multiplicative in identity space.
+            a_var_ols = store_ols.a_var.values
+            a_var_ols[1:, :] = (a_var_ols[1:, :] + a_var_ols[[0], :]) / a_var_ols[[0], :]
+        elif self.noise_model == "norm":
+            a_var_ols = store_ols.a_var
+        else:
+            raise ValueError("noise model %s not yet supported for plot_comparison_ols" % self.noise_model)
+
+        summaries_fits = [
+            pd.DataFrame({
+                "user": self.model_estim.inverse_link_loc(self.model_estim.a_var[i, :]),
+                "ols": a_var_ols[i, :],
+                "coef": par_loc[i]
+            }) for i in range(self.model_estim.a_var.shape[0])
+        ]
+
+        plt.ioff()
+        nrows = len(par_loc) // ncols + int((len(par_loc) % ncols) > 0)
+
+        gs = gridspec.GridSpec(
+            nrows=nrows,
+            ncols=ncols,
+            hspace=row_gap,
+            wspace=col_gap
+        )
+        fig = plt.figure(
+            figsize=(
+                ncols * rcParams['figure.figsize'][0],  # width in inches
+                nrows * rcParams['figure.figsize'][1] * (1 + row_gap)  # height in inches
+            )
+        )
+
+        axs = []
+        for i, par_i in enumerate(par_loc):
+            ax = plt.subplot(gs[i])
+            axs.append(ax)
+
+            x = summaries_fits[i]["user"].values
+            y = summaries_fits[i]["ols"].values
+
+            sns.scatterplot(
+                x=x,
+                y=y,
+                ax=ax,
+                s=size
+            )
+            sns.lineplot(
+                x=np.array([np.min([np.min(x), np.min(y)]), np.max([np.max(x), np.max(y)])]),
+                y=np.array([np.min([np.min(x), np.min(y)]), np.max([np.max(x), np.max(y)])]),
+                ax=ax,
+                color="red",
+                legend=False
+            )
+            ax.set(xlabel="user supplied model", ylabel="OLS model")
+            title_i = par_loc[i] + " (R=" + str(np.round(np.corrcoef(x, y)[0, 1], 3)) + ")"
+            ax.set_title(title_i)
+
+        # Save, show and return figure.
+        if save is not None:
+            plt.savefig(save + suffix)
+
+        if show:
+            plt.show()
+
+        plt.close(fig)
+        plt.ion()
+
+        if return_axs:
+            return axs
+        else:
+            return
 
 
 class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
