@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 
-from batchglm.api.models.glm_nb import Simulator
 import diffxpy.api as de
 
 
@@ -26,9 +25,12 @@ class _TestSingleNull:
         :param n_genes: Number of genes to simulate (number of tests).
         :param noise_model: Noise model to use for data fitting.
         """
-        logging.getLogger("tensorflow").setLevel(logging.ERROR)
-        logging.getLogger("batchglm").setLevel(logging.WARNING)
-        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+        if noise_model == "nb":
+            from batchglm.api.models.glm_nb import Simulator
+        elif noise_model == "norm":
+            from batchglm.api.models.glm_norm import Simulator
+        else:
+            raise ValueError("noise model %s not recognized" % noise_model)
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -55,7 +57,7 @@ class _TestSingleNull:
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
+        assert pval_h0 > 0.05, ("KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5))
 
         return True
 
@@ -75,9 +77,12 @@ class _TestSingleNull:
         :param n_genes: Number of genes to simulate (number of tests).
         :param noise_model: Noise model to use for data fitting.
         """
-        logging.getLogger("tensorflow").setLevel(logging.ERROR)
-        logging.getLogger("batchglm").setLevel(logging.WARNING)
-        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+        if noise_model == "nb":
+            from batchglm.api.models.glm_nb import Simulator
+        elif noise_model == "norm":
+            from batchglm.api.models.glm_norm import Simulator
+        else:
+            raise ValueError("noise model %s not recognized" % noise_model)
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -102,7 +107,7 @@ class _TestSingleNull:
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
+        assert pval_h0 > 0.05, ("KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5))
 
         return True
 
@@ -122,9 +127,12 @@ class _TestSingleNull:
         :param n_genes: Number of genes to simulate (number of tests).
         :param noise_model: Noise model to use for data fitting.
         """
-        logging.getLogger("tensorflow").setLevel(logging.ERROR)
-        logging.getLogger("batchglm").setLevel(logging.WARNING)
-        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+        if noise_model == "nb":
+            from batchglm.api.models.glm_nb import Simulator
+        elif noise_model == "norm":
+            from batchglm.api.models.glm_norm import Simulator
+        else:
+            raise ValueError("noise model %s not recognized" % noise_model)
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -151,7 +159,7 @@ class _TestSingleNull:
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of lrt(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
+        assert pval_h0 > 0.05, ("KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5))
 
         return True
 
@@ -169,9 +177,7 @@ class _TestSingleNull:
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
-        logging.getLogger("tensorflow").setLevel(logging.ERROR)
-        logging.getLogger("batchglm").setLevel(logging.WARNING)
-        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+        from batchglm.api.models.glm_norm import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -194,7 +200,7 @@ class _TestSingleNull:
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of t_test(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
+        assert pval_h0 > 0.05, ("KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5))
 
         return True
 
@@ -212,9 +218,7 @@ class _TestSingleNull:
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
-        logging.getLogger("tensorflow").setLevel(logging.ERROR)
-        logging.getLogger("batchglm").setLevel(logging.WARNING)
-        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+        from batchglm.api.models.glm_norm import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -236,7 +240,7 @@ class _TestSingleNull:
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of rank_test(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
+        assert pval_h0 > 0.05, ("KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5))
 
         return True
 
@@ -257,6 +261,10 @@ class TestSingleNullStandard(_TestSingleNull, unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
         return self._test_null_distribution_ttest(
             n_cells=n_cells,
             n_genes=n_genes
@@ -273,6 +281,10 @@ class TestSingleNullStandard(_TestSingleNull, unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
         return self._test_null_distribution_rank(
             n_cells=n_cells,
             n_genes=n_genes
@@ -295,6 +307,10 @@ class TestSingleNullNB(_TestSingleNull, unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
         return self._test_null_distribution_wald(
             n_cells=n_cells,
             n_genes=n_genes,
@@ -313,6 +329,10 @@ class TestSingleNullNB(_TestSingleNull, unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
         return self._test_null_distribution_wald_multi(
             n_cells=n_cells,
             n_genes=n_genes,
@@ -325,11 +345,15 @@ class TestSingleNullNB(_TestSingleNull, unittest.TestCase):
             n_genes: int = 200
     ):
         """
-        Test if wald() generates a uniform p-value distribution for "nb" noise model.
+        Test if lrt() generates a uniform p-value distribution for "nb" noise model.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
         return self._test_null_distribution_lrt(
             n_cells=n_cells,
             n_genes=n_genes,
@@ -344,7 +368,7 @@ class TestSingleNullNORM(_TestSingleNull, unittest.TestCase):
     """
     def test_null_distribution_wald_norm(
             self,
-            n_cells: int = 2000,
+            n_cells: int = 200,
             n_genes: int = 200
     ):
         """
@@ -353,6 +377,10 @@ class TestSingleNullNORM(_TestSingleNull, unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
         return self._test_null_distribution_wald(
             n_cells=n_cells,
             n_genes=n_genes,
@@ -371,7 +399,32 @@ class TestSingleNullNORM(_TestSingleNull, unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
         return self._test_null_distribution_wald_multi(
+            n_cells=n_cells,
+            n_genes=n_genes,
+            noise_model="norm"
+        )
+
+    def test_null_distribution_lrt_norm(
+            self,
+            n_cells: int = 2000,
+            n_genes: int = 200
+    ):
+        """
+        Test if lrt() generates a uniform p-value distribution for "norm" noise model.
+
+        :param n_cells: Number of cells to simulate (number of observations per test).
+        :param n_genes: Number of genes to simulate (number of tests).
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        return self._test_null_distribution_lrt(
             n_cells=n_cells,
             n_genes=n_genes,
             noise_model="norm"

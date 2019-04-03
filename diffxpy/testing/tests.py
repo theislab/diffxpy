@@ -19,8 +19,6 @@ from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, 
     DifferentialExpressionTestWaldCont, DifferentialExpressionTestLRTCont
 from .utils import parse_gene_names, parse_data, parse_sample_description, parse_size_factors, parse_grouping
 
-logger = logging.getLogger("diffxpy")
-
 # Use this to suppress matrix subclass PendingDepreceationWarnings from numpy:
 np.warnings.filterwarnings("ignore")
 
@@ -145,8 +143,8 @@ def _fit(
         else:
             raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
 
-        logger.info("Fitting model...")
-        logger.debug(" * Assembling input data...")
+        logging.getLogger("diffxpy").info("Fitting model...")
+        logging.getLogger("diffxpy").debug(" * Assembling input data...")
         input_data = InputData.new(
             data=data,
             design_loc=design_loc,
@@ -157,7 +155,7 @@ def _fit(
             feature_names=gene_names,
         )
 
-        logger.debug(" * Set up Estimator...")
+        logging.getLogger("diffxpy").debug(" * Set up Estimator...")
         constructor_args = {}
         if batch_size is not None:
             constructor_args["batch_size"] = batch_size
@@ -176,10 +174,10 @@ def _fit(
             **constructor_args
         )
 
-        logger.debug(" * Initializing Estimator...")
+        logging.getLogger("diffxpy").debug(" * Initializing Estimator...")
         estim.initialize()
 
-        logger.debug(" * Run estimation...")
+        logging.getLogger("diffxpy").debug(" * Run estimation...")
         # training:
         if callable(training_strategy):
             # call training_strategy if it is a function
@@ -188,11 +186,11 @@ def _fit(
             estim.train_sequence(training_strategy=training_strategy)
 
         if close_session:
-            logger.debug(" * Finalize estimation...")
+            logging.getLogger("diffxpy").debug(" * Finalize estimation...")
             model = estim.finalize()
         else:
             model = estim
-        logger.debug(" * Model fitting done.")
+        logging.getLogger("diffxpy").debug(" * Model fitting done.")
 
     return model
 
