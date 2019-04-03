@@ -946,7 +946,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             show: bool = True,
             save: Union[str, None] = None,
             suffix: str = "_ols_comparison.png",
-            ncols=5,
+            ncols=3,
             row_gap=0.3,
             col_gap=0.25,
             return_axs: bool = False
@@ -1053,6 +1053,126 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             ax.set(xlabel="user supplied model", ylabel="OLS model")
             title_i = par_loc[i] + " (R=" + str(np.round(np.corrcoef(x, y)[0, 1], 3)) + ")"
             ax.set_title(title_i)
+
+        # Save, show and return figure.
+        if save is not None:
+            plt.savefig(save + suffix)
+
+        if show:
+            plt.show()
+
+        plt.close(fig)
+        plt.ion()
+
+        if return_axs:
+            return axs
+        else:
+            return
+
+    def plot_gene_fits(
+            self,
+            gene_names: Tuple,
+            covariate_x: str = None,
+            covariate_hue: str = None,
+            size_factor_normalize: bool = False,
+            log_transform: bool = False,
+            show: bool = True,
+            save: Union[str, None] = None,
+            suffix: str = "_genes.png",
+            ncols=3,
+            row_gap=0.3,
+            col_gap=0.25,
+            return_axs: bool = False
+    ):
+        """
+        Plot gene-wise model fits and observed distribution by covariates.
+
+        Use this to inspect fitting performance on individual genes.
+
+        :param gene_names: Genes to generate plots for.
+        :param covariate_x: Covariate in location model to partition x-axis by.
+        :param covariate_hue: Covariate in location model to stack boxplots by.
+        :param size_factor_normalize: Whether to size_factor normalize observations
+            before estimating the distribution with boxplot.
+        :param log_transform: Whether to log transform observations
+            before estimating the distribution with boxplot. Model estimates are adjusted accordingly.
+        :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
+        :param save: Path+file name stem to save plots to.
+            File will be save+suffix. Does not save if save is None.
+        :param suffix: Suffix for file name to save plot to. Also use this to set the file type.
+        :param ncols: Number of columns in plot grid if multiple genes are plotted.
+        :param row_gap: Vertical gap between panel rows relative to panel height.
+        :param col_gap: Horizontal gap between panel columns relative to panel width.
+        :param return_axs: Whether to return axis objects.
+
+        :return: Matplotlib axis objects.
+        """
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        from matplotlib import gridspec
+        from matplotlib import rcParams
+
+        plt.ioff()
+        nrows = len(par_loc) // ncols + int((len(par_loc) % ncols) > 0)
+
+        gs = gridspec.GridSpec(
+            nrows=nrows,
+            ncols=ncols,
+            hspace=row_gap,
+            wspace=col_gap
+        )
+        fig = plt.figure(
+            figsize=(
+                ncols * rcParams['figure.figsize'][0],  # width in inches
+                nrows * rcParams['figure.figsize'][1] * (1 + row_gap)  # height in inches
+            )
+        )
+
+        axs = []
+        for i, g in enumerate(gene_names):
+            # Prepare data boxplot.
+            y = self.model_estim.X[:, g]
+            if size_factor_normalize:
+                pass
+            if log_transform:
+                pass
+
+            summary_fit = pd.DataFrame({
+                "y": y
+            })
+            if covariate_x is not None:
+                if covariate_x in self.model_estim.design_loc.columns:
+                    summary_fit["x"] = self.model_estim.design_loc.[covariate_x]
+                else
+                    raise ValueError("covariate_x=%s not found in location model" % covariate_x)
+
+            if covariate_hue is not None:
+                if covariate_hue in self.model_estim.design_loc.columns:
+                    summary_fit["hue"] = self.model_estim.design_loc.[covariate_hue]
+                else
+                    raise ValueError("covariate_x=%s not found in location model" % covariate_x)
+
+            # Prepare model fit plot.
+            if self.noise_model == "nb":
+                pass
+            elif self.noise_model == "norm":
+                pass
+            else:
+                raise ValueError("noise model %s not yet supported for plot_gene_fits" % self.noise_model)
+
+            ax = plt.subplot(gs[i])
+            axs.append(ax)
+
+            sns.boxplot(
+                x="x",
+                y="y",
+                hue="hue",
+                data=summary_fit,
+                ax=ax
+            )
+
+            ax.set(xlabel="covariate", ylabel="expression")
+            ax.set_title(g)
 
         # Save, show and return figure.
         if save is not None:
