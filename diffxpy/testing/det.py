@@ -1113,7 +1113,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         from matplotlib import rcParams
 
         plt.ioff()
-        nrows = len(par_loc) // ncols + int((len(par_loc) % ncols) > 0)
+        nrows = len(gene_names) // ncols + int((len(gene_names) % ncols) > 0)
 
         gs = gridspec.GridSpec(
             nrows=nrows,
@@ -1142,14 +1142,14 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             })
             if covariate_x is not None:
                 if covariate_x in self.model_estim.design_loc.columns:
-                    summary_fit["x"] = self.model_estim.design_loc.[covariate_x]
-                else
+                    summary_fit["x"] = self.model_estim.design_loc[covariate_x]
+                else:
                     raise ValueError("covariate_x=%s not found in location model" % covariate_x)
 
             if covariate_hue is not None:
                 if covariate_hue in self.model_estim.design_loc.columns:
-                    summary_fit["hue"] = self.model_estim.design_loc.[covariate_hue]
-                else
+                    summary_fit["hue"] = self.model_estim.design_loc[covariate_hue]
+                else:
                     raise ValueError("covariate_x=%s not found in location model" % covariate_x)
 
             # Prepare model fit plot.
