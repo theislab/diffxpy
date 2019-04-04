@@ -2,6 +2,7 @@ import abc
 import logging
 from typing import Union, Dict, Tuple, List, Set
 import pandas as pd
+from random import sample
 
 import numpy as np
 import xarray as xr
@@ -14,6 +15,7 @@ try:
 except ImportError:
     anndata = None
 
+from batchglm.xarray_sparse.base import SparseXArrayDataArray
 from batchglm.models.glm_nb import Model as GeneralizedLinearModel
 
 from ..stats import stats
@@ -777,6 +779,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         self.model_estim = model_estim
         self.coef_loc_totest = col_indices
         self.noise_model = noise_model
+        self._store_ols = None
 
         try:
             if model_estim._error_codes is not None:
@@ -940,12 +943,12 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         else:
             return
 
-    def plot_comparison_ols(
+    def plot_comparison_ols_coef(
             self,
             size=20,
             show: bool = True,
             save: Union[str, None] = None,
-            suffix: str = "_ols_comparison.png",
+            suffix: str = "_ols_comparison_coef.png",
             ncols=3,
             row_gap=0.3,
             col_gap=0.25,
@@ -955,6 +958,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         Plot location model coefficients of inferred model against those obtained from an OLS model.
 
         Red line shown is the identity line.
+        Note that this comparison only seems to be useful if the covariates are zero centred. This is
+        especially important for continuous covariates.
 
         :param size: Size of points.
         :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
@@ -975,39 +980,47 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         from batchglm.api.models.glm_norm import Estimator, InputData
 
         # Run OLS model fit to have comparison coefficients.
-        input_data_ols = InputData.new(
-            data=self.model_estim.input_data.data,
-            design_loc=self.model_estim.input_data.design_loc,
-            design_scale=self.model_estim.input_data.design_scale[:, [0]],
-            constraints_loc=self.model_estim.input_data.constraints_loc,
-            constraints_scale=self.model_estim.input_data.constraints_scale[[0], [0]],
-            size_factors=self.model_estim.input_data.size_factors,
-            feature_names=self.model_estim.input_data.features,
-        )
-        estim_ols = Estimator(
-            input_data=input_data_ols,
-            init_model=None,
-            init_a="standard",
-            init_b="standard",
-            dtype=self.model_estim.a_var.dtype
-        )
-        estim_ols.initialize()
-        store_ols = estim_ols.finalize()
+        if self._store_ols is None:
+            input_data_ols = InputData.new(
+                data=self.model_estim.input_data.data,
+                design_loc=self.model_estim.input_data.design_loc,
+                design_scale=self.model_estim.input_data.design_scale[:, [0]],
+                constraints_loc=self.model_estim.input_data.constraints_loc,
+                constraints_scale=self.model_estim.input_data.constraints_scale[[0], [0]],
+                size_factors=self.model_estim.input_data.size_factors,
+                feature_names=self.model_estim.input_data.features,
+            )
+            estim_ols = Estimator(
+                input_data=input_data_ols,
+                init_model=None,
+                init_a="standard",
+                init_b="standard",
+                dtype=self.model_estim.a_var.dtype
+            )
+            estim_ols.initialize()
+            store_ols = estim_ols.finalize()
+            self._store_ols = store_ols
+        else:
+            store_ols = self._store_ols
 
         # Prepare parameter summary of both model fits.
-        par_loc = input_data_ols.data.coords["design_loc_params"].values
+        par_loc = self.model_estim.input_data.data.coords["design_loc_params"].values
+
+        a_var_ols = store_ols.a_var.values
+        a_var_ols[1:, :] = (a_var_ols[1:, :] + a_var_ols[[0], :]) / a_var_ols[[0], :]
+
+        a_var_user = self.model_estim.a_var.values
+        # Translate coefficients from both fits to be multiplicative in identity space.
         if self.noise_model == "nb":
-            # Translate coefficients from OLS fit to be multiplicative in identity space.
-            a_var_ols = store_ols.a_var.values
-            a_var_ols[1:, :] = (a_var_ols[1:, :] + a_var_ols[[0], :]) / a_var_ols[[0], :]
+            a_var_user = np.exp(a_var_user)  # self.model_estim.inverse_link_loc(a_var_user)
         elif self.noise_model == "norm":
-            a_var_ols = store_ols.a_var
+            a_var_user[1:, :] = (a_var_user[1:, :] + a_var_user[[0], :]) / a_var_user[[0], :]
         else:
             raise ValueError("noise model %s not yet supported for plot_comparison_ols" % self.noise_model)
 
         summaries_fits = [
             pd.DataFrame({
-                "user": self.model_estim.inverse_link_loc(self.model_estim.a_var[i, :]),
+                "user": a_var_user[i, :],
                 "ols": a_var_ols[i, :],
                 "coef": par_loc[i]
             }) for i in range(self.model_estim.a_var.shape[0])
@@ -1053,6 +1066,174 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             ax.set(xlabel="user supplied model", ylabel="OLS model")
             title_i = par_loc[i] + " (R=" + str(np.round(np.corrcoef(x, y)[0, 1], 3)) + ")"
             ax.set_title(title_i)
+
+        # Save, show and return figure.
+        if save is not None:
+            plt.savefig(save + suffix)
+
+        if show:
+            plt.show()
+
+        plt.close(fig)
+        plt.ion()
+
+        if return_axs:
+            return axs
+        else:
+            return
+
+    def plot_comparison_ols_pred(
+            self,
+            size=20,
+            log1p_transform: bool = True,
+            show: bool = True,
+            save: Union[str, None] = None,
+            suffix: str = "_ols_comparison_pred.png",
+            row_gap=0.3,
+            col_gap=0.25,
+            return_axs: bool = False
+    ):
+        """
+        Compare location model prediction of inferred model with one obtained from an OLS model.
+
+        Red line shown is the identity line.
+
+        :param size: Size of points.
+        :param log1p_transform: Whether to log1p transform the data.
+        :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
+        :param save: Path+file name stem to save plots to.
+            File will be save+suffix. Does not save if save is None.
+        :param suffix: Suffix for file name to save plot to. Also use this to set the file type.
+        :param row_gap: Vertical gap between panel rows relative to panel height.
+        :param col_gap: Horizontal gap between panel columns relative to panel width.
+        :param return_axs: Whether to return axis objects.
+
+        :return: Matplotlib axis objects.
+        """
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        from matplotlib import gridspec
+        from matplotlib import rcParams
+        from batchglm.api.models.glm_norm import Estimator, InputData
+
+        # Run OLS model fit to have comparison coefficients.
+        if self._store_ols is None:
+            input_data_ols = InputData.new(
+                data=self.model_estim.input_data.data,
+                design_loc=self.model_estim.input_data.design_loc,
+                design_scale=self.model_estim.input_data.design_scale[:, [0]],
+                constraints_loc=self.model_estim.input_data.constraints_loc,
+                constraints_scale=self.model_estim.input_data.constraints_scale[[0], [0]],
+                size_factors=self.model_estim.input_data.size_factors,
+                feature_names=self.model_estim.input_data.features,
+            )
+            estim_ols = Estimator(
+                input_data=input_data_ols,
+                init_model=None,
+                init_a="standard",
+                init_b="standard",
+                dtype=self.model_estim.a_var.dtype
+            )
+            estim_ols.initialize()
+            store_ols = estim_ols.finalize()
+            self._store_ols = store_ols
+        else:
+            store_ols = self._store_ols
+
+        # Prepare parameter summary of both model fits.
+        plt.ioff()
+        nrows = 1
+        ncols = 2
+
+        axs = []
+        gs = gridspec.GridSpec(
+            nrows=nrows,
+            ncols=ncols,
+            hspace=row_gap,
+            wspace=col_gap
+        )
+        fig = plt.figure(
+            figsize=(
+                ncols * rcParams['figure.figsize'][0],  # width in inches
+                nrows * rcParams['figure.figsize'][1] * (1 + row_gap)  # height in inches
+            )
+        )
+
+        pred_n_cells = sample(
+            population=list(np.arange(0, self.model_estim.X.shape[0])),
+            k=np.min([20, self.model_estim.design_loc.shape[0]])
+        )
+
+        if isinstance(self.model_estim.X, SparseXArrayDataArray):
+            x = np.asarray(self.model_estim.X.X[pred_n_cells, :].todense()).flatten()
+        else:
+            x = np.asarray(self.model_estim.X[pred_n_cells, :]).flatten()
+
+        y_user = self.model_estim.inverse_link_loc(
+            np.matmul(self.model_estim.design_loc[pred_n_cells, :].values, self.model_estim.a_var.values).flatten()
+        )
+        y_ols = store_ols.inverse_link_loc(
+            np.matmul(store_ols.design_loc[pred_n_cells, :].values, store_ols.a_var.values).flatten()
+        )
+        if log1p_transform:
+            x = np.log(x+1)
+            y_user = np.log(y_user + 1)
+            y_ols = np.log(y_ols + 1)
+
+        y = np.concatenate([y_user, y_ols])
+
+        summary0_fit = pd.concat([
+            pd.DataFrame({
+                "observed": y_user,
+                "predicted": x,
+                "model": ["user" for i in x]
+            }),
+            pd.DataFrame({
+                "observed": y_ols,
+                "predicted": x,
+                "model": ["OLS" for i in x]
+            })
+        ])
+
+        ax0 = plt.subplot(gs[0])
+        axs.append(ax0)
+        sns.scatterplot(
+            x="observed",
+            y="predicted",
+            hue="model",
+            data=summary0_fit,
+            ax=ax0,
+            s=size
+        )
+        sns.lineplot(
+            x=np.array([np.min([np.min(x), np.min(y)]), np.max([np.max(x), np.max(y)])]),
+            y=np.array([np.min([np.min(x), np.min(y)]), np.max([np.max(x), np.max(y)])]),
+            ax=ax0,
+            color="red",
+            legend=False
+        )
+        ax0.set(xlabel="observed value", ylabel="model")
+
+        summary1_fit = pd.concat([
+            pd.DataFrame({
+                "dev": y_user-x,
+                "model": ["user" for i in x]
+            }),
+            pd.DataFrame({
+                "dev": y_ols-x,
+                "model": ["OLS" for i in x]
+            })
+        ])
+
+        ax1 = plt.subplot(gs[1])
+        axs.append(ax0)
+        sns.boxplot(
+            x="model",
+            y="dev",
+            data=summary1_fit,
+            ax=ax1
+        )
+        ax1.set(xlabel="model", ylabel="deviation from observations")
 
         # Save, show and return figure.
         if save is not None:
