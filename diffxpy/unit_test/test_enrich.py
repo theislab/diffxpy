@@ -36,11 +36,20 @@ class TestEnrich(unittest.TestCase):
         rs.add(id="set1", source="manual", gene_ids=["1", "3"])
         rs.add(id="set2", source="manual", gene_ids=["5", "6"])
 
-        enrich_test = de.enrich.test(
-            ref=rs,
-            det=test,
-            de_threshold=0.05
-        )
+        for i in [True, False]:
+            for j in [True, False]:
+                enrich_test_i = de.enrich.test(
+                    ref=rs,
+                    det=test,
+                    de_threshold=0.05,
+                    incl_all_zero=i,
+                    clean_ref=j,
+                )
+                _ = enrich_test_i.summary()
+                _ = enrich_test_i.significant_set_ids()
+                _ = enrich_test_i.significant_sets()
+                _ = enrich_test_i.set_summary(id="set1")
+
         return True
 
 

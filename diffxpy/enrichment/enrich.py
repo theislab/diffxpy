@@ -7,7 +7,6 @@ from ..stats import stats
 from ..testing import correction
 from ..testing.det import _DifferentialExpressionTest
 
-logger = logging.getLogger(__name__)
 
 class RefSets:
     """
@@ -42,15 +41,19 @@ class RefSets:
 
     def __init__(self, sets=None, fn=None, type='gmt'):
         if sets is not None:
-            self.load_sets(sets, type=type)
-            self._genes = np.sort(np.unique(np.concatenate([np.asarray(list(x.genes)) for x in self.sets])))
+            if len(sets) > 0:
+                self.load_sets(sets, type=type)
+                self._genes = np.sort(np.unique(np.concatenate([np.asarray(list(x.genes)) for x in self.sets])))
+            else:
+                self.sets = []
+                self._genes = np.array([])
         elif fn is not None:
             self.read_from_file(fn=fn, type=type)
             self._genes = np.sort(np.unique(np.concatenate([np.asarray(list(x.genes)) for x in self.sets])))
         else:
             self.sets = []
             self._genes = np.array([])
-        self._ids = [x.id for x in self.sets]
+        self._ids = np.array([x.id for x in self.sets])
         self._set_lens = np.array([x.len for x in self.sets])
         self.genes_discarded = None
 
@@ -113,7 +116,7 @@ class RefSets:
         self.sets.append(self._Set(id=id, source=source, gene_ids=gene_ids))
         # Update summary variables:
         self._genes = np.sort(np.unique(np.concatenate([np.asarray(list(x.genes)) for x in self.sets])))
-        self._ids = [x.id for x in self.sets]
+        self._ids = np.array([x.id for x in self.sets])
         self._set_lens = np.array([x.len for x in self.sets])
 
     ## Processing functions.
@@ -165,7 +168,7 @@ class RefSets:
         """ 
         Return the set with a given set identifier.
         """
-        return self.sets[self._ids.index(id)]
+        return self.sets[self._ids.tolist().index(id)]
 
     ## Overlap functions.
 
@@ -205,31 +208,22 @@ def test(
     nice doc string and that the call to this is de.enrich.test which
     makes more sense to me than de.enrich.Enrich.
 
-    :param RefSets:
-        The annotated gene sets against which enrichment is tested.
-    :param DETest:
-        The differential expression results object which is tested
+    :param ref: The annotated gene sets against which enrichment is tested.
+    :param det: The differential expression results object which is tested
         for enrichment in the gene sets.
-    :param pval:
-        Alternative to DETest, vector of p-values for differential expression.
-    :param gene_ids:
-        If pval was supplied instead of DETest, use gene_ids to supply the
+    :param pval: Alternative to DETest, vector of p-values for differential expression.
+    :param gene_ids: If pval was supplied instead of DETest, use gene_ids to supply the
         vector of gene identifiers (strings) that correspond to the p-values
         which can be matched against the identifieres in the sets in RefSets.
-    :param de_threshold:
-        Significance threshold at which a differential test (a multiple-testing 
+    :param de_threshold: Significance threshold at which a differential test (a multiple-testing
         corrected p-value) is called siginficant. T
-    :param incl_all_zero:
-        Wehther to include genes in gene universe which were all zero.
-    :param all_ids:
-        Set of all gene identifiers, this is used as the background set in the
+    :param incl_all_zero: Wehther to include genes in gene universe which were all zero.
+    :param all_ids: Set of all gene identifiers, this is used as the background set in the
         hypergeometric test. Only supply this if not all genes were tested
         and are supplied above in DETest or gene_ids.
-    :param clean_ref:
-        Whether or not to only retain gene identifiers in RefSets that occur in 
+    :param clean_ref: Whether or not to only retain gene identifiers in RefSets that occur in
         the background set of identifiers supplied here through all_ids.
-    :param capital:
-        Make all gene IDs captial.
+    :param capital: Make all gene IDs captial.
     """
     return Enrich(
         ref=ref,
@@ -263,8 +257,8 @@ class Enrich:
         self._n_overlaps = None
         self._pval_enrich = None
         self._qval_enrich = None
-        if isinstance(gene_ids, np.ndarray):
-            gene_ids = gene_ids.tolist()
+        if isinstance(gene_ids, list):
+            gene_ids = np.asarray(gene_ids)
         # Load multiple-testing-corrected differential expression
         # p-values from differential expression output.
         if det is not None:
@@ -284,7 +278,7 @@ class Enrich:
         # Select significant genes based on user defined threshold.
         if any([x is np.nan for x in self._gene_ids]):
             idx_notnan = np.where([x is not np.nan for x in self._gene_ids])[0]
-            logger.info(
+            logging.getLogger("diffxpy").info(
                 " Discarded %i nan gene ids, leaving %i genes.",
                 len(self._gene_ids) - len(idx_notnan),
                 len(idx_notnan)
@@ -305,7 +299,7 @@ class Enrich:
             self._significant_ids = set([x.upper() for x in self._significant_ids])
 
         # Generate diagnostic statistic of number of possible overlaps in total.
-        logger.info(
+        logging.getLogger("diffxpy").info(
             " %i overlaps found between refset (%i) and provided gene list (%i).",
             len(set(self._all_ids).intersection(set(ref._genes))),
             len(ref._genes),
@@ -320,7 +314,7 @@ class Enrich:
         # Print if there are empty sets.
         idx_nonempty = np.where([len(x.genes) > 0 for x in self.RefSets.sets])[0]
         if len(self.RefSets.sets) - len(idx_nonempty) > 0:
-            logger.info(
+            logging.getLogger("diffxpy").info(
                 " Found %i empty sets, removing those.",
                 len(self.RefSets.sets) - len(idx_nonempty)
             )
@@ -391,7 +385,10 @@ class Enrich:
         """
         Return significant sets from gene set enrichement analysis as an output table.
         """
-        return self.RefSets.subset(idx=np.where(self.qval <= threshold)[0])
+        sig_sets = np.where(self.qval <= threshold)[0]
+        if len(sig_sets) == 0:
+            logging.getLogger("diffxpy").info("no significant sets found")
+        return self.RefSets.subset(idx=sig_sets)
 
     def significant_set_ids(self, threshold=0.05) -> np.array:
         """
@@ -426,4 +423,4 @@ class Enrich:
 
         :return: Slice of summary table.
         """
-        return self.summary(sort=False).iloc[self.RefSets._ids.index(id), :]
+        return self.summary(sort=False).iloc[self.RefSets._ids.tolist().index(id), :]
