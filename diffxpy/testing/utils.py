@@ -63,6 +63,7 @@ def parse_size_factors(size_factors, data):
         if isinstance(size_factors, pd.core.series.Series):
             size_factors = size_factors.values
         assert size_factors.shape[0] == data.shape[0], "data matrix and size factors must contain same number of cells"
+        assert np.all(size_factors > 0), "size_factors <= 0 found, please remove these cells"
     return size_factors
 
 
