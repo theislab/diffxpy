@@ -612,7 +612,8 @@ def wald(
     de_test = DifferentialExpressionTestWald(
         model_estim=model,
         col_indices=col_indices,
-        noise_model=noise_model
+        noise_model=noise_model,
+        sample_description=sample_description
     )
 
     return de_test
@@ -650,6 +651,7 @@ def t_test(
 
     de_test = DifferentialExpressionTestTT(
         data=X.astype(dtype),
+        sample_description=sample_description,
         grouping=grouping,
         gene_names=gene_names,
         is_logged=is_logged
@@ -690,6 +692,7 @@ def rank_test(
 
     de_test = DifferentialExpressionTestRank(
         data=X.astype(dtype),
+        sample_description=sample_description,
         grouping=grouping,
         gene_names=gene_names,
         is_logged=is_logged

@@ -758,6 +758,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     """
 
     model_estim: _Estimation
+    sample_description: pd.DataFrame
     coef_loc_totest: np.ndarray
     theta_mle: np.ndarray
     theta_sd: np.ndarray
@@ -769,6 +770,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             model_estim: _Estimation,
             col_indices: np.ndarray,
             noise_model: str,
+            sample_description: pd.DataFrame
     ):
         """
         :param model_estim:
@@ -776,6 +778,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         """
         super().__init__()
 
+        self.sample_description = sample_description
         self.model_estim = model_estim
         self.coef_loc_totest = col_indices
         self.noise_model = noise_model
@@ -909,6 +912,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             return_axs: bool = False
     ):
         """
+        Normalizes data by size factors if any were used in model.
 
         :param log10:
         :param return_axs: Whether to return axis objects.
@@ -920,8 +924,11 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         from .tests import t_test
 
         grouping = np.asarray(self.model_estim.design_loc[:, self.coef_loc_totest])
+        # Normalize by size factors that were used in regression.
+        sf = np.broadcast_to(np.expand_dims(self.model_estim.size_factors, axis=1),
+                             shape=self.model_estim.X.shape)
         ttest = t_test(
-            data=self.model_estim.X,
+            data=self.model_estim.X.multiply(1 / sf, copy=True),
             grouping=grouping,
             gene_names=self.gene_ids,
         )
@@ -1250,19 +1257,97 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         else:
             return
 
-    def plot_gene_fits(
+    def _assemble_gene_fits(
+            self,
+            gene_names: Tuple,
+            covariate_x: str,
+            covariate_hue: Union[None, str],
+            log1p_transform: bool,
+    ):
+        """
+        Prepare data for gene-wise model plots.
+
+        :param gene_names: Genes to generate plots for.
+        :param covariate_x: Covariate in location model to partition x-axis by.
+        :param covariate_hue: Covariate in location model to stack boxplots by.
+        :param log1p_transform: Whether to log transform observations
+            before estimating the distribution with boxplot. Model estimates are adjusted accordingly.
+        :return summaries_genes: List with data frame for seabron in it.
+        """
+
+        summaries_genes = []
+        for i, g in enumerate(gene_names):
+            assert g in self.model_estim.features, "gene %g not found" % g
+            g_idx = self.model_estim.features.tolist().index(g)
+            # Raw data for boxplot:
+            y = self.model_estim.X[:, g_idx]
+            # Model fits:
+            loc = self.model_estim.location[:, g_idx]
+            scale = self.model_estim.scale[:, g_idx]
+            if self.noise_model == "nb":
+                yhat = np.random.negative_binomial(
+                        n=scale,
+                        p=1 - loc / (scale + loc)
+                    )
+            elif self.noise_model == "norm":
+                yhat = np.random.normal(
+                    loc=loc,
+                    scale=scale
+                )
+            else:
+                raise ValueError("noise model %s not yet supported for plot_gene_fits" % self.noise_model)
+
+            # Transform observed data:
+            if log1p_transform:
+                y = np.log(y + 1)
+                yhat = np.log(yhat + 1)
+
+            # Build DataFrame which contains all information for raw data:
+            summary_raw = pd.DataFrame({"y": y, "data": "obs"})
+            summary_fit = pd.DataFrame({"y": yhat, "data": "fit"})
+            if covariate_x is not None:
+                assert self.sample_description is not None, "sample_description was not provided to test.wald()"
+                if covariate_x in self.sample_description.columns:
+                    summary_raw["x"] = self.sample_description[covariate_x].values.astype(str)
+                    summary_fit["x"] = self.sample_description[covariate_x].values.astype(str)
+                else:
+                    raise ValueError("covariate_x=%s not found in location model" % covariate_x)
+            else:
+                summary_raw["x"] = " "
+                summary_fit["x"] = " "
+
+            if covariate_hue is not None:
+                assert self.sample_description is not None, "sample_description was not provided to test.wald()"
+                if covariate_hue in self.sample_description.columns:
+                    summary_raw["hue"] = [str(x)+"_obs" for x in self.sample_description[covariate_hue].values]
+                    summary_fit["hue"] = [str(x)+"_fit" for x in self.sample_description[covariate_hue].values]
+                else:
+                    raise ValueError("covariate_x=%s not found in location model" % covariate_x)
+            else:
+                summary_raw["hue"] = "obs"
+                summary_fit["hue"] = "fit"
+
+            summaries = pd.concat([summary_raw, summary_fit])
+            summaries.x = pd.Categorical(summaries.x, ordered=True)
+            summaries.hue = pd.Categorical(summaries.hue, ordered=True)
+
+            summaries_genes.append(summaries)
+
+        return summaries_genes
+
+    def plot_gene_fits_boxplots(
             self,
             gene_names: Tuple,
             covariate_x: str = None,
             covariate_hue: str = None,
-            size_factor_normalize: bool = False,
-            log_transform: bool = False,
+            log1p_transform: bool = False,
             show: bool = True,
             save: Union[str, None] = None,
-            suffix: str = "_genes.png",
+            suffix: str = "_genes_boxplot.png",
             ncols=3,
             row_gap=0.3,
             col_gap=0.25,
+            xtick_rotation=0,
             return_axs: bool = False
     ):
         """
@@ -1273,9 +1358,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         :param gene_names: Genes to generate plots for.
         :param covariate_x: Covariate in location model to partition x-axis by.
         :param covariate_hue: Covariate in location model to stack boxplots by.
-        :param size_factor_normalize: Whether to size_factor normalize observations
-            before estimating the distribution with boxplot.
-        :param log_transform: Whether to log transform observations
+        :param log1p_transform: Whether to log transform observations
             before estimating the distribution with boxplot. Model estimates are adjusted accordingly.
         :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
         :param save: Path+file name stem to save plots to.
@@ -1284,6 +1367,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         :param ncols: Number of columns in plot grid if multiple genes are plotted.
         :param row_gap: Vertical gap between panel rows relative to panel height.
         :param col_gap: Horizontal gap between panel columns relative to panel width.
+        :param xtick_rotation: Angle to rotate x-ticks by.
         :param return_axs: Whether to return axis objects.
 
         :return: Matplotlib axis objects.
@@ -1310,50 +1394,136 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         )
 
         axs = []
+        summaries = self._assemble_gene_fits(
+            gene_names=gene_names,
+            covariate_x=covariate_x,
+            covariate_hue=covariate_hue,
+            log1p_transform=log1p_transform
+        )
         for i, g in enumerate(gene_names):
-            # Prepare data boxplot.
-            y = self.model_estim.X[:, g]
-            if size_factor_normalize:
-                pass
-            if log_transform:
-                pass
-
-            summary_fit = pd.DataFrame({
-                "y": y
-            })
-            if covariate_x is not None:
-                if covariate_x in self.model_estim.design_loc.columns:
-                    summary_fit["x"] = self.model_estim.design_loc[covariate_x]
-                else:
-                    raise ValueError("covariate_x=%s not found in location model" % covariate_x)
-
-            if covariate_hue is not None:
-                if covariate_hue in self.model_estim.design_loc.columns:
-                    summary_fit["hue"] = self.model_estim.design_loc[covariate_hue]
-                else:
-                    raise ValueError("covariate_x=%s not found in location model" % covariate_x)
-
-            # Prepare model fit plot.
-            if self.noise_model == "nb":
-                pass
-            elif self.noise_model == "norm":
-                pass
-            else:
-                raise ValueError("noise model %s not yet supported for plot_gene_fits" % self.noise_model)
-
             ax = plt.subplot(gs[i])
             axs.append(ax)
+
+            if log1p_transform:
+                ylabel = "log1p expression"
+            else:
+                ylabel = "expression"
 
             sns.boxplot(
                 x="x",
                 y="y",
                 hue="hue",
-                data=summary_fit,
+                data=summaries[i],
                 ax=ax
             )
 
-            ax.set(xlabel="covariate", ylabel="expression")
+            ax.set(xlabel="covariate", ylabel=ylabel)
             ax.set_title(g)
+
+            plt.xticks(rotation=xtick_rotation)
+
+        # Save, show and return figure.
+        if save is not None:
+            plt.savefig(save + suffix)
+
+        if show:
+            plt.show()
+
+        plt.close(fig)
+        plt.ion()
+
+        if return_axs:
+            return axs
+        else:
+            return
+
+    def plot_gene_fits_violins(
+            self,
+            gene_names: Tuple,
+            covariate_x: str = None,
+            log1p_transform: bool = False,
+            show: bool = True,
+            save: Union[str, None] = None,
+            suffix: str = "_genes_violin.png",
+            ncols=3,
+            row_gap=0.3,
+            col_gap=0.25,
+            xtick_rotation=0,
+            return_axs: bool = False,
+            **kwargs
+    ):
+        """
+        Plot gene-wise model fits and observed distribution by covariates as violins.
+
+        Use this to inspect fitting performance on individual genes.
+
+        :param gene_names: Genes to generate plots for.
+        :param covariate_x: Covariate in location model to partition x-axis by.
+        :param log1p_transform: Whether to log transform observations
+            before estimating the distribution with boxplot. Model estimates are adjusted accordingly.
+        :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
+        :param save: Path+file name stem to save plots to.
+            File will be save+suffix. Does not save if save is None.
+        :param suffix: Suffix for file name to save plot to. Also use this to set the file type.
+        :param ncols: Number of columns in plot grid if multiple genes are plotted.
+        :param row_gap: Vertical gap between panel rows relative to panel height.
+        :param col_gap: Horizontal gap between panel columns relative to panel width.
+        :param xtick_rotation: Angle to rotate x-ticks by.
+        :param return_axs: Whether to return axis objects.
+
+        :return: Matplotlib axis objects.
+        """
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        from matplotlib import gridspec
+        from matplotlib import rcParams
+
+        plt.ioff()
+        nrows = len(gene_names) // ncols + int((len(gene_names) % ncols) > 0)
+
+        gs = gridspec.GridSpec(
+            nrows=nrows,
+            ncols=ncols,
+            hspace=row_gap,
+            wspace=col_gap
+        )
+        fig = plt.figure(
+            figsize=(
+                ncols * rcParams['figure.figsize'][0],  # width in inches
+                nrows * rcParams['figure.figsize'][1] * (1 + row_gap)  # height in inches
+            )
+        )
+
+        axs = []
+        summaries = self._assemble_gene_fits(
+            gene_names=gene_names,
+            covariate_x=covariate_x,
+            covariate_hue=None,
+            log1p_transform=log1p_transform
+        )
+        for i, g in enumerate(gene_names):
+            ax = plt.subplot(gs[i])
+            axs.append(ax)
+
+            if log1p_transform:
+                ylabel = "log1p expression"
+            else:
+                ylabel = "expression"
+
+            sns.violinplot(
+                x="x",
+                y="y",
+                hue="data",
+                split=True,
+                data=summaries[i],
+                ax=ax,
+                **kwargs
+            )
+
+            ax.set(xlabel="covariate", ylabel=ylabel)
+            ax.set_title(g)
+
+            plt.xticks(rotation=xtick_rotation)
 
         # Save, show and return figure.
         if save is not None:
@@ -1376,9 +1546,17 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
     Single t-test test per gene.
     """
 
-    def __init__(self, data, grouping, gene_names, is_logged):
+    def __init__(
+            self,
+            data,
+            sample_description: pd.DataFrame,
+            grouping,
+            gene_names,
+            is_logged
+    ):
         super().__init__()
         self._X = data
+        self.sample_description = sample_description
         self.grouping = grouping
         self._gene_names = np.asarray(gene_names)
 
@@ -1484,9 +1662,17 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
     Single rank test per gene (Mann-Whitney U test).
     """
 
-    def __init__(self, data, grouping, gene_names, is_logged):
+    def __init__(
+            self,
+            data,
+            sample_description: pd.DataFrame,
+            grouping,
+            gene_names,
+            is_logged
+    ):
         super().__init__()
         self._X = data
+        self.sample_description = sample_description
         self.grouping = grouping
         self._gene_names = np.asarray(gene_names)
 
