@@ -249,7 +249,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
     def _threshold_summary(
             self,
-            res,
+            res: pd.DataFrame,
             qval_thres=None,
             fc_upper_thres=None,
             fc_lower_thres=None,
@@ -257,6 +257,13 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
     ) -> pd.DataFrame:
         """
         Reduce differential expression results into an output table with desired thresholds.
+
+        :param res: Unfiltered summary table.
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
+        :return: Filtered summary table.
         """
         assert fc_lower_thres > 0 if fc_lower_thres is not None else True, "supply positive fc_lower_thres"
         assert fc_upper_thres > 0 if fc_upper_thres is not None else True, "supply positive fc_upper_thres"
@@ -519,6 +526,12 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
     ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
+
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
+        :return: Summary table of differential expression test.
         """
         assert self.gene_ids is not None
 
@@ -731,11 +744,22 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
         return retval
 
-    def summary(self, qval_thres=None, fc_upper_thres=None,
-                fc_lower_thres=None, mean_thres=None,
-                **kwargs) -> pd.DataFrame:
+    def summary(
+            self,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None,
+            **kwargs
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
+
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
+        :return: Summary table of differential expression test.
         """
         res = super().summary(**kwargs)
         res["grad"] = self.full_model_gradient.data
@@ -876,11 +900,22 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 theta0=0
             )
 
-    def summary(self, qval_thres=None, fc_upper_thres=None,
-                fc_lower_thres=None, mean_thres=None,
-                **kwargs) -> pd.DataFrame:
+    def summary(
+            self,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None,
+            **kwargs
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
+
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
+        :return: Summary table of differential expression test.
         """
         res = super().summary(**kwargs)
         res["grad"] = self.model_gradient.data
@@ -1263,6 +1298,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             covariate_x: str,
             covariate_hue: Union[None, str],
             log1p_transform: bool,
+            incl_fits: bool
     ):
         """
         Prepare data for gene-wise model plots.
@@ -1272,6 +1308,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         :param covariate_hue: Covariate in location model to stack boxplots by.
         :param log1p_transform: Whether to log transform observations
             before estimating the distribution with boxplot. Model estimates are adjusted accordingly.
+        :param incl_fits: Whether to include fits in plot.
         :return summaries_genes: List with data frame for seabron in it.
         """
 
@@ -1304,30 +1341,40 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
             # Build DataFrame which contains all information for raw data:
             summary_raw = pd.DataFrame({"y": y, "data": "obs"})
-            summary_fit = pd.DataFrame({"y": yhat, "data": "fit"})
+            if incl_fits:
+                summary_fit = pd.DataFrame({"y": yhat, "data": "fit"})
             if covariate_x is not None:
                 assert self.sample_description is not None, "sample_description was not provided to test.wald()"
                 if covariate_x in self.sample_description.columns:
                     summary_raw["x"] = self.sample_description[covariate_x].values.astype(str)
-                    summary_fit["x"] = self.sample_description[covariate_x].values.astype(str)
+                    if incl_fits:
+                        summary_fit["x"] = self.sample_description[covariate_x].values.astype(str)
                 else:
                     raise ValueError("covariate_x=%s not found in location model" % covariate_x)
             else:
                 summary_raw["x"] = " "
-                summary_fit["x"] = " "
+                if incl_fits:
+                    summary_fit["x"] = " "
 
             if covariate_hue is not None:
                 assert self.sample_description is not None, "sample_description was not provided to test.wald()"
                 if covariate_hue in self.sample_description.columns:
-                    summary_raw["hue"] = [str(x)+"_obs" for x in self.sample_description[covariate_hue].values]
-                    summary_fit["hue"] = [str(x)+"_fit" for x in self.sample_description[covariate_hue].values]
+                    if incl_fits:
+                        summary_raw["hue"] = [str(x)+"_obs" for x in self.sample_description[covariate_hue].values]
+                        summary_fit["hue"] = [str(x)+"_fit" for x in self.sample_description[covariate_hue].values]
+                    else:
+                        summary_raw["hue"] = self.sample_description[covariate_hue].values
                 else:
                     raise ValueError("covariate_x=%s not found in location model" % covariate_x)
             else:
                 summary_raw["hue"] = "obs"
-                summary_fit["hue"] = "fit"
+                if incl_fits:
+                    summary_fit["hue"] = "fit"
 
-            summaries = pd.concat([summary_raw, summary_fit])
+            if incl_fits:
+                summaries = pd.concat([summary_raw, summary_fit])
+            else:
+                summaries = summary_raw
             summaries.x = pd.Categorical(summaries.x, ordered=True)
             summaries.hue = pd.Categorical(summaries.hue, ordered=True)
 
@@ -1341,6 +1388,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             covariate_x: str = None,
             covariate_hue: str = None,
             log1p_transform: bool = False,
+            incl_fits: bool = True,
             show: bool = True,
             save: Union[str, None] = None,
             suffix: str = "_genes_boxplot.png",
@@ -1348,7 +1396,9 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             row_gap=0.3,
             col_gap=0.25,
             xtick_rotation=0,
-            return_axs: bool = False
+            legend: bool = True,
+            return_axs: bool = False,
+            **kwargs
     ):
         """
         Plot gene-wise model fits and observed distribution by covariates.
@@ -1360,6 +1410,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         :param covariate_hue: Covariate in location model to stack boxplots by.
         :param log1p_transform: Whether to log transform observations
             before estimating the distribution with boxplot. Model estimates are adjusted accordingly.
+        :param incl_fits: Whether to include fits in plot.
         :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
         :param save: Path+file name stem to save plots to.
             File will be save+suffix. Does not save if save is None.
@@ -1368,6 +1419,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         :param row_gap: Vertical gap between panel rows relative to panel height.
         :param col_gap: Horizontal gap between panel columns relative to panel width.
         :param xtick_rotation: Angle to rotate x-ticks by.
+        :param legend: Whether to show legend.
         :param return_axs: Whether to return axis objects.
 
         :return: Matplotlib axis objects.
@@ -1398,7 +1450,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             gene_names=gene_names,
             covariate_x=covariate_x,
             covariate_hue=covariate_hue,
-            log1p_transform=log1p_transform
+            log1p_transform=log1p_transform,
+            incl_fits=incl_fits
         )
         for i, g in enumerate(gene_names):
             ax = plt.subplot(gs[i])
@@ -1414,11 +1467,14 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 y="y",
                 hue="hue",
                 data=summaries[i],
-                ax=ax
+                ax=ax,
+                **kwargs
             )
 
             ax.set(xlabel="covariate", ylabel=ylabel)
             ax.set_title(g)
+            if not legend:
+                ax.legend_.remove()
 
             plt.xticks(rotation=xtick_rotation)
 
@@ -1499,7 +1555,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             gene_names=gene_names,
             covariate_x=covariate_x,
             covariate_hue=None,
-            log1p_transform=log1p_transform
+            log1p_transform=log1p_transform,
+            incl_fits=True
         )
         for i, g in enumerate(gene_names):
             ax = plt.subplot(gs[i])
@@ -1634,7 +1691,8 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         return self._logfc / np.log(base)
 
     def summary(
-            self, qval_thres=None,
+            self,
+            qval_thres=None,
             fc_upper_thres=None,
             fc_lower_thres=None,
             mean_thres=None,
@@ -1642,6 +1700,12 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
     ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
+
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
+        :return: Summary table of differential expression test.
         """
         res = super().summary(**kwargs)
         res["zero_variance"] = np.logical_not(self._var_geq_zero)
@@ -1733,11 +1797,22 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
         else:
             return self._logfc / np.log(base)
 
-    def summary(self, qval_thres=None, fc_upper_thres=None,
-                fc_lower_thres=None, mean_thres=None,
-                **kwargs) -> pd.DataFrame:
+    def summary(
+            self,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None,
+            **kwargs
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
+
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
+        :return: Summary table of differential expression test.
         """
         res = super().summary(**kwargs)
         res["zero_variance"] = np.logical_not(self._var_geq_zero)
@@ -1963,12 +2038,18 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         log10_qval_clean = np.clip(log10_qval_clean, log10_threshold, 0, log10_qval_clean)
         return log10_qval_clean
 
-    def log_fold_change_pair(self, group1, group2, base=np.e):
+    def log_fold_change_pair(
+            self,
+            group1,
+            group2,
+            base=np.e
+    ):
         """
         Get log fold changes of the comparison of group1 and group2.
 
         :param group1: Identifier of first group of observations in pair-wise comparison.
         :param group2: Identifier of second group of observations in pair-wise comparison.
+        :param base: Base of logarithm.
         :return: log fold changes
         """
         assert self._logfc is not None
@@ -1986,6 +2067,12 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
     ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
+
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
+        :return: Summary table of differential expression test.
         """
         res = super().summary(**kwargs)
 
@@ -2006,14 +2093,17 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
             qval_thres=None,
             fc_upper_thres=None,
             fc_lower_thres=None,
-            mean_thres=None,
-            **kwargs
+            mean_thres=None
     ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
 
         :param group1: Identifier of first group of observations in pair-wise comparison.
         :param group2: Identifier of second group of observations in pair-wise comparison.
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
         :return: pandas.DataFrame with the following columns:
 
             - gene: the gene id's
@@ -2160,7 +2250,8 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         return self.log_fold_change(base=base)[self.groups.index(group1), self.groups.index(group2), :]
 
     def summary(
-            self, qval_thres=None,
+            self,
+            qval_thres=None,
             fc_upper_thres=None,
             fc_lower_thres=None,
             mean_thres=None,
@@ -2168,6 +2259,12 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
     ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
+
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
+        :return: Summary table of differential expression test.
         """
         res = super().summary(**kwargs)
 
@@ -2193,6 +2290,12 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         """
         Summarize differential expression results into an output table.
 
+        :param group1: Identifier of first group of observations in pair-wise comparison.
+        :param group2: Identifier of second group of observations in pair-wise comparison.
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
         :return: pandas.DataFrame with the following columns:
 
             - gene: the gene id's
@@ -2220,6 +2323,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         )
 
         return res
+
 
 class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
     """
@@ -2289,8 +2393,8 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
 
         pvals = np.tile(np.NaN, [len(groups0), len(groups1), num_features])
 
-        for i,g0 in enumerate(groups0):
-            for j,g1 in enumerate(groups1):
+        for i, g0 in enumerate(groups0):
+            for j, g1 in enumerate(groups1):
                 if g0 != g1:
                     pvals[i, j] = stats.two_coef_z_test(
                         theta_mle0=self._theta_mle[g0],
@@ -2351,12 +2455,25 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         """
         pass
 
-    def summary(self, qval_thres=None, fc_upper_thres=None,
-                fc_lower_thres=None, mean_thres=None,
-                **kwargs) -> pd.DataFrame:
+    def summary(
+            self,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None,
+            **kwargs
+    ) -> pd.DataFrame:
         """
+        Summarize differential expression results into an output table.
+
         This function is not available in lazy results evaluation as it would
         require all pairwise tests to be performed.
+
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
+        :return: Summary table of differential expression test.
         """
         pass
 
@@ -2470,8 +2587,12 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         Summarize differential expression results of single pairwose comparison
         into an output table.
 
-        :param group0: Firt group in pair-wise comparison.
-        :param group1: Second group in pair-wise comparison.
+        :param groups0: First set of groups in pair-wise comparison.
+        :param groups1: Second set of groups in pair-wise comparison.
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
         :return: pandas.DataFrame with the following columns:
 
             - gene: the gene id's
@@ -2523,6 +2644,10 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
 
         :param groups0: First set of groups in pair-wise comparison.
         :param groups1: Second set of groups in pair-wise comparison.
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
         :return: pandas.DataFrame with the following columns:
 
             - gene: the gene id's
@@ -2581,7 +2706,7 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
         self.groups = list(np.asarray(groups))
         self._tests = tests
 
-        q = self.qval
+        _ = self.qval
 
     @property
     def tests(self):
@@ -2652,6 +2777,11 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
         """
         Summarize differential expression results into an output table.
 
+        :param group:
+        :param qval_thres: Upper bound of corrected p-values for gene to be included.
+        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
+        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
+        :param mean_thres: Lower bound of average expression for gene to be included.
         :return: pandas.DataFrame with the following columns:
 
             - gene: the gene id's
@@ -2762,14 +2892,16 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             de_test: _DifferentialExpressionTestSingle,
             model_estim: _Estimation,
             size_factors: np.ndarray,
-            continuous_coords: str,
-            spline_coefs: list
+            continuous_coords: np.ndarray,
+            spline_coefs: list,
+            noise_model: str
     ):
         self._de_test = de_test
         self._model_estim = model_estim
         self._size_factors = size_factors
         self._continuous_coords = continuous_coords
         self._spline_coefs = spline_coefs
+        self.noise_model = noise_model
 
     @property
     def gene_ids(self) -> np.ndarray:
@@ -2851,7 +2983,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :return: Filtered list of genes
         """
         genes_found = np.array([x in self.gene_ids for x in genes])
-        if any(genes_found == False):
+        if any(np.logical_not(genes_found)):
             logger.info("did not find some genes, omitting")
             genes = genes[genes_found]
         return genes
@@ -2991,6 +3123,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :param genes: Gene IDs to plot.
         :param hue: Confounder to include in plot.
         :param size: Point size.
+        :param log: Whether to log values.
         :param nonnumeric:
         :param save: Path+file name stem to save plots to.
             File will be save+"_genes.png". Does not save if save is None.
@@ -3180,14 +3313,16 @@ class DifferentialExpressionTestWaldCont(_DifferentialExpressionTestCont):
             de_test: DifferentialExpressionTestWald,
             size_factors: np.ndarray,
             continuous_coords: np.ndarray,
-            spline_coefs: list
+            spline_coefs: list,
+            noise_model: str,
     ):
         super().__init__(
             de_test=de_test,
             model_estim=de_test.model_estim,
             size_factors=size_factors,
             continuous_coords=continuous_coords,
-            spline_coefs=spline_coefs
+            spline_coefs=spline_coefs,
+            noise_model=noise_model
         )
 
 
@@ -3199,12 +3334,14 @@ class DifferentialExpressionTestLRTCont(_DifferentialExpressionTestCont):
             de_test: DifferentialExpressionTestLRT,
             size_factors: np.ndarray,
             continuous_coords: np.ndarray,
-            spline_coefs: list
+            spline_coefs: list,
+            noise_model: str
     ):
         super().__init__(
             de_test=de_test,
             model_estim=de_test.full_estim,
             size_factors=size_factors,
             continuous_coords=continuous_coords,
-            spline_coefs=spline_coefs
+            spline_coefs=spline_coefs,
+            noise_model=noise_model
         )
