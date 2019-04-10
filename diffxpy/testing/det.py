@@ -2587,8 +2587,8 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         Summarize differential expression results of single pairwose comparison
         into an output table.
 
-        :param groups0: First set of groups in pair-wise comparison.
-        :param groups1: Second set of groups in pair-wise comparison.
+        :param group0: First set of groups in pair-wise comparison.
+        :param group1: Second set of groups in pair-wise comparison.
         :param qval_thres: Upper bound of corrected p-values for gene to be included.
         :param fc_upper_thres: Upper bound of fold-change for gene to be included.
         :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
@@ -2970,7 +2970,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         else:
             genes = self._idx_genes(genes)
 
-        fc = self.max(genes=genes, nonnumeric=nonnumeric) - self.min(genes=genes, nonnumeric=nonnumeric)
+        fc = self.max(genes=genes, non_numeric=nonnumeric) - self.min(genes=genes, non_numeric=nonnumeric)
         fc = np.nextafter(0, 1, out=fc, where=fc == 0)
 
         return np.log(fc) / np.log(base)
@@ -3031,75 +3031,75 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             idx = np.concatenate([np.where([[x == 'Intercept' for x in par_loc_names]])[0], idx])
         return idx
 
-    def _continuous_model(self, idx, nonnumeric=False):
+    def _continuous_model(self, idx, non_numeric=False):
         """
         Recover continuous fit for a gene.
 
         :param idx: Index of genes to recover fit for.
-        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :param non_numeric: Whether to include non-numeric covariates in fit.
         :return: Continuuos fit for each cell for given gene.
         """
         idx = np.asarray(idx)
-        if nonnumeric:
+        if non_numeric:
             mu = np.matmul(self._model_estim.design_loc.values,
                            self._model_estim.par_link_loc[:, idx])
             if self._size_factors is not None:
                 mu = mu + self._size_factors
         else:
             idx_basis = self._spline_par_loc_idx(intercept=True)
-            mu = np.matmul(self._model_estim.design_loc[:,idx_basis].values,
+            mu = np.matmul(self._model_estim.design_loc[:, idx_basis].values,
                            self._model_estim.par_link_loc[idx_basis, idx])
 
         mu = np.exp(mu)
         return mu
 
-    def max(self, genes, nonnumeric=False):
+    def max(self, genes, non_numeric=False):
         """
         Return maximum fitted expression value by gene.
 
         :param genes: Genes for which to return maximum fitted value.
-        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :param non_numeric: Whether to include non-numeric covariates in fit.
         :return: Maximum fitted expression value by gene.
         """
         genes = self._idx_genes(genes)
-        return np.array([np.max(self._continuous_model(idx=i, nonnumeric=nonnumeric))
+        return np.array([np.max(self._continuous_model(idx=i, non_numeric=non_numeric))
                          for i in genes])
 
-    def min(self, genes, nonnumeric=False):
+    def min(self, genes, non_numeric=False):
         """
         Return minimum fitted expression value by gene.
 
         :param genes: Genes for which to return maximum fitted value.
-        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :param non_numeric: Whether to include non-numeric covariates in fit.
         :return: Maximum fitted expression value by gene.
         """
         genes = self._idx_genes(genes)
-        return np.array([np.min(self._continuous_model(idx=i, nonnumeric=nonnumeric))
+        return np.array([np.min(self._continuous_model(idx=i, non_numeric=non_numeric))
                          for i in genes])
 
-    def argmax(self, genes, nonnumeric=False):
+    def argmax(self, genes, non_numeric=False):
         """
         Return maximum fitted expression value by gene.
 
         :param genes: Genes for which to return maximum fitted value.
-        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :param non_numeric: Whether to include non-numeric covariates in fit.
         :return: Maximum fitted expression value by gene.
         """
         genes = self._idx_genes(genes)
-        idx = np.array([np.argmax(self._continuous_model(idx=i, nonnumeric=nonnumeric))
+        idx = np.array([np.argmax(self._continuous_model(idx=i, non_numeric=non_numeric))
                         for i in genes])
         return self._continuous_coords[idx]
 
-    def argmin(self, genes, nonnumeric=False):
+    def argmin(self, genes, non_numeric=False):
         """
         Return minimum fitted expression value by gene.
 
         :param genes: Genes for which to return maximum fitted value.
-        :param nonnumeric: Whether to include non-numeric covariates in fit.
+        :param non_numeric: Whether to include non-numeric covariates in fit.
         :return: Maximum fitted expression value by gene.
         """
         genes = self._idx_genes(genes)
-        idx = np.array([np.argmin(self._continuous_model(idx=i, nonnumeric=nonnumeric))
+        idx = np.array([np.argmin(self._continuous_model(idx=i, non_numeric=non_numeric))
                         for i in genes])
         return self._continuous_coords[idx]
 
@@ -3109,7 +3109,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             hue=None,
             size=1,
             log=True,
-            nonnumeric=False,
+            non_numeric=False,
             save=None,
             show=True,
             ncols=2,
@@ -3124,7 +3124,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :param hue: Confounder to include in plot.
         :param size: Point size.
         :param log: Whether to log values.
-        :param nonnumeric:
+        :param non_numeric:
         :param save: Path+file name stem to save plots to.
             File will be save+"_genes.png". Does not save if save is None.
         :param show: Whether to display plot.
@@ -3169,7 +3169,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             axs.append(ax)
 
             y = self.X[:, g]
-            yhat = self._continuous_model(idx=g, nonnumeric=nonnumeric)
+            yhat = self._continuous_model(idx=g, non_numeric=non_numeric)
             if log:
                 y = np.log(y + 1)
                 yhat = np.log(yhat + 1)
@@ -3251,7 +3251,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         # Build heatmap matrix.
         # Add in data.
         data = np.array([
-            self._continuous_model(idx=g, nonnumeric=False)
+            self._continuous_model(idx=g, non_numeric=False)
             for i, g in enumerate(gene_idx)
         ])
         # Order columns by continuous covariate.
