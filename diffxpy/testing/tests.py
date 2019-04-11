@@ -1645,6 +1645,10 @@ def continuous_1d(
         init_b: Union[np.ndarray, str] = "standard",
         gene_names: Union[np.ndarray, list] = None,
         sample_description=None,
+        dmat_loc: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
+        dmat_scale: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
+        constraints_loc: np.ndarray = None,
+        constraints_scale: np.ndarray = None,
         noise_model: str = 'nb',
         size_factors: np.ndarray = None,
         batch_size: int = None,
@@ -1717,6 +1721,32 @@ def continuous_1d(
         - np.ndarray: direct initialization of 'b'
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param dmat_loc: Pre-built location model design matrix.
+        This over-rides formula_loc and sample description information given in
+        data or sample_description.
+    :param dmat_scale: Pre-built scale model design matrix.
+        This over-rides formula_scale and sample description information given in
+        data or sample_description.
+    :param constraints_loc: : Constraints for location model.
+        Array with constraints in rows and model parameters in columns.
+        Each constraint contains non-zero entries for the a of parameters that
+        has to sum to zero. This constraint is enforced by binding one parameter
+        to the negative sum of the other parameters, effectively representing that
+        parameter as a function of the other parameters. This dependent
+        parameter is indicated by a -1 in this array, the independent parameters
+        of that constraint (which may be dependent at an earlier constraint)
+        are indicated by a 1. It is highly recommended to only use this option
+        together with prebuilt design matrix for the location model, dmat_loc.
+    :param constraints_scale: : Constraints for scale model.
+        Array with constraints in rows and model parameters in columns.
+        Each constraint contains non-zero entries for the a of parameters that
+        has to sum to zero. This constraint is enforced by binding one parameter
+        to the negative sum of the other parameters, effectively representing that
+        parameter as a function of the other parameters. This dependent
+        parameter is indicated by a -1 in this array, the independent parameters
+        of that constraint (which may be dependent at an earlier constraint)
+        are indicated by a 1. It is highly recommended to only use this option
+        together with prebuilt design matrix for the scale model, dmat_scale.
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
@@ -1901,6 +1931,6 @@ def continuous_1d(
             spline_coefs=new_coefs
         )
     else:
-        raise ValueError('base.continuous(): Parameter `test` not recognized.')
+        raise ValueError('continuous(): Parameter `test` not recognized.')
 
     return de_test
