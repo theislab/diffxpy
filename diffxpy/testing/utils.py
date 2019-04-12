@@ -4,6 +4,7 @@ import anndata
 import numpy as np
 import pandas as pd
 import patsy
+import scipy
 import xarray as xr
 
 from batchglm import data as data_utils
@@ -31,7 +32,17 @@ def parse_data(data, gene_names) -> xr.DataArray:
     return X
 
 
-def parse_sample_description(data, sample_description=None) -> pd.DataFrame:
+def parse_sample_description(
+        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        sample_description: Union[pd.DataFrame, None]
+) -> pd.DataFrame:
+    """
+    Parse sample description from input.
+
+    :param data: Input data matrix (observations x features) or (cells x genes).
+    :param sample_description: pandas.DataFrame containing sample annotations, can be None.
+    :return: Assembled sample annotations.
+    """
     if sample_description is None:
         if anndata is not None and isinstance(data, anndata.AnnData):
             sample_description = data_utils.sample_description_from_anndata(
@@ -58,10 +69,27 @@ def parse_sample_description(data, sample_description=None) -> pd.DataFrame:
     return sample_description
 
 
-def parse_size_factors(size_factors, data):
+def parse_size_factors(
+        size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray],
+        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        sample_description: pd.DataFrame
+) -> Union[np.ndarray, None]:
+    """
+    Parse size-factors from input.
+
+    :param size_factors: 1D array of transformed library size factors for each cell in the
+        same order as in data or string-type column identifier of size-factor containing
+        column in sample description.
+    :param data: Input data matrix (observations x features) or (cells x genes).
+    :param sample_description: optional pandas.DataFrame containing sample annotations
+    :return: Assebled size-factors.
+    """
     if size_factors is not None:
         if isinstance(size_factors, pd.core.series.Series):
             size_factors = size_factors.values
+        elif isinstance(size_factors, str):
+            assert size_factors in sample_description.columns, ""
+            size_factors = sample_description[size_factors].values
         assert size_factors.shape[0] == data.shape[0], "data matrix and size factors must contain same number of cells"
         assert np.all(size_factors > 0), "size_factors <= 0 found, please remove these cells"
     return size_factors

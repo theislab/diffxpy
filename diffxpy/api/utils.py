@@ -1,1 +1,3 @@
-import batchglm.data as data_utils
+from batchglm.data import constraint_matrix_from_string, setup_constrained
+from batchglm.data import design_matrix, design_matrix_from_xarray, design_matrix_from_anndata
+from batchglm.data import view_coef_names

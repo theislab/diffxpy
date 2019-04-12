@@ -207,7 +207,7 @@ def lrt(
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         noise_model="nb",
-        size_factors: np.ndarray = None,
+        size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray] = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "DEFAULT",
         quick_scale: bool = False,
@@ -220,8 +220,7 @@ def lrt(
     Note that lrt() does not support constraints in its current form. Please
     use wald() for constraints.
 
-    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data matrix (observations x features) or (cells x genes).
+    :param data: Input data matrix (observations x features) or (cells x genes).
     :param full_formula_loc: formula
         Full model formula for location parameter model.
         If not specified, `full_formula` will be used instead.
@@ -264,7 +263,8 @@ def lrt(
 
         - 'nb': default
     :param size_factors: 1D array of transformed library size factors for each cell in the
-        same order as in data
+        same order as in data or string-type column identifier of size-factor containing
+        column in sample description.
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
@@ -302,27 +302,35 @@ def lrt(
     gene_names = parse_gene_names(data, gene_names)
     X = parse_data(data, gene_names)
     sample_description = parse_sample_description(data, sample_description)
-    size_factors = parse_size_factors(size_factors=size_factors, data=X)
+    size_factors = parse_size_factors(
+        size_factors=size_factors,
+        data=X,
+        sample_description=sample_description
+    )
 
     full_design_loc = data_utils.design_matrix(
         sample_description=sample_description,
         formula=full_formula_loc,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        return_type="patsy"
     )
     reduced_design_loc = data_utils.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_loc,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        return_type="patsy"
     )
     full_design_scale = data_utils.design_matrix(
         sample_description=sample_description,
         formula=full_formula_scale,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        return_type="patsy"
     )
     reduced_design_scale = data_utils.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_scale,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        return_type="patsy"
     )
 
     reduced_model = _fit(
@@ -388,7 +396,7 @@ def wald(
         constraints_loc: np.ndarray = None,
         constraints_scale: np.ndarray = None,
         noise_model: str = "nb",
-        size_factors: np.ndarray = None,
+        size_factors: Union[np.ndarray, pd.core.series.Series, str] = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = False,
@@ -417,7 +425,7 @@ def wald(
     :param as_numeric:
         Which columns of sample_description to treat as numeric and
         not as categorical. This yields columns in the design matrix
-        which do not correpond to one-hot encoded discrete factors.
+        which do not correspond to one-hot encoded discrete factors.
         This makes sense for number of genes, time, pseudotime or space
         for example.
     :param init_a: (Optional) Low-level initial values for a.
@@ -465,7 +473,8 @@ def wald(
         are indicated by a 1. It is highly recommended to only use this option
         together with prebuilt design matrix for the scale model, dmat_scale.
     :param size_factors: 1D array of transformed library size factors for each cell in the
-        same order as in data
+        same order as in data or string-type column identifier of size-factor containing
+        column in sample description.
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
@@ -488,10 +497,14 @@ def wald(
     if len(kwargs) != 0:
         logging.getLogger("diffxpy").debug("additional kwargs: %s", str(kwargs))
 
-    if dmat_loc is None and formula_loc is None:
-        raise ValueError("Supply either dmat_loc or formula_loc or formula.")
-    if dmat_scale is None and formula_scale is None:
-        raise ValueError("Supply either dmat_loc or formula_loc or formula.")
+    if (dmat_loc is None and formula_loc is None) or \
+            (dmat_loc is not None and formula_loc is not None):
+        raise ValueError("Supply either dmat_loc or formula_loc.")
+    if (dmat_scale is None and formula_scale is None) or \
+            (dmat_scale is not None and formula_scale != "~1"):
+        raise ValueError("Supply either dmat_scale or formula_scale.")
+    if dmat_loc is not None and factor_loc_totest is not None:
+        raise ValueError("Supply coef_to_test and not factor_loc_totest if dmat_loc is supplied.")
     # Check that factor_loc_totest and coef_to_test are lists and not single strings:
     if isinstance(factor_loc_totest, str):
         factor_loc_totest = [factor_loc_totest]
@@ -505,13 +518,18 @@ def wald(
     X = parse_data(data, gene_names)
     if dmat_loc is None and dmat_scale is None:
         sample_description = parse_sample_description(data, sample_description)
-    size_factors = parse_size_factors(size_factors=size_factors, data=X)
+    size_factors = parse_size_factors(
+        size_factors=size_factors,
+        data=X,
+        sample_description=sample_description
+    )
 
     if dmat_loc is None:
         design_loc = data_utils.design_matrix(
             sample_description=sample_description,
             formula=formula_loc,
-            as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+            as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+            return_type="patsy"
         )
         # Check that closed-form is not used if numeric predictors are used and model is not "norm".
         if isinstance(init_a, str):
@@ -533,7 +551,8 @@ def wald(
         design_scale = data_utils.design_matrix(
             sample_description=sample_description,
             formula=formula_scale,
-            as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+            as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+            return_type="patsy"
         )
         # Check that closed-form is not used if numeric predictors are used and model is not "norm".
         if isinstance(init_b, str):
@@ -1645,10 +1664,8 @@ def continuous_1d(
         init_b: Union[np.ndarray, str] = "standard",
         gene_names: Union[np.ndarray, list] = None,
         sample_description=None,
-        dmat_loc: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
-        dmat_scale: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
-        constraints_loc: np.ndarray = None,
-        constraints_scale: np.ndarray = None,
+        constraints_loc: Union[Tuple[str], List[str]] = (),
+        constraints_scale: Union[Tuple[str], List[str]] = (),
         noise_model: str = 'nb',
         size_factors: np.ndarray = None,
         batch_size: int = None,
@@ -1696,11 +1713,10 @@ def continuous_1d(
         this will be propagated across all coefficients which represent this covariate
         in the spline basis space.
     :param as_numeric:
-        Which columns of sample_description to treat as numeric and
-        not as categorical. This yields columns in the design matrix
-        which do not correpond to one-hot encoded discrete factors.
-        This makes sense for number of genes, time, pseudotime or space
-        for example.
+        Which columns of sample_description to treat as numeric and not as categorical.
+        This yields columns in the design matrix which do not correpond to one-hot encoded discrete factors.
+        This makes sense for library depth for example. Do not use this for the covariate that you
+        want to extrpolate with using a spline-basis!
     :param test: str, statistical test to use. Possible options:
 
         - 'wald': default
@@ -1719,34 +1735,33 @@ def continuous_1d(
             * "auto": automatically choose best initialization
             * "standard": initialize with zeros
         - np.ndarray: direct initialization of 'b'
-    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param gene_names: optional list/array of gene names which will be used if `data` does
+        not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
-    :param dmat_loc: Pre-built location model design matrix.
-        This over-rides formula_loc and sample description information given in
-        data or sample_description.
-    :param dmat_scale: Pre-built scale model design matrix.
-        This over-rides formula_scale and sample description information given in
-        data or sample_description.
-    :param constraints_loc: : Constraints for location model.
-        Array with constraints in rows and model parameters in columns.
-        Each constraint contains non-zero entries for the a of parameters that
-        has to sum to zero. This constraint is enforced by binding one parameter
-        to the negative sum of the other parameters, effectively representing that
-        parameter as a function of the other parameters. This dependent
-        parameter is indicated by a -1 in this array, the independent parameters
-        of that constraint (which may be dependent at an earlier constraint)
-        are indicated by a 1. It is highly recommended to only use this option
-        together with prebuilt design matrix for the location model, dmat_loc.
-    :param constraints_scale: : Constraints for scale model.
-        Array with constraints in rows and model parameters in columns.
-        Each constraint contains non-zero entries for the a of parameters that
-        has to sum to zero. This constraint is enforced by binding one parameter
-        to the negative sum of the other parameters, effectively representing that
-        parameter as a function of the other parameters. This dependent
-        parameter is indicated by a -1 in this array, the independent parameters
-        of that constraint (which may be dependent at an earlier constraint)
-        are indicated by a 1. It is highly recommended to only use this option
-        together with prebuilt design matrix for the scale model, dmat_scale.
+    :param constraints_loc: Grouped factors to enfore equality constraints on for location model.
+        Every element of the iteratable corresponds to one set of equality constraints.
+        Each set has to be a dictionary of the form {x: y} where x is the factor to be constrained
+        and y is a factor by which levels of x are grouped and then constrained. Set y="1" to constrain
+        all levels of x to sum to one, a single equality constraint.
+
+            E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
+                zero. This is applicable if repeats of a an experiment within each condition
+                are independent so that the set-up ~1+condition+batch is perfectly confounded.
+
+        Can only group by non-constrained effects right now, use constraint_matrix_from_string
+        for other cases.
+    :param constraints_scale: Grouped factors to enfore equality constraints on for scale model.
+        Every element of the iteratable corresponds to one set of equality constraints.
+        Each set has to be a dictionary of the form {x: y} where x is the factor to be constrained
+        and y is a factor by which levels of x are grouped and then constrained. Set y="1" to constrain
+        all levels of x to sum to one, a single equality constraint.
+
+            E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
+                zero. This is applicable if repeats of a an experiment within each condition
+                are independent so that the set-up ~1+condition+batch is perfectly confounded.
+
+        Can only group by non-constrained effects right now, use constraint_matrix_from_string
+        for other cases.
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
@@ -1757,9 +1772,9 @@ def continuous_1d(
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
         - function: Can be used to implement custom training function will be called as
-          `training_strategy(estimator)`.
-        - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
-          method arguments.
+            `training_strategy(estimator)`.
+        - list of keyword dicts containing method arguments: Will call Estimator.train()
+            once with each dict of method arguments.
 
           Example:
 

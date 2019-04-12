@@ -47,12 +47,12 @@ class TestSingle(unittest.TestCase):
         dmat_est_scale = de.test.design_matrix(dmat=dmat_est)
 
         # Build constraints:
-        constraints_loc = de.utils.data_utils.build_equality_constraints_string(
+        constraints_loc = de.utils.data_utils.constraint_matrix_from_string(
             dmat=dmat_est_loc,
             constraints=["bio1+bio2=0", "bio3+bio4=0"],
             dims=["design_loc_params", "loc_params"]
         )
-        constraints_scale = de.utils.data_utils.build_equality_constraints_string(
+        constraints_scale = de.utils.data_utils.constraint_matrix_from_string(
             dmat=dmat_est_scale,
             constraints=["bio1+bio2=0", "bio3+bio4=0"],
             dims=["design_scale_params", "scale_params"]
@@ -131,7 +131,7 @@ class TestSingle(unittest.TestCase):
         dmat_est_scale = de.test.design_matrix(dmat=dmat_est.iloc[:, [0]])
 
         # Build constraints:
-        constraints_loc = de.utils.data_utils.build_equality_constraints_string(
+        constraints_loc = de.utils.data_utils.constraint_matrix_from_string(
             dmat=dmat_est_loc,
             constraints=["bio1+bio2=0",
                          "bio3+bio4=0",
@@ -207,14 +207,14 @@ class TestSingle(unittest.TestCase):
         dmat_est_scale = de.test.design_matrix(dmat=dmat_est)
 
         # Build constraints:
-        constraints_loc = de.utils.data_utils.build_equality_constraints_string(
+        constraints_loc = de.utils.data_utils.constraint_matrix_from_string(
             dmat=dmat_est_loc,
             constraints=["bio1+bio2=0",
                          "bio3+bio4=0",
                          "bio5+bio6=0"],
             dims=["design_loc_params", "loc_params"]
         )
-        constraints_scale = de.utils.data_utils.build_equality_constraints_string(
+        constraints_scale = de.utils.data_utils.constraint_matrix_from_string(
             dmat=dmat_est_scale,
             constraints=["bio1+bio2=0",
                          "bio3+bio4=0",
