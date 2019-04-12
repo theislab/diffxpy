@@ -7,8 +7,9 @@ from typing import List, Tuple, Union
 import xarray as xr
 
 from batchglm import data as data_utils
-# Relay util functions for diffxpy api. design_matrix and preview_coef_names are redefined here.
-from batchglm.data import constraint_matrix_from_string, setup_constrained
+# Relay util functions for diffxpy api.
+# design_matrix, preview_coef_names and constraint_system_from_star are redefined here.
+from batchglm.data import constraint_matrix_from_string, constraint_matrix_from_dict
 from batchglm.data import design_matrix_from_xarray, design_matrix_from_anndata
 from batchglm.data import view_coef_names
 
@@ -126,7 +127,7 @@ def design_matrix(
         formula: Union[None, str] = None,
         as_numeric: Union[List[str], Tuple[str], str] = (),
         dmat: Union[pd.DataFrame, None] = None,
-        return_type: str = "xarray",
+        return_type: str = "xarray"
 ) -> Union[patsy.design_info.DesignMatrix, xr.Dataset, pd.DataFrame]:
     """ Create a design matrix from some sample description.
 
@@ -207,4 +208,72 @@ def preview_coef_names(
         sample_description=sample_description,
         formula=formula,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+    )
+
+
+def constraint_system_from_star(
+        dmat: Union[None, np.ndarray, xr.DataArray, xr.Dataset] = None,
+        sample_description: Union[None, pd.DataFrame] = None,
+        formula: Union[None, str] = None,
+        as_numeric: Union[List[str], Tuple[str], str] = (),
+        constraints: dict = {},
+        dims: Union[Tuple[str, str], List[str]] = (),
+        return_type: str = "xarray",
+) -> Tuple:
+    """
+    Create a design matrix and a constraint matrix.
+
+    This function relays batchglm.data.constraint_matrix_from_star() to behave like the other wrappers in diffxpy.
+
+    :param dmat: Pre-built model design matrix.
+    :param sample_description: pandas.DataFrame of length "num_observations" containing explanatory variables as columns
+    :param formula: model formula as string, describing the relations of the explanatory variables.
+
+        E.g. '~ 1 + batch + confounder'
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correspond to one-hot encoded discrete factors.
+    :param constraints: Grouped factors to enfore equality constraints on. Every element of
+        the dictionary corresponds to one set of equality constraints. Each set has to be
+        be an entry of the form {..., x: y, ...} where x is the factor to be constrained and y is
+        a factor by which levels of x are grouped and then constrained. Set y="1" to constrain
+        all levels of x to sum to one, a single equality constraint.
+
+            E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
+                zero. This is applicable if repeats of a an experiment within each condition
+                are independent so that the set-up ~1+condition+batch is perfectly confounded.
+
+        Can only group by non-constrained effects right now, use constraint_matrix_from_string
+        for other cases.
+    :param dims: Dimension names of xarray.
+
+        E.g.: ["design_loc_params", "loc_params"] or ["design_scale_params", "scale_params"]
+    :param return_type: type of the returned value.
+
+        - "patsy": return plain patsy.design_info.DesignMatrix object
+        - "dataframe": return pd.DataFrame with observations as rows and params as columns
+        - "xarray": return xr.Dataset with design matrix as ds["design"] and the sample description embedded as
+            one variable per column
+        This option is overridden if constraints are supplied as dict.
+    :return: a model design matrix and a constraint matrix formatted as xr.DataArray
+    """
+    if isinstance(as_numeric, str):
+        as_numeric = [as_numeric]
+    if isinstance(as_numeric, tuple):
+        as_numeric = list(as_numeric)
+
+    if sample_description is not None:
+        as_categorical = [False if x in as_numeric else True for x in sample_description.columns.values]
+    else:
+        as_categorical = True
+
+    return data_utils.constraint_system_from_star(
+        dmat=dmat,
+        sample_description=sample_description,
+        formula=formula,
+        as_categorical=as_categorical,
+        constraints=constraints,
+        dims=dims,
+        return_type=return_type
     )

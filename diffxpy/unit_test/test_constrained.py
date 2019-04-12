@@ -88,13 +88,13 @@ class TestConstrained(unittest.TestCase):
         })
 
         # Build constraints:
-        dmat_loc, constraints_loc = de.utils.setup_constrained(
+        dmat_loc, constraints_loc = de.utils.constraint_matrix_from_dict(
             sample_description=sample_description,
             formula="~1+cond+batch",
             constraints={"batch": "cond"},
             dims=["design_loc_params", "loc_params"]
         )
-        dmat_scale, constraints_scale = de.utils.setup_constrained(
+        dmat_scale, constraints_scale = de.utils.constraint_matrix_from_dict(
             sample_description=sample_description,
             formula="~1+cond+batch",
             constraints={"batch": "cond"},
@@ -141,13 +141,13 @@ class TestConstrained(unittest.TestCase):
         })
 
         # Build constraints:
-        dmat_loc, constraints_loc = de.utils.setup_constrained(
+        dmat_loc, constraints_loc = de.utils.constraint_matrix_from_dict(
             sample_description=sample_description,
             formula="~1+cond+batch",
             constraints={"batch": "cond"},
             dims=["design_loc_params", "loc_params"]
         )
-        dmat_scale, constraints_scale = de.utils.setup_constrained(
+        dmat_scale, constraints_scale = de.utils.constraint_matrix_from_dict(
             sample_description=sample_description,
             formula="~1+cond+batch",
             constraints={"batch": "cond"},
@@ -323,7 +323,7 @@ class TestConstrained(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % pval_h0
 
         return True
 

@@ -290,6 +290,7 @@ class TestSingleNullStandard(_TestSingleNull, unittest.TestCase):
             n_genes=n_genes
         )
 
+
 class TestSingleNullNB(_TestSingleNull, unittest.TestCase):
     """
     Negative binomial noise model unit tests that test whether a test generates uniformly

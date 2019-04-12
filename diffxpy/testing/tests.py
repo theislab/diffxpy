@@ -17,7 +17,8 @@ from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, 
     DifferentialExpressionTestZTestLazy, DifferentialExpressionTestZTest, DifferentialExpressionTestPairwise, \
     DifferentialExpressionTestVsRest, _DifferentialExpressionTestMulti, DifferentialExpressionTestByPartition, \
     DifferentialExpressionTestWaldCont, DifferentialExpressionTestLRTCont
-from .utils import parse_gene_names, parse_data, parse_sample_description, parse_size_factors, parse_grouping
+from .utils import parse_gene_names, parse_data, parse_sample_description, parse_size_factors, parse_grouping, \
+    constraint_system_from_star
 
 # Use this to suppress matrix subclass PendingDepreceationWarnings from numpy:
 np.warnings.filterwarnings("ignore")
@@ -393,8 +394,8 @@ def wald(
         sample_description: Union[None, pd.DataFrame] = None,
         dmat_loc: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
         dmat_scale: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
-        constraints_loc: np.ndarray = None,
-        constraints_scale: np.ndarray = None,
+        constraints_loc: Union[None, List[str], Tuple[str, str], dict, np.ndarray] = None,
+        constraints_scale: Union[None, List[str], Tuple[str, str], dict, np.ndarray] = None,
         noise_model: str = "nb",
         size_factors: Union[np.ndarray, pd.core.series.Series, str] = None,
         batch_size: int = None,
@@ -451,26 +452,72 @@ def wald(
     :param dmat_scale: Pre-built scale model design matrix.
         This over-rides formula_scale and sample description information given in
         data or sample_description.
-    :param constraints_loc: : Constraints for location model.
-        Array with constraints in rows and model parameters in columns.
-        Each constraint contains non-zero entries for the a of parameters that
-        has to sum to zero. This constraint is enforced by binding one parameter
-        to the negative sum of the other parameters, effectively representing that
-        parameter as a function of the other parameters. This dependent
-        parameter is indicated by a -1 in this array, the independent parameters
-        of that constraint (which may be dependent at an earlier constraint)
-        are indicated by a 1. It is highly recommended to only use this option
-        together with prebuilt design matrix for the location model, dmat_loc.
-    :param constraints_scale: : Constraints for scale model.
-        Array with constraints in rows and model parameters in columns.
-        Each constraint contains non-zero entries for the a of parameters that
-        has to sum to zero. This constraint is enforced by binding one parameter
-        to the negative sum of the other parameters, effectively representing that
-        parameter as a function of the other parameters. This dependent
-        parameter is indicated by a -1 in this array, the independent parameters
-        of that constraint (which may be dependent at an earlier constraint)
-        are indicated by a 1. It is highly recommended to only use this option
-        together with prebuilt design matrix for the scale model, dmat_scale.
+    :param constraints_loc: Constraints for location model. Can be one of the following:
+
+            - np.ndarray:
+                Array with constraints in rows and model parameters in columns.
+                Each constraint contains non-zero entries for the a of parameters that
+                has to sum to zero. This constraint is enforced by binding one parameter
+                to the negative sum of the other parameters, effectively representing that
+                parameter as a function of the other parameters. This dependent
+                parameter is indicated by a -1 in this array, the independent parameters
+                of that constraint (which may be dependent at an earlier constraint)
+                are indicated by a 1. You should only use this option
+                together with prebuilt design matrix for the location model, dmat_loc,
+                for example via de.utils.setup_constrained().
+            - dict:
+                Every element of the dictionary corresponds to one set of equality constraints.
+                Each set has to be be an entry of the form {..., x: y, ...}
+                where x is the factor to be constrained and y is a factor by which levels of x are grouped
+                and then constrained. Set y="1" to constrain all levels of x to sum to one,
+                a single equality constraint.
+
+                    E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
+                        zero. This is applicable if repeats of a an experiment within each condition
+                        are independent so that the set-up ~1+condition+batch is perfectly confounded.
+
+                Can only group by non-constrained effects right now, use constraint_matrix_from_string
+                for other cases.
+            - list of strings or tuple of strings:
+                String encoded equality constraints.
+
+                    E.g. ["batch1 + batch2 + batch3 = 0"]
+            - None:
+                No constraints are used, this is equivalent to using an identity matrix as a
+                constraint matrix.
+    :param constraints_scale: Constraints for scale model. Can be one of the following:
+
+            - np.ndarray:
+                Array with constraints in rows and model parameters in columns.
+                Each constraint contains non-zero entries for the a of parameters that
+                has to sum to zero. This constraint is enforced by binding one parameter
+                to the negative sum of the other parameters, effectively representing that
+                parameter as a function of the other parameters. This dependent
+                parameter is indicated by a -1 in this array, the independent parameters
+                of that constraint (which may be dependent at an earlier constraint)
+                are indicated by a 1. You should only use this option
+                together with prebuilt design matrix for the scale model, dmat_scale,
+                for example via de.utils.setup_constrained().
+            - dict:
+                Every element of the dictionary corresponds to one set of equality constraints.
+                Each set has to be be an entry of the form {..., x: y, ...}
+                where x is the factor to be constrained and y is a factor by which levels of x are grouped
+                and then constrained. Set y="1" to constrain all levels of x to sum to one,
+                a single equality constraint.
+
+                    E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
+                        zero. This is applicable if repeats of a an experiment within each condition
+                        are independent so that the set-up ~1+condition+batch is perfectly confounded.
+
+                Can only group by non-constrained effects right now, use constraint_matrix_from_string
+                for other cases.
+            - list of strings or tuple of strings:
+                String encoded equality constraints.
+
+                    E.g. ["batch1 + batch2 + batch3 = 0"]
+            - None:
+                No constraints are used, this is equivalent to using an identity matrix as a
+                constraint matrix.
     :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data or string-type column identifier of size-factor containing
         column in sample description.
@@ -523,50 +570,26 @@ def wald(
         sample_description=sample_description
     )
 
-    if dmat_loc is None:
-        design_loc = data_utils.design_matrix(
-            sample_description=sample_description,
-            formula=formula_loc,
-            as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
-            return_type="patsy"
-        )
-        # Check that closed-form is not used if numeric predictors are used and model is not "norm".
-        if isinstance(init_a, str):
-            if np.any([True if x in as_numeric else False for x in sample_description.columns.values]):
-                if noise_model.lower() not in ["normal", "norm"]:
-                    if init_a == "closed_form":
-                        init_a = "standard"
-                        logging.getLogger("diffxpy").warning(
-                            "Setting init_a to standard as numeric predictors were supplied.")
-                        logging.getLogger("diffxpy").warning(
-                            "Closed-form initialisation is not possible" +
-                            " for noise model %s with numeric predictors." % noise_model)
-                    elif init_a == "AUTO":
-                        init_a = "standard"
-    else:
-        design_loc = dmat_loc
-
-    if dmat_scale is None:
-        design_scale = data_utils.design_matrix(
-            sample_description=sample_description,
-            formula=formula_scale,
-            as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
-            return_type="patsy"
-        )
-        # Check that closed-form is not used if numeric predictors are used and model is not "norm".
-        if isinstance(init_b, str):
-            if np.any([True if x in as_numeric else False for x in sample_description.columns.values]):
-                if init_b == "closed_form":
-                    init_b = "standard"
-                    logging.getLogger("diffxpy").warning(
-                        "Setting init_b to standard as numeric predictors were supplied.")
-                    logging.getLogger("diffxpy").warning(
-                        "Closed-form initialisation is not possible" +
-                        " for noise model %s with numeric predictors." % noise_model)
-                elif init_b == "AUTO":
-                    init_b = "standard"
-    else:
-        design_scale = dmat_scale
+    logging.getLogger("diffxpy").debug("building location model")
+    design_loc, constraints_loc = constraint_system_from_star(
+        dmat=dmat_loc,
+        sample_description=sample_description,
+        formula=formula_loc,
+        as_numeric=as_numeric,
+        constraints=constraints_loc,
+        dims=["design_loc_params", "loc_params"],
+        return_type="patsy"
+    )
+    logging.getLogger("diffxpy").debug("building scale model")
+    design_scale, constraints_scale = constraint_system_from_star(
+        dmat=dmat_scale,
+        sample_description=sample_description,
+        formula=formula_scale,
+        as_numeric=as_numeric,
+        constraints=constraints_scale,
+        dims=["design_scale_params", "scale_params"],
+        return_type="patsy"
+    )
 
     # Define indices of coefficients to test:
     constraints_loc_temp = constraints_loc if constraints_loc is not None else np.eye(design_loc.shape[-1])
@@ -1661,8 +1684,8 @@ def continuous_1d(
         init_b: Union[np.ndarray, str] = "standard",
         gene_names: Union[np.ndarray, list] = None,
         sample_description=None,
-        constraints_loc: Union[Tuple[str], List[str]] = (),
-        constraints_scale: Union[Tuple[str], List[str]] = (),
+        constraints_loc: Union[dict, None] = None,
+        constraints_scale: Union[dict, None] = None,
         noise_model: str = 'nb',
         size_factors: np.ndarray = None,
         batch_size: int = None,
@@ -1676,7 +1699,7 @@ def continuous_1d(
 
     This function wraps the selected statistical test for
     scenarios with continuous covariates and performs the necessary
-    spline basis transformation of the continuous covariate so that the
+    spline basis transformation of the continuous co-variate so that the
     problem can be framed as a GLM.
 
     Note that direct supply of dmats is not enabled as this function wraps
@@ -1684,6 +1707,11 @@ def continuous_1d(
     covariates. Advanced users who want to control dmat can directly
     perform these spline basis transforms outside of diffxpy and feed the
     dmat directly to one of the test routines wald() or lrt().
+
+    The constraint interface only-supports dictionary-formatted constraints and
+    string-formatted constraints but not array-formatted constraint matrices as
+    design matrices are built within this function and the shape of constraint
+    matrices depends on the output of this function.
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
         Input data matrix (observations x features) or (cells x genes).
@@ -1735,32 +1763,56 @@ def continuous_1d(
     :param gene_names: optional list/array of gene names which will be used if `data` does
         not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
-    :param constraints_loc: Grouped factors to enfore equality constraints on for location model.
-        Every element of the dictionary corresponds to one set of equality constraints.
-        Each set has to be be an entry of the form {..., x: y, ...}
-        where x is the factor to be constrained and y is a factor by which levels of x are grouped
-        and then constrained. Set y="1" to constrain all levels of x to sum to one,
-        a single equality constraint.
+    :param constraints_loc: Constraints for location model. Can be one of the following:
 
-            E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
-                zero. This is applicable if repeats of a an experiment within each condition
-                are independent so that the set-up ~1+condition+batch is perfectly confounded.
+        - dict:
+            Every element of the dictionary corresponds to one set of equality constraints.
+            Each set has to be be an entry of the form {..., x: y, ...}
+            where x is the factor to be constrained and y is a factor by which levels of x are grouped
+            and then constrained. Set y="1" to constrain all levels of x to sum to one,
+            a single equality constraint.
 
-        Can only group by non-constrained effects right now, use constraint_matrix_from_string
-        for other cases.
-    :param constraints_scale: Grouped factors to enfore equality constraints on for scale model.
-        Every element of the dictionary corresponds to one set of equality constraints.
-        Each set has to be be an entry of the form {..., x: y, ...}
-        where x is the factor to be constrained and y is a factor by which levels of x are grouped
-        and then constrained. Set y="1" to constrain all levels of x to sum to one,
-        a single equality constraint.
+                E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
+                    zero. This is applicable if repeats of a an experiment within each condition
+                    are independent so that the set-up ~1+condition+batch is perfectly confounded.
 
-            E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
-                zero. This is applicable if repeats of a an experiment within each condition
-                are independent so that the set-up ~1+condition+batch is perfectly confounded.
+            Can only group by non-constrained effects right now, use constraint_matrix_from_string
+            for other cases.
+        - list of strings or tuple of strings:
+            String encoded equality constraints.
 
-        Can only group by non-constrained effects right now, use constraint_matrix_from_string
-        for other cases.
+                E.g. ["batch1 + batch2 + batch3 = 0"]
+        - None:
+            No constraints are used, this is equivalent to using an identity matrix as a
+            constraint matrix.
+
+        Note that np.ndarray encoded full constraint matrices are not supported here as the design
+        matrices are built within this function.
+    :param constraints_scale: Constraints for scale model. Can be following:
+
+        - dict:
+            Every element of the dictionary corresponds to one set of equality constraints.
+            Each set has to be be an entry of the form {..., x: y, ...}
+            where x is the factor to be constrained and y is a factor by which levels of x are grouped
+            and then constrained. Set y="1" to constrain all levels of x to sum to one,
+            a single equality constraint.
+
+                E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
+                    zero. This is applicable if repeats of a an experiment within each condition
+                    are independent so that the set-up ~1+condition+batch is perfectly confounded.
+
+            Can only group by non-constrained effects right now, use constraint_matrix_from_string
+            for other cases.
+        - list of strings or tuple of strings:
+            String encoded equality constraints.
+
+                E.g. ["batch1 + batch2 + batch3 = 0"]
+        - None:
+            No constraints are used, this is equivalent to using an identity matrix as a
+            constraint matrix.
+
+        Note that np.ndarray encoded full constraint matrices are not supported here as the design
+        matrices are built within this function.
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
@@ -1879,6 +1931,8 @@ def continuous_1d(
             init_b=init_b,
             gene_names=gene_names,
             sample_description=sample_description,
+            constraints_loc=constraints_loc,
+            constraints_scale=constraints_scale,
             noise_model=noise_model,
             size_factors=size_factors,
             batch_size=batch_size,
