@@ -1,13 +1,16 @@
-from typing import Union
-
 import anndata
 import numpy as np
 import pandas as pd
 import patsy
 import scipy
+from typing import List, Tuple, Union
 import xarray as xr
 
 from batchglm import data as data_utils
+# Relay util functions for diffxpy api. design_matrix and preview_coef_names are redefined here.
+from batchglm.data import constraint_matrix_from_string, setup_constrained
+from batchglm.data import design_matrix_from_xarray, design_matrix_from_anndata
+from batchglm.data import view_coef_names
 
 
 def parse_gene_names(data, gene_names):
@@ -95,64 +98,6 @@ def parse_size_factors(
     return size_factors
 
 
-def design_matrix(
-        data=None,
-        sample_description: pd.DataFrame = None,
-        formula: str = None,
-        dmat: pd.DataFrame = None
-) -> Union[patsy.design_info.DesignMatrix, xr.Dataset]:
-    """ Build design matrix for fit of generalized linear model.
-
-    This is necessary for wald tests and likelihood ratio tests.
-    This function only carries through formatting if dmat is directly supplied.
-
-    :param data: input data
-    :param formula: model formula.
-    :param sample_description: optional pandas.DataFrame containing sample annotations
-    :param dmat: model design matrix
-    """
-    if data is None and sample_description is None and dmat is None:
-        raise ValueError("Supply either data or sample_description or dmat.")
-    if dmat is None and formula is None:
-        raise ValueError("Supply either dmat or formula.")
-
-    if dmat is None:
-        sample_description = parse_sample_description(data, sample_description)
-        dmat = data_utils.design_matrix(sample_description=sample_description, formula=formula)
-
-        return dmat
-    else:
-        ar = xr.DataArray(dmat, dims=("observations", "design_params"))
-        ar.coords["design_params"] = dmat.columns
-
-        ds = xr.Dataset({
-            "design": ar,
-        })
-
-        return ds
-
-
-def coef_names(
-        data=None,
-        sample_description: pd.DataFrame = None,
-        formula: str = None,
-        dmat: pd.DataFrame = None
-) -> list:
-    """ Output coefficient names of model only.
-
-    :param data: input data
-    :param formula: model formula.
-    :param sample_description: optional pandas.DataFrame containing sample annotations
-    :param dmat: model design matrix
-    """
-    return design_matrix(
-        data=data,
-        sample_description=sample_description,
-        formula=formula,
-        dmat=dmat
-    ).design_info.column_names
-
-
 def parse_grouping(data, sample_description, grouping):
     if isinstance(grouping, str):
         sample_description = parse_sample_description(data, sample_description)
@@ -172,3 +117,94 @@ def dmat_unique(dmat, sample_description):
     sample_description = sample_description.iloc[idx].reset_index(drop=True)
 
     return dmat, sample_description
+
+
+def design_matrix(
+        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray,
+                    scipy.sparse.csr_matrix] = None,
+        sample_description: Union[None, pd.DataFrame] = None,
+        formula: Union[None, str] = None,
+        as_numeric: Union[List[str], Tuple[str], str] = (),
+        dmat: Union[pd.DataFrame, None] = None,
+        return_type: str = "xarray",
+) -> Union[patsy.design_info.DesignMatrix, xr.Dataset, pd.DataFrame]:
+    """ Create a design matrix from some sample description.
+
+    This function defaults to perform formatting if dmat is directly supplied as a pd.DataFrame.
+    This function relays batchglm.data.design_matrix() to behave like the other wrappers in diffxpy.
+
+    :param data: Input data matrix (observations x features) or (cells x genes).
+    :param sample_description: pandas.DataFrame of length "num_observations" containing explanatory variables as columns
+    :param formula: model formula as string, describing the relations of the explanatory variables.
+
+        E.g. '~ 1 + batch + confounder'
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
+    :param dmat: a model design matrix as a pd.DataFrame
+    :param return_type: type of the returned value.
+
+        - "patsy": return plain patsy.design_info.DesignMatrix object
+        - "dataframe": return pd.DataFrame with observations as rows and params as columns
+        - "xarray": return xr.Dataset with design matrix as ds["design"] and the sample description embedded as
+            one variable per column
+    :param dmat: model design matrix
+    """
+    if data is None and sample_description is None and dmat is None:
+        raise ValueError("supply either data or sample_description or dmat")
+    if dmat is None and formula is None:
+        raise ValueError("supply either dmat or formula")
+
+    if dmat is None:
+        sample_description = parse_sample_description(data, sample_description)
+
+    if sample_description is not None:
+        as_categorical = [False if x in as_numeric else True for x in sample_description.columns.values]
+    else:
+        as_categorical = True
+
+    return data_utils.design_matrix(
+        sample_description=sample_description,
+        formula=formula,
+        as_categorical=as_categorical,
+        dmat=dmat,
+        return_type=return_type
+    )
+
+
+def preview_coef_names(
+        sample_description: pd.DataFrame,
+        formula: str,
+        as_numeric: Union[List[str], Tuple[str], str] = ()
+) -> np.ndarray:
+    """
+    Return coefficient names of model.
+
+    Use this to preview what the model would look like.
+    This function relays batchglm.data.preview_coef_names() to behave like the other wrappers in diffxpy.
+
+    :param sample_description: pandas.DataFrame of length "num_observations" containing explanatory variables as columns
+    :param formula: model formula as string, describing the relations of the explanatory variables.
+
+        E.g. '~ 1 + batch + confounder'
+    :param as_numeric:
+        Which columns of sample_description to treat as numeric and
+        not as categorical. This yields columns in the design matrix
+        which do not correpond to one-hot encoded discrete factors.
+        This makes sense for number of genes, time, pseudotime or space
+        for example.
+    :return: A list of coefficient names.
+    """
+    if isinstance(as_numeric, str):
+        as_numeric = [as_numeric]
+    if isinstance(as_numeric, tuple):
+        as_numeric = list(as_numeric)
+
+    return data_utils.preview_coef_names(
+        sample_description=sample_description,
+        formula=formula,
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+    )

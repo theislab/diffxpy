@@ -384,13 +384,13 @@ def wald(
         data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         factor_loc_totest: Union[str, List[str]] = None,
         coef_to_test: Union[str, List[str]] = None,
-        formula_loc: str = None,
-        formula_scale: str = "~1",
+        formula_loc: Union[None, str] = None,
+        formula_scale: Union[None, str] = "~1",
         as_numeric: Union[List[str], Tuple[str], str] = (),
         init_a: Union[np.ndarray, str] = "AUTO",
         init_b: Union[np.ndarray, str] = "AUTO",
         gene_names: Union[np.ndarray, list] = None,
-        sample_description: pd.DataFrame = None,
+        sample_description: Union[None, pd.DataFrame] = None,
         dmat_loc: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
         dmat_scale: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
         constraints_loc: np.ndarray = None,
@@ -406,8 +406,7 @@ def wald(
     """
     Perform Wald test for differential expression for each gene.
 
-    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data matrix (observations x features) or (cells x genes).
+    :param data: Input data matrix (observations x features) or (cells x genes).
     :param factor_loc_totest: str, list of strings
         List of factors of formula to test with Wald test.
         E.g. "condition" or ["batch", "condition"] if formula_loc would be "~ 1 + batch + condition"
@@ -589,18 +588,16 @@ def wald(
     elif coef_to_test is not None:
         # Directly select coefficients to test from design matrix (xarray):
         # Check that coefficients to test are not dependent parameters if constraints are given:
-        # TODO: design_loc is sometimes xarray and sometimes patsy when it arrives here,
-        # should it not always be xarray?
-        if isinstance(design_loc, patsy.design_info.DesignMatrix):
-            col_indices = np.asarray([
-                design_loc.design_info.column_names.index(x)
-                for x in coef_to_test
-            ])
-        else:
-            col_indices = np.asarray([
-                list(np.asarray(design_loc.coords['design_params'])).index(x)
-                for x in coef_to_test
-            ])
+        coef_loc_names = data_utils.view_coef_names(design_loc).tolist()
+        if not np.all([x in coef_loc_names for x in coef_to_test]):
+            raise ValueError(
+                "the requested test coefficients %s were found in model coefficients %s" %
+                (", ".join([x for x in coef_to_test if x not in coef_loc_names]),
+                 ", ".join(coef_loc_names))
+            )
+        col_indices = np.asarray([
+            coef_loc_names.index(x) for x in coef_to_test
+        ])
     else:
         raise ValueError("either set factor_loc_totest or coef_to_test")
     # Check that all tested coefficients are independent:
@@ -1739,10 +1736,11 @@ def continuous_1d(
         not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     :param constraints_loc: Grouped factors to enfore equality constraints on for location model.
-        Every element of the iteratable corresponds to one set of equality constraints.
-        Each set has to be a dictionary of the form {x: y} where x is the factor to be constrained
-        and y is a factor by which levels of x are grouped and then constrained. Set y="1" to constrain
-        all levels of x to sum to one, a single equality constraint.
+        Every element of the dictionary corresponds to one set of equality constraints.
+        Each set has to be be an entry of the form {..., x: y, ...}
+        where x is the factor to be constrained and y is a factor by which levels of x are grouped
+        and then constrained. Set y="1" to constrain all levels of x to sum to one,
+        a single equality constraint.
 
             E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
                 zero. This is applicable if repeats of a an experiment within each condition
@@ -1751,10 +1749,11 @@ def continuous_1d(
         Can only group by non-constrained effects right now, use constraint_matrix_from_string
         for other cases.
     :param constraints_scale: Grouped factors to enfore equality constraints on for scale model.
-        Every element of the iteratable corresponds to one set of equality constraints.
-        Each set has to be a dictionary of the form {x: y} where x is the factor to be constrained
-        and y is a factor by which levels of x are grouped and then constrained. Set y="1" to constrain
-        all levels of x to sum to one, a single equality constraint.
+        Every element of the dictionary corresponds to one set of equality constraints.
+        Each set has to be be an entry of the form {..., x: y, ...}
+        where x is the factor to be constrained and y is a factor by which levels of x are grouped
+        and then constrained. Set y="1" to constrain all levels of x to sum to one,
+        a single equality constraint.
 
             E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
                 zero. This is applicable if repeats of a an experiment within each condition
