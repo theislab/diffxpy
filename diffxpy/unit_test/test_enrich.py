@@ -41,7 +41,7 @@ class TestEnrich(unittest.TestCase):
                 enrich_test_i = de.enrich.test(
                     ref=rs,
                     det=test,
-                    de_threshold=0.05,
+                    threshold=0.05,
                     incl_all_zero=i,
                     clean_ref=j,
                 )

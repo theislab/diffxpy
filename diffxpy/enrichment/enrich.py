@@ -194,9 +194,9 @@ class RefSets:
 def test(
         ref: RefSets,
         det: Union[_DifferentialExpressionTest, None] = None,
-        pval: Union[np.array, None] = None,
+        scores: Union[np.array, None] = None,
         gene_ids: Union[list, None] = None,
-        de_threshold=0.05,
+        threshold=0.05,
         incl_all_zero=False,
         all_ids=None,
         clean_ref=False,
@@ -211,12 +211,14 @@ def test(
     :param ref: The annotated gene sets against which enrichment is tested.
     :param det: The differential expression results object which is tested
         for enrichment in the gene sets.
-    :param pval: Alternative to DETest, vector of p-values for differential expression.
+    :param scores: Alternative to DETest, vector of scores (scalar per gene) which are then
+        used to discretize gene list. This can for example be corrected p-values from a differential expression
+        test, in that case the parameter threshold would be a significance threshold.
     :param gene_ids: If pval was supplied instead of DETest, use gene_ids to supply the
         vector of gene identifiers (strings) that correspond to the p-values
         which can be matched against the identifieres in the sets in RefSets.
-    :param de_threshold: Significance threshold at which a differential test (a multiple-testing
-        corrected p-value) is called siginficant. T
+    :param threshold: Threshold of parameter scores at which a gene is included as a hit: In the case
+        of differential test p-values in scores, threshold is the siginficance threshold.
     :param incl_all_zero: Wehther to include genes in gene universe which were all zero.
     :param all_ids: Set of all gene identifiers, this is used as the background set in the
         hypergeometric test. Only supply this if not all genes were tested
@@ -228,9 +230,9 @@ def test(
     return Enrich(
         ref=ref,
         det=det,
-        pval=pval,
+        scores=scores,
         gene_ids=gene_ids,
-        de_threshold=de_threshold,
+        threshold=threshold,
         incl_all_zero=incl_all_zero,
         all_ids=all_ids,
         clean_ref=clean_ref,
@@ -246,9 +248,9 @@ class Enrich:
             self,
             ref: RefSets,
             det: Union[_DifferentialExpressionTest, None],
-            pval: Union[np.array, None],
+            scores: Union[np.array, None],
             gene_ids: Union[list, np.ndarray, None],
-            de_threshold,
+            threshold,
             incl_all_zero,
             all_ids,
             clean_ref,
@@ -269,8 +271,8 @@ class Enrich:
                 idx_not_all_zero = np.where(np.logical_not(det.summary()["zero_mean"].values))[0]
                 self._qval_de = det.qval[idx_not_all_zero]
                 self._gene_ids = det.gene_ids[idx_not_all_zero]
-        elif pval is not None and gene_ids is not None:
-            self._qval_de = np.asarray(pval)
+        elif scores is not None and gene_ids is not None:
+            self._qval_de = np.asarray(scores)
             self._gene_ids = gene_ids
         else:
             raise ValueError('Supply either DETest or pval and gene_ids to Enrich().')
@@ -286,7 +288,7 @@ class Enrich:
             self._qval_de = self._qval_de[idx_notnan]
             self._gene_ids = self._gene_ids[idx_notnan]
 
-        self._significant_de = self._qval_de <= de_threshold
+        self._significant_de = self._qval_de <= threshold
         self._significant_ids = set(self._gene_ids[np.where(self._significant_de)[0]])
         if all_ids is not None:
             self._all_ids = set(all_ids)
