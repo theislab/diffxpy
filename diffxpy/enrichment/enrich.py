@@ -216,9 +216,9 @@ def test(
         test, in that case the parameter threshold would be a significance threshold.
     :param gene_ids: If pval was supplied instead of DETest, use gene_ids to supply the
         vector of gene identifiers (strings) that correspond to the p-values
-        which can be matched against the identifieres in the sets in RefSets.
+        which can be matched against the identifiers in the sets in RefSets.
     :param threshold: Threshold of parameter scores at which a gene is included as a hit: In the case
-        of differential test p-values in scores, threshold is the siginficance threshold.
+        of differential test p-values in scores, threshold is the significance threshold.
     :param incl_all_zero: Wehther to include genes in gene universe which were all zero.
     :param all_ids: Set of all gene identifiers, this is used as the background set in the
         hypergeometric test. Only supply this if not all genes were tested
