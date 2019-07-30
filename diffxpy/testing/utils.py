@@ -6,6 +6,11 @@ import scipy
 from typing import List, Tuple, Union
 import xarray as xr
 
+try:
+    from anndata.base import Raw
+except ImportError:
+    from anndata import Raw
+
 from batchglm import data as data_utils
 # Relay util functions for diffxpy api.
 # design_matrix, preview_coef_names and constraint_system_from_star are redefined here.
@@ -16,7 +21,7 @@ from batchglm.data import view_coef_names
 
 def parse_gene_names(data, gene_names):
     if gene_names is None:
-        if anndata is not None and (isinstance(data, anndata.AnnData) or isinstance(data, anndata.base.Raw)):
+        if anndata is not None and (isinstance(data, anndata.AnnData) or isinstance(data, Raw)):
             gene_names = data.var_names
         elif isinstance(data, xr.DataArray):
             gene_names = data["features"]
@@ -37,7 +42,7 @@ def parse_data(data, gene_names) -> xr.DataArray:
 
 
 def parse_sample_description(
-        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         sample_description: Union[pd.DataFrame, None]
 ) -> pd.DataFrame:
     """
@@ -63,8 +68,8 @@ def parse_sample_description(
                 "with corresponding sample annotations"
             )
 
-    if anndata is not None and isinstance(data, anndata.base.Raw):
-        # anndata.base.Raw does not have attribute shape.
+    if anndata is not None and isinstance(data, Raw):
+        # Raw does not have attribute shape.
         assert data.X.shape[0] == sample_description.shape[0], \
             "data matrix and sample description must contain same number of cells"
     else:
@@ -75,7 +80,7 @@ def parse_sample_description(
 
 def parse_size_factors(
         size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray],
-        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         sample_description: pd.DataFrame
 ) -> Union[np.ndarray, None]:
     """
@@ -121,7 +126,7 @@ def dmat_unique(dmat, sample_description):
 
 
 def design_matrix(
-        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray,
+        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray,
                     scipy.sparse.csr_matrix] = None,
         sample_description: Union[None, pd.DataFrame] = None,
         formula: Union[None, str] = None,
