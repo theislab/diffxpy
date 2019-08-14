@@ -5,7 +5,7 @@ author = 'David S. Fischer, Florian R. Hölzlwimmer'
 author_email='david.fischer@helmholtz-muenchen.de, diffxpy@frhoelzlwimmer.de'
 description="Fast and scalable differential expression analysis on single-cell RNA-seq data"
 
-with open("README.md", "r") as fh:
+with open("README.rst", "r") as fh:
      long_description = fh.read()
 
 setup(
