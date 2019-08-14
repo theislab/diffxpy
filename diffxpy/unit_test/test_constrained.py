@@ -9,7 +9,109 @@ from batchglm.api.models.glm_nb import Simulator
 import diffxpy.api as de
 
 
-class TestSingle(unittest.TestCase):
+class TestConstrained(unittest.TestCase):
+
+    def test_forfatal_from_string(self):
+        """
+        Test if _from_string interface is working.
+
+        n_cells is constant as the design matrix and constraints depend on it.
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        n_cells = 2000
+        n_genes = 2
+
+        sim = Simulator(num_observations=n_cells, num_features=n_genes)
+        sim.generate_sample_description(num_batches=0, num_conditions=0)
+        sim.generate()
+
+        # Build design matrix:
+        dmat = np.zeros([n_cells, 6])
+        dmat[:, 0] = 1
+        dmat[:500, 1] = 1  # bio rep 1
+        dmat[500:1000, 2] = 1  # bio rep 2
+        dmat[1000:1500, 3] = 1  # bio rep 3
+        dmat[1500:2000, 4] = 1  # bio rep 4
+        dmat[1000:2000, 5] = 1  # condition effect
+        coefficient_names = ['intercept', 'bio1', 'bio2', 'bio3', 'bio4', 'treatment1']
+        dmat_est = pd.DataFrame(data=dmat, columns=coefficient_names)
+
+        dmat_est_loc = de.utils.design_matrix(dmat=dmat_est)
+        dmat_est_scale = de.utils.design_matrix(dmat=dmat_est)
+
+        # Build constraints:
+        constraints_loc = de.utils.constraint_matrix_from_string(
+            dmat=dmat_est_loc,
+            constraints=["bio1+bio2=0", "bio3+bio4=0"],
+            dims=["design_loc_params", "loc_params"]
+        )
+        constraints_scale = de.utils.constraint_matrix_from_string(
+            dmat=dmat_est_scale,
+            constraints=["bio1+bio2=0", "bio3+bio4=0"],
+            dims=["design_scale_params", "scale_params"]
+        )
+
+        test = de.test.wald(
+            data=sim.X,
+            dmat_loc=dmat_est_loc,
+            dmat_scale=dmat_est_scale,
+            constraints_loc=constraints_loc,
+            constraints_scale=constraints_scale,
+            coef_to_test=["treatment1"]
+        )
+        summary = test.summary()
+
+        return True
+
+    def test_forfatal_from_dict(self):
+        """
+        Test if dictionary-based constraint interface is working.
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        n_cells = 2000
+        n_genes = 2
+
+        sim = Simulator(num_observations=n_cells, num_features=n_genes)
+        sim.generate_sample_description(num_batches=0, num_conditions=0)
+        sim.generate()
+
+        # Build design matrix:
+        sample_description = pd.DataFrame({
+            "cond": ["cond"+str(i // 1000) for i in range(n_cells)],
+            "batch": ["batch"+str(i // 500) for i in range(n_cells)]
+        })
+
+        # Build constraints:
+        dmat_loc, constraints_loc = de.utils.constraint_matrix_from_dict(
+            sample_description=sample_description,
+            formula="~1+cond+batch",
+            constraints={"batch": "cond"},
+            dims=["design_loc_params", "loc_params"]
+        )
+        dmat_scale, constraints_scale = de.utils.constraint_matrix_from_dict(
+            sample_description=sample_description,
+            formula="~1+cond+batch",
+            constraints={"batch": "cond"},
+            dims=["design_scale_params", "scale_params"]
+        )
+
+        test = de.test.wald(
+            data=sim.X,
+            dmat_loc=dmat_loc,
+            dmat_scale=dmat_scale,
+            constraints_loc=constraints_loc,
+            constraints_scale=constraints_scale,
+            coef_to_test=["cond[T.cond1]"]
+        )
+        summary = test.summary()
+
+        return True
 
     def test_null_distribution_wald_constrained(self, n_genes: int = 100):
         """
@@ -33,42 +135,32 @@ class TestSingle(unittest.TestCase):
         sim.generate()
 
         # Build design matrix:
-        dmat = np.zeros([n_cells, 6])
-        dmat[:, 0] = 1
-        dmat[:500, 1] = 1  # bio rep 1
-        dmat[500:1000, 2] = 1  # bio rep 2
-        dmat[1000:1500, 3] = 1  # bio rep 3
-        dmat[1500:2000, 4] = 1  # bio rep 4
-        dmat[1000:2000, 5] = 1  # condition effect
-        coefficient_names = ['intercept', 'bio1', 'bio2', 'bio3', 'bio4', 'treatment1']
-        dmat_est = pd.DataFrame(data=dmat, columns=coefficient_names)
-
-        dmat_est_loc = de.test.design_matrix(dmat=dmat_est)
-        dmat_est_scale = de.test.design_matrix(dmat=dmat_est)
+        sample_description = pd.DataFrame({
+            "cond": ["cond" + str(i // 1000) for i in range(n_cells)],
+            "batch": ["batch" + str(i // 500) for i in range(n_cells)]
+        })
 
         # Build constraints:
-        constraints_loc = de.utils.data_utils.build_equality_constraints_string(
-            dmat=dmat_est_loc,
-            constraints=["bio1+bio2=0", "bio3+bio4=0"],
+        dmat_loc, constraints_loc = de.utils.constraint_matrix_from_dict(
+            sample_description=sample_description,
+            formula="~1+cond+batch",
+            constraints={"batch": "cond"},
             dims=["design_loc_params", "loc_params"]
         )
-        constraints_scale = de.utils.data_utils.build_equality_constraints_string(
-            dmat=dmat_est_scale,
-            constraints=["bio1+bio2=0", "bio3+bio4=0"],
+        dmat_scale, constraints_scale = de.utils.constraint_matrix_from_dict(
+            sample_description=sample_description,
+            formula="~1+cond+batch",
+            constraints={"batch": "cond"},
             dims=["design_scale_params", "scale_params"]
         )
 
         test = de.test.wald(
             data=sim.X,
-            dmat_loc=dmat_est_loc.data_vars['design'],
-            dmat_scale=dmat_est_scale.data_vars['design'],
-            init_a="standard",
-            init_b="standard",
+            dmat_loc=dmat_loc,
+            dmat_scale=dmat_scale,
             constraints_loc=constraints_loc,
             constraints_scale=constraints_scale,
-            coef_to_test=["treatment1"],
-            training_strategy="DEFAULT",
-            dtype="float64"
+            coef_to_test=["cond[T.cond1]"]
         )
         summary = test.summary()
 
@@ -127,11 +219,11 @@ class TestSingle(unittest.TestCase):
                              'tech1', 'tech2', 'tech3', 'tech4']
         dmat_est = pd.DataFrame(data=dmat, columns=coefficient_names)
 
-        dmat_est_loc = de.test.design_matrix(dmat=dmat_est)
-        dmat_est_scale = de.test.design_matrix(dmat=dmat_est.iloc[:, [0]])
+        dmat_est_loc = de.utils.design_matrix(dmat=dmat_est)
+        dmat_est_scale = de.utils.design_matrix(dmat=dmat_est.iloc[:, [0]])
 
         # Build constraints:
-        constraints_loc = de.utils.data_utils.build_equality_constraints_string(
+        constraints_loc = de.utils.constraint_matrix_from_string(
             dmat=dmat_est_loc,
             constraints=["bio1+bio2=0",
                          "bio3+bio4=0",
@@ -145,16 +237,11 @@ class TestSingle(unittest.TestCase):
 
         test = de.test.wald(
             data=sim.X,
-            dmat_loc=dmat_est_loc.data_vars['design'],
-            dmat_scale=dmat_est_scale.data_vars['design'],
-            init_a="standard",
-            init_b="standard",
+            dmat_loc=dmat_est_loc,
+            dmat_scale=dmat_est_scale,
             constraints_loc=constraints_loc,
             constraints_scale=constraints_scale,
-            coef_to_test=["treatment1"],
-            training_strategy="DEFAULT",
-            quick_scale=False,
-            dtype="float64"
+            coef_to_test=["treatment1"]
         )
         summary = test.summary()
 
@@ -203,18 +290,18 @@ class TestSingle(unittest.TestCase):
                              'bio5', 'bio6', 'treatment1', 'treatment2']
         dmat_est = pd.DataFrame(data=dmat, columns=coefficient_names)
 
-        dmat_est_loc = de.test.design_matrix(dmat=dmat_est)
-        dmat_est_scale = de.test.design_matrix(dmat=dmat_est)
+        dmat_est_loc = de.utils.design_matrix(dmat=dmat_est)
+        dmat_est_scale = de.utils.design_matrix(dmat=dmat_est)
 
         # Build constraints:
-        constraints_loc = de.utils.data_utils.build_equality_constraints_string(
+        constraints_loc = de.utils.constraint_matrix_from_string(
             dmat=dmat_est_loc,
             constraints=["bio1+bio2=0",
                          "bio3+bio4=0",
                          "bio5+bio6=0"],
             dims=["design_loc_params", "loc_params"]
         )
-        constraints_scale = de.utils.data_utils.build_equality_constraints_string(
+        constraints_scale = de.utils.constraint_matrix_from_string(
             dmat=dmat_est_scale,
             constraints=["bio1+bio2=0",
                          "bio3+bio4=0",
@@ -224,13 +311,11 @@ class TestSingle(unittest.TestCase):
 
         test = de.test.wald(
             data=sim.X,
-            dmat_loc=dmat_est_loc.data_vars['design'],
-            dmat_scale=dmat_est_scale.data_vars['design'],
+            dmat_loc=dmat_est_loc,
+            dmat_scale=dmat_est_scale,
             constraints_loc=constraints_loc,
             constraints_scale=constraints_scale,
-            coef_to_test=["treatment1", "treatment2"],
-            training_strategy="DEFAULT",
-            dtype="float64"
+            coef_to_test=["treatment1", "treatment2"]
         )
         summary = test.summary()
 
@@ -238,7 +323,7 @@ class TestSingle(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % pval_h0
 
         return True
 

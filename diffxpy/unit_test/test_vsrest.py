@@ -48,7 +48,7 @@ class TestVsRest(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval.flatten(), 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of test_wald_loc(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
 
         return True
 
@@ -64,7 +64,7 @@ class TestVsRest(unittest.TestCase):
         """
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
-        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.ERROR)
         from batchglm.api.models.glm_nb import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
@@ -90,12 +90,12 @@ class TestVsRest(unittest.TestCase):
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval.flatten(), 'uniform').pvalue
 
-        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of test_wald_loc(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of test_lrt(): %f' % pval_h0)
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
 
         return True
 
-    def test_null_distribution_wilcoxon(self, n_cells: int = 2000, n_genes: int = 100, n_groups: int = 2):
+    def test_null_distribution_rank(self, n_cells: int = 2000, n_genes: int = 100, n_groups: int = 2):
         """
         Test if de.test_wald_loc() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -121,7 +121,7 @@ class TestVsRest(unittest.TestCase):
         test = de.test.versus_rest(
             data=sim.X,
             grouping="condition",
-            test="wilcoxon",
+            test="rank",
             sample_description=random_sample_description,
             dtype="float64"
         )
@@ -131,7 +131,7 @@ class TestVsRest(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval.flatten(), 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of test_wald_loc(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
 
         return True
 
@@ -171,7 +171,7 @@ class TestVsRest(unittest.TestCase):
         pval_h0 = stats.kstest(test.pval.flatten(), 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of test_wald_loc(): %f' % pval_h0)
-        assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
+        assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
 
         return True
 

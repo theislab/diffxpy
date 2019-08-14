@@ -8,6 +8,11 @@ import patsy
 import scipy.sparse
 import xarray as xr
 
+try:
+    from anndata.base import Raw
+except ImportError:
+    from anndata import Raw
+
 from batchglm import data as data_utils
 from batchglm.xarray_sparse import SparseXArrayDataSet
 from diffxpy import pkg_constants
@@ -17,9 +22,8 @@ from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, 
     DifferentialExpressionTestZTestLazy, DifferentialExpressionTestZTest, DifferentialExpressionTestPairwise, \
     DifferentialExpressionTestVsRest, _DifferentialExpressionTestMulti, DifferentialExpressionTestByPartition, \
     DifferentialExpressionTestWaldCont, DifferentialExpressionTestLRTCont
-from .utils import parse_gene_names, parse_data, parse_sample_description, parse_size_factors, parse_grouping
-
-logger = logging.getLogger("diffxpy")
+from .utils import parse_gene_names, parse_data, parse_sample_description, parse_size_factors, parse_grouping, \
+    constraint_system_from_star
 
 # Use this to suppress matrix subclass PendingDepreceationWarnings from numpy:
 np.warnings.filterwarnings("ignore")
@@ -145,8 +149,8 @@ def _fit(
         else:
             raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
 
-        logger.info("Fitting model...")
-        logger.debug(" * Assembling input data...")
+        logging.getLogger("diffxpy").info("Fitting model...")
+        logging.getLogger("diffxpy").debug(" * Assembling input data...")
         input_data = InputData.new(
             data=data,
             design_loc=design_loc,
@@ -157,7 +161,7 @@ def _fit(
             feature_names=gene_names,
         )
 
-        logger.debug(" * Set up Estimator...")
+        logging.getLogger("diffxpy").debug(" * Set up Estimator...")
         constructor_args = {}
         if batch_size is not None:
             constructor_args["batch_size"] = batch_size
@@ -176,10 +180,10 @@ def _fit(
             **constructor_args
         )
 
-        logger.debug(" * Initializing Estimator...")
+        logging.getLogger("diffxpy").debug(" * Initializing Estimator...")
         estim.initialize()
 
-        logger.debug(" * Run estimation...")
+        logging.getLogger("diffxpy").debug(" * Run estimation...")
         # training:
         if callable(training_strategy):
             # call training_strategy if it is a function
@@ -188,28 +192,28 @@ def _fit(
             estim.train_sequence(training_strategy=training_strategy)
 
         if close_session:
-            logger.debug(" * Finalize estimation...")
+            logging.getLogger("diffxpy").debug(" * Finalize estimation...")
             model = estim.finalize()
         else:
             model = estim
-        logger.debug(" * Model fitting done.")
+        logging.getLogger("diffxpy").debug(" * Model fitting done.")
 
     return model
 
 
 def lrt(
-        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
-        reduced_formula_loc: str,
+        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         full_formula_loc: str,
-        reduced_formula_scale: str = "~1",
+        reduced_formula_loc: str,
         full_formula_scale: str = "~1",
+        reduced_formula_scale: str = "~1",
         as_numeric: Union[List[str], Tuple[str], str] = (),
         init_a: Union[np.ndarray, str] = "AUTO",
         init_b: Union[np.ndarray, str] = "AUTO",
-        gene_names=None,
+        gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         noise_model="nb",
-        size_factors: np.ndarray = None,
+        size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray] = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "DEFAULT",
         quick_scale: bool = False,
@@ -222,20 +226,19 @@ def lrt(
     Note that lrt() does not support constraints in its current form. Please
     use wald() for constraints.
 
-    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data matrix (observations x features) or (cells x genes).
-    :param reduced_formula_loc: formula
-        Reduced model formula for location and scale parameter models.
-        If not specified, `reduced_formula` will be used instead.
+    :param data: Input data matrix (observations x features) or (cells x genes).
     :param full_formula_loc: formula
         Full model formula for location parameter model.
         If not specified, `full_formula` will be used instead.
-    :param reduced_formula_scale: formula
-        Reduced model formula for scale parameter model.
+    :param reduced_formula_loc: formula
+        Reduced model formula for location and scale parameter models.
         If not specified, `reduced_formula` will be used instead.
     :param full_formula_scale: formula
         Full model formula for scale parameter model.
         If not specified, `reduced_formula_scale` will be used instead.
+    :param reduced_formula_scale: formula
+        Reduced model formula for scale parameter model.
+        If not specified, `reduced_formula` will be used instead.
     :param as_numeric:
         Which columns of sample_description to treat as numeric and
         not as categorical. This yields columns in the design matrix
@@ -247,7 +250,6 @@ def lrt(
 
         - str:
             * "auto": automatically choose best initialization
-            * "random": initialize with random values
             * "standard": initialize intercept with observed mean
             * "init_model": initialize with another model (see `ìnit_model` parameter)
             * "closed_form": try to initialize with closed form
@@ -257,7 +259,6 @@ def lrt(
 
         - str:
             * "auto": automatically choose best initialization
-            * "random": initialize with random values
             * "standard": initialize with zeros
             * "init_model": initialize with another model (see `ìnit_model` parameter)
             * "closed_form": try to initialize with closed form
@@ -268,7 +269,8 @@ def lrt(
 
         - 'nb': default
     :param size_factors: 1D array of transformed library size factors for each cell in the
-        same order as in data
+        same order as in data or string-type column identifier of size-factor containing
+        column in sample description.
     :param batch_size: the batch size to use for the estimator
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
@@ -298,7 +300,7 @@ def lrt(
     """
     # TODO test nestedness
     if len(kwargs) != 0:
-        logger.info("additional kwargs: %s", str(kwargs))
+        logging.getLogger("diffxpy").info("additional kwargs: %s", str(kwargs))
 
     if isinstance(as_numeric, str):
         as_numeric = [as_numeric]
@@ -306,27 +308,35 @@ def lrt(
     gene_names = parse_gene_names(data, gene_names)
     X = parse_data(data, gene_names)
     sample_description = parse_sample_description(data, sample_description)
-    size_factors = parse_size_factors(size_factors=size_factors, data=X)
+    size_factors = parse_size_factors(
+        size_factors=size_factors,
+        data=X,
+        sample_description=sample_description
+    )
 
     full_design_loc = data_utils.design_matrix(
         sample_description=sample_description,
         formula=full_formula_loc,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        return_type="patsy"
     )
     reduced_design_loc = data_utils.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_loc,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        return_type="patsy"
     )
     full_design_scale = data_utils.design_matrix(
         sample_description=sample_description,
         formula=full_formula_scale,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        return_type="patsy"
     )
     reduced_design_scale = data_utils.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_scale,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        return_type="patsy"
     )
 
     reduced_model = _fit(
@@ -377,22 +387,22 @@ def lrt(
 
 
 def wald(
-        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         factor_loc_totest: Union[str, List[str]] = None,
         coef_to_test: Union[str, List[str]] = None,
-        formula_loc: str = None,
-        formula_scale: str = "~1",
+        formula_loc: Union[None, str] = None,
+        formula_scale: Union[None, str] = "~1",
         as_numeric: Union[List[str], Tuple[str], str] = (),
         init_a: Union[np.ndarray, str] = "AUTO",
         init_b: Union[np.ndarray, str] = "AUTO",
-        gene_names: Union[str, np.ndarray] = None,
-        sample_description: pd.DataFrame = None,
+        gene_names: Union[np.ndarray, list] = None,
+        sample_description: Union[None, pd.DataFrame] = None,
         dmat_loc: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
         dmat_scale: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
-        constraints_loc: np.ndarray = None,
-        constraints_scale: np.ndarray = None,
+        constraints_loc: Union[None, List[str], Tuple[str, str], dict, np.ndarray] = None,
+        constraints_scale: Union[None, List[str], Tuple[str, str], dict, np.ndarray] = None,
         noise_model: str = "nb",
-        size_factors: np.ndarray = None,
+        size_factors: Union[np.ndarray, pd.core.series.Series, str] = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = False,
@@ -402,8 +412,7 @@ def wald(
     """
     Perform Wald test for differential expression for each gene.
 
-    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
-        Input data matrix (observations x features) or (cells x genes).
+    :param data: Input data matrix (observations x features) or (cells x genes).
     :param factor_loc_totest: str, list of strings
         List of factors of formula to test with Wald test.
         E.g. "condition" or ["batch", "condition"] if formula_loc would be "~ 1 + batch + condition"
@@ -412,8 +421,6 @@ def wald(
         this parameter allows to specify the group which should be tested.
         Alternatively, if factor_loc_totest is not given, this list sets
         the exact coefficients which are to be tested.
-    :param formula: formula
-        model formula for location and scale parameter models.
     :param formula_loc: formula
         model formula for location and scale parameter models.
         If not specified, `formula` will be used instead.
@@ -423,7 +430,7 @@ def wald(
     :param as_numeric:
         Which columns of sample_description to treat as numeric and
         not as categorical. This yields columns in the design matrix
-        which do not correpond to one-hot encoded discrete factors.
+        which do not correspond to one-hot encoded discrete factors.
         This makes sense for number of genes, time, pseudotime or space
         for example.
     :param init_a: (Optional) Low-level initial values for a.
@@ -450,32 +457,79 @@ def wald(
     :param dmat_scale: Pre-built scale model design matrix.
         This over-rides formula_scale and sample description information given in
         data or sample_description.
-    :param constraints_loc: : Constraints for location model.
-        Array with constraints in rows and model parameters in columns.
-        Each constraint contains non-zero entries for the a of parameters that
-        has to sum to zero. This constraint is enforced by binding one parameter
-        to the negative sum of the other parameters, effectively representing that
-        parameter as a function of the other parameters. This dependent
-        parameter is indicated by a -1 in this array, the independent parameters
-        of that constraint (which may be dependent at an earlier constraint)
-        are indicated by a 1. It is highly recommended to only use this option
-        together with prebuilt design matrix for the location model, dmat_loc.
-    :param constraints_scale: : Constraints for scale model.
-        Array with constraints in rows and model parameters in columns.
-        Each constraint contains non-zero entries for the a of parameters that
-        has to sum to zero. This constraint is enforced by binding one parameter
-        to the negative sum of the other parameters, effectively representing that
-        parameter as a function of the other parameters. This dependent
-        parameter is indicated by a -1 in this array, the independent parameters
-        of that constraint (which may be dependent at an earlier constraint)
-        are indicated by a 1. It is highly recommended to only use this option
-        together with prebuilt design matrix for the scale model, dmat_scale.
+    :param constraints_loc: Constraints for location model. Can be one of the following:
+
+            - np.ndarray:
+                Array with constraints in rows and model parameters in columns.
+                Each constraint contains non-zero entries for the a of parameters that
+                has to sum to zero. This constraint is enforced by binding one parameter
+                to the negative sum of the other parameters, effectively representing that
+                parameter as a function of the other parameters. This dependent
+                parameter is indicated by a -1 in this array, the independent parameters
+                of that constraint (which may be dependent at an earlier constraint)
+                are indicated by a 1. You should only use this option
+                together with prebuilt design matrix for the location model, dmat_loc,
+                for example via de.utils.setup_constrained().
+            - dict:
+                Every element of the dictionary corresponds to one set of equality constraints.
+                Each set has to be be an entry of the form {..., x: y, ...}
+                where x is the factor to be constrained and y is a factor by which levels of x are grouped
+                and then constrained. Set y="1" to constrain all levels of x to sum to one,
+                a single equality constraint.
+
+                    E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
+                        zero. This is applicable if repeats of a an experiment within each condition
+                        are independent so that the set-up ~1+condition+batch is perfectly confounded.
+
+                Can only group by non-constrained effects right now, use constraint_matrix_from_string
+                for other cases.
+            - list of strings or tuple of strings:
+                String encoded equality constraints.
+
+                    E.g. ["batch1 + batch2 + batch3 = 0"]
+            - None:
+                No constraints are used, this is equivalent to using an identity matrix as a
+                constraint matrix.
+    :param constraints_scale: Constraints for scale model. Can be one of the following:
+
+            - np.ndarray:
+                Array with constraints in rows and model parameters in columns.
+                Each constraint contains non-zero entries for the a of parameters that
+                has to sum to zero. This constraint is enforced by binding one parameter
+                to the negative sum of the other parameters, effectively representing that
+                parameter as a function of the other parameters. This dependent
+                parameter is indicated by a -1 in this array, the independent parameters
+                of that constraint (which may be dependent at an earlier constraint)
+                are indicated by a 1. You should only use this option
+                together with prebuilt design matrix for the scale model, dmat_scale,
+                for example via de.utils.setup_constrained().
+            - dict:
+                Every element of the dictionary corresponds to one set of equality constraints.
+                Each set has to be be an entry of the form {..., x: y, ...}
+                where x is the factor to be constrained and y is a factor by which levels of x are grouped
+                and then constrained. Set y="1" to constrain all levels of x to sum to one,
+                a single equality constraint.
+
+                    E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
+                        zero. This is applicable if repeats of a an experiment within each condition
+                        are independent so that the set-up ~1+condition+batch is perfectly confounded.
+
+                Can only group by non-constrained effects right now, use constraint_matrix_from_string
+                for other cases.
+            - list of strings or tuple of strings:
+                String encoded equality constraints.
+
+                    E.g. ["batch1 + batch2 + batch3 = 0"]
+            - None:
+                No constraints are used, this is equivalent to using an identity matrix as a
+                constraint matrix.
     :param size_factors: 1D array of transformed library size factors for each cell in the
-        same order as in data
+        same order as in data or string-type column identifier of size-factor containing
+        column in sample description.
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
-    :param batch_size: the batch size to use for the estimator
+    :param batch_size: The batch size to use for the estimator.
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -483,17 +537,6 @@ def wald(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-
-          Example:
-
-          .. code-block:: python
-
-              [
-                {"learning_rate": 0.5, },
-                {"learning_rate": 0.05, },
-              ]
-
-          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
@@ -503,12 +546,16 @@ def wald(
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
-        logger.debug("additional kwargs: %s", str(kwargs))
+        logging.getLogger("diffxpy").debug("additional kwargs: %s", str(kwargs))
 
-    if dmat_loc is None and formula_loc is None:
-        raise ValueError("Supply either dmat_loc or formula_loc or formula.")
-    if dmat_scale is None and formula_scale is None:
-        raise ValueError("Supply either dmat_loc or formula_loc or formula.")
+    if (dmat_loc is None and formula_loc is None) or \
+            (dmat_loc is not None and formula_loc is not None):
+        raise ValueError("Supply either dmat_loc or formula_loc.")
+    if (dmat_scale is None and formula_scale is None) or \
+            (dmat_scale is not None and formula_scale != "~1"):
+        raise ValueError("Supply either dmat_scale or formula_scale.")
+    if dmat_loc is not None and factor_loc_totest is not None:
+        raise ValueError("Supply coef_to_test and not factor_loc_totest if dmat_loc is supplied.")
     # Check that factor_loc_totest and coef_to_test are lists and not single strings:
     if isinstance(factor_loc_totest, str):
         factor_loc_totest = [factor_loc_totest]
@@ -522,46 +569,32 @@ def wald(
     X = parse_data(data, gene_names)
     if dmat_loc is None and dmat_scale is None:
         sample_description = parse_sample_description(data, sample_description)
-    size_factors = parse_size_factors(size_factors=size_factors, data=X)
+    size_factors = parse_size_factors(
+        size_factors=size_factors,
+        data=X,
+        sample_description=sample_description
+    )
 
-    if dmat_loc is None:
-        design_loc = data_utils.design_matrix(
-            sample_description=sample_description,
-            formula=formula_loc,
-            as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
-        )
-        # Check that closed-form is not used if numeric predictors are used and model is not "norm".
-        if isinstance(init_a, str):
-            if np.any([True if x in as_numeric else False for x in sample_description.columns.values]):
-                if noise_model.lower() not in ["normal", "norm"]:
-                    if init_a == "closed_form":
-                        init_a = "standard"
-                        logger.warning("Setting init_a to standard as numeric predictors were supplied.")
-                        logger.warning("Closed-form initialisation is not possible" +
-                                       " for noise model %s with numeric predictors." % noise_model)
-                    elif init_a == "AUTO":
-                        init_a = "standard"
-    else:
-        design_loc = dmat_loc
-
-    if dmat_scale is None:
-        design_scale = data_utils.design_matrix(
-            sample_description=sample_description,
-            formula=formula_scale,
-            as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
-        )
-        # Check that closed-form is not used if numeric predictors are used and model is not "norm".
-        if isinstance(init_b, str):
-            if np.any([True if x in as_numeric else False for x in sample_description.columns.values]):
-                if init_b == "closed_form":
-                    init_b = "standard"
-                    logger.warning("Setting init_b to standard as numeric predictors were supplied.")
-                    logger.warning("Closed-form initialisation is not possible" +
-                                   " for noise model %s with numeric predictors." % noise_model)
-                elif init_b == "AUTO":
-                    init_b = "standard"
-    else:
-        design_scale = dmat_scale
+    logging.getLogger("diffxpy").debug("building location model")
+    design_loc, constraints_loc = constraint_system_from_star(
+        dmat=dmat_loc,
+        sample_description=sample_description,
+        formula=formula_loc,
+        as_numeric=as_numeric,
+        constraints=constraints_loc,
+        dims=["design_loc_params", "loc_params"],
+        return_type="patsy"
+    )
+    logging.getLogger("diffxpy").debug("building scale model")
+    design_scale, constraints_scale = constraint_system_from_star(
+        dmat=dmat_scale,
+        sample_description=sample_description,
+        formula=formula_scale,
+        as_numeric=as_numeric,
+        constraints=constraints_scale,
+        dims=["design_scale_params", "scale_params"],
+        return_type="patsy"
+    )
 
     # Define indices of coefficients to test:
     constraints_loc_temp = constraints_loc if constraints_loc is not None else np.eye(design_loc.shape[-1])
@@ -583,18 +616,16 @@ def wald(
     elif coef_to_test is not None:
         # Directly select coefficients to test from design matrix (xarray):
         # Check that coefficients to test are not dependent parameters if constraints are given:
-        # TODO: design_loc is sometimes xarray and sometimes patsy when it arrives here,
-        # should it not always be xarray?
-        if isinstance(design_loc, patsy.design_info.DesignMatrix):
-            col_indices = np.asarray([
-                design_loc.design_info.column_names.index(x)
-                for x in coef_to_test
-            ])
-        else:
-            col_indices = np.asarray([
-                list(np.asarray(design_loc.coords['design_params'])).index(x)
-                for x in coef_to_test
-            ])
+        coef_loc_names = data_utils.view_coef_names(design_loc).tolist()
+        if not np.all([x in coef_loc_names for x in coef_to_test]):
+            raise ValueError(
+                "the requested test coefficients %s were found in model coefficients %s" %
+                (", ".join([x for x in coef_to_test if x not in coef_loc_names]),
+                 ", ".join(coef_loc_names))
+            )
+        col_indices = np.asarray([
+            coef_loc_names.index(x) for x in coef_to_test
+        ])
     else:
         raise ValueError("either set factor_loc_totest or coef_to_test")
     # Check that all tested coefficients are independent:
@@ -624,18 +655,21 @@ def wald(
 
     de_test = DifferentialExpressionTestWald(
         model_estim=model,
-        col_indices=col_indices
+        col_indices=col_indices,
+        noise_model=noise_model,
+        sample_description=sample_description
     )
 
     return de_test
 
 
 def t_test(
-        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         grouping,
-        gene_names=None,
-        sample_description=None,
-        is_logged=False,
+        gene_names: Union[np.ndarray, list] = None,
+        sample_description: pd.DataFrame = None,
+        is_logged: bool = False,
+        is_sig_zerovar: bool = True,
         dtype="float64"
 ):
     """
@@ -653,6 +687,9 @@ def t_test(
     :param is_logged:
         Whether data is already logged. If True, log-fold changes are computed as fold changes on this data.
         If False, log-fold changes are computed as log-fold changes on this data.
+    :param is_sig_zerovar:
+        Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+        the p-value is set to np.nan.
     """
     gene_names = parse_gene_names(data, gene_names)
     X = parse_data(data, gene_names)
@@ -662,20 +699,23 @@ def t_test(
 
     de_test = DifferentialExpressionTestTT(
         data=X.astype(dtype),
+        sample_description=sample_description,
         grouping=grouping,
         gene_names=gene_names,
-        is_logged=is_logged
+        is_logged=is_logged,
+        is_sig_zerovar=is_sig_zerovar
     )
 
     return de_test
 
 
 def rank_test(
-        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
-        grouping,
-        gene_names=None,
-        sample_description=None,
-        is_logged=False,
+        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        grouping: Union[str, np.ndarray, list],
+        gene_names: Union[np.ndarray, list] = None,
+        sample_description: pd.DataFrame = None,
+        is_logged: bool = False,
+        is_sig_zerovar: bool = True,
         dtype="float64"
 ):
     """
@@ -693,6 +733,9 @@ def rank_test(
     :param is_logged:
         Whether data is already logged. If True, log-fold changes are computed as fold changes on this data.
         If False, log-fold changes are computed as log-fold changes on this data.
+    :param is_sig_zerovar:
+        Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+        the p-value is set to np.nan.
     """
     gene_names = parse_gene_names(data, gene_names)
     X = parse_data(data, gene_names)
@@ -702,25 +745,28 @@ def rank_test(
 
     de_test = DifferentialExpressionTestRank(
         data=X.astype(dtype),
+        sample_description=sample_description,
         grouping=grouping,
         gene_names=gene_names,
-        is_logged=is_logged
+        is_logged=is_logged,
+        is_sig_zerovar=is_sig_zerovar
     )
 
     return de_test
 
 
 def two_sample(
-        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
-        test=None,
-        gene_names=None,
-        sample_description=None,
+        test: str = "t-test",
+        gene_names: Union[np.ndarray, list] = None,
+        sample_description: pd.DataFrame = None,
         noise_model: str = None,
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        is_sig_zerovar: bool = True,
         quick_scale: bool = None,
         dtype="float64",
         **kwargs
@@ -735,7 +781,7 @@ def two_sample(
     The exact unit_test are as follows (assuming the group labels
     are saved in a column named "group"):
 
-    - lrt(log-likelihood ratio test):
+    - "lrt" - (log-likelihood ratio test):
         Requires the fitting of 2 generalized linear models (full and reduced).
         The models are automatically assembled as follows, use the de.test.lrt()
         function if you would like to perform a different test.
@@ -744,15 +790,15 @@ def two_sample(
             * full model scale parameter: ~ 1 + group
             * reduced model location parameter: ~ 1
             * reduced model scale parameter: ~ 1 + group
-    - Wald test:
+    - "wald" - Wald test:
         Requires the fitting of 1 generalized linear models.
         model location parameter: ~ 1 + group
         model scale parameter: ~ 1 + group
         Test the group coefficient of the location parameter model against 0.
-    - t-test:
+    - "t-test" - Welch's t-test:
         Doesn't require fitting of generalized linear models.
         Welch's t-test between both observation groups.
-    - wilcoxon:
+    - "rank" - Wilcoxon rank sum (Mann-Whitney U) test:
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
@@ -773,15 +819,15 @@ def two_sample(
         - 'wald': default
         - 'lrt'
         - 't-test'
-        - 'wilcoxon'
+        - 'rank'
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param size_factors: 1D array of transformed library size factors for each cell in the
+        same order as in data
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
-    :param size_factors: 1D array of transformed library size factors for each cell in the
-        same order as in data
-    :param batch_size: the batch size to use for the estimator
+    :param batch_size: The batch size to use for the estimator.
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -789,17 +835,9 @@ def two_sample(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-
-          Example:
-
-          .. code-block:: python
-
-              [
-                {"learning_rate": 0.5, },
-                {"learning_rate": 0.05, },
-              ]
-
-          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+    :param is_sig_zerovar:
+        Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+        the p-value is set to np.nan.
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
@@ -808,8 +846,8 @@ def two_sample(
         Should be "float32" for single precision or "float64" for double precision.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
-    if test in ['t-test', 'wilcoxon'] and noise_model is not None:
-        raise ValueError('base.two_sample(): Do not specify `noise_model` if using test t-test or wilcoxon: ' +
+    if test in ['t-test', 'rank'] and noise_model is not None:
+        raise ValueError('base.two_sample(): Do not specify `noise_model` if using test t-test or rank_test: ' +
                          'The t-test is based on a gaussian noise model and wilcoxon is model free.')
 
     gene_names = parse_gene_names(data, gene_names)
@@ -822,10 +860,6 @@ def two_sample(
         raise ValueError("More than two groups detected:\n\t%s", groups)
     if groups.size < 2:
         raise ValueError("Less than two groups detected:\n\t%s", groups)
-
-    # Set default test:
-    if test is None:
-        test = 'wald'
 
     if test.lower() == 'wald':
         if noise_model is None:
@@ -853,9 +887,9 @@ def two_sample(
         if noise_model is None:
             raise ValueError("Please specify noise_model")
         full_formula_loc = '~ 1 + grouping'
-        full_formula_scale = '~ 1 + grouping'
+        full_formula_scale = '~ 1'
         reduced_formula_loc = '~ 1'
-        reduced_formula_scale = '~ 1 + grouping'
+        reduced_formula_scale = '~ 1'
         de_test = lrt(
             data=X,
             full_formula_loc=full_formula_loc,
@@ -878,36 +912,39 @@ def two_sample(
             data=X,
             gene_names=gene_names,
             grouping=grouping,
+            is_sig_zerovar=is_sig_zerovar,
             dtype=dtype
         )
-    elif test.lower() == 'wilcoxon':
+    elif test.lower() == 'rank':
         de_test = rank_test(
             data=X,
             gene_names=gene_names,
             grouping=grouping,
+            is_sig_zerovar=is_sig_zerovar,
             dtype=dtype
         )
     else:
-        raise ValueError('base.two_sample(): Parameter `test="%s"` not recognized.' % test)
+        raise ValueError('two_sample(): Parameter `test="%s"` not recognized.' % test)
 
     return de_test
 
 
 def pairwise(
-        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         grouping: Union[str, np.ndarray, list],
-        as_numeric: Union[List[str], Tuple[str], str] = [],
+        as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'z-test',
         lazy: bool = False,
-        gene_names: str = None,
+        gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
-        pval_correction: str = "global",
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        is_sig_zerovar: bool = True,
         quick_scale: bool = None,
         dtype="float64",
+        pval_correction: str = "global",
         keep_full_test_objs: bool = False,
         **kwargs
 ):
@@ -926,22 +963,22 @@ def pairwise(
     on the subset of the data that only contains observations of a given
     pair of groups:
 
-    - lrt(log-likelihood ratio test):
+    - "lrt" -log-likelihood ratio test:
         Requires the fitting of 2 generalized linear models (full and reduced).
 
         * full model location parameter: ~ 1 + group
         * full model scale parameter: ~ 1 + group
         * reduced model location parameter: ~ 1
         * reduced model scale parameter: ~ 1 + group
-    - Wald test:
+    - "wald" - Wald test:
         Requires the fitting of 1 generalized linear models.
         model location parameter: ~ 1 + group
         model scale parameter: ~ 1 + group
         Test the group coefficient of the location parameter model against 0.
-    - t-test:
+    - "t-test" - Welch's t-test:
         Doesn't require fitting of generalized linear models.
         Welch's t-test between both observation groups.
-    - wilcoxon:
+    - "rank" - Wilcoxon rank sum (Mann-Whitney U) test:
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
@@ -963,7 +1000,7 @@ def pairwise(
         - 'wald'
         - 'lrt'
         - 't-test'
-        - 'wilcoxon'
+        - 'rank'
     :param lazy: bool, whether to enable lazy results evaluation.
         This is only possible if test=="ztest" and yields an output object which computes
         p-values etc. only upon request of certain pairs. This makes sense if the entire
@@ -972,17 +1009,12 @@ def pairwise(
         a certain subset of the pairwise comparisons is desired anyway.
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param size_factors: 1D array of transformed library size factors for each cell in the
+        same order as in data
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
-    :param pval_correction: Choose between global and test-wise correction.
-        Can be:
-
-        - "global": correct all p-values in one operation
-        - "by_test": correct the p-values of each test individually
-    :param size_factors: 1D array of transformed library size factors for each cell in the
-        same order as in data
-    :param batch_size: the batch size to use for the estimator
+    :param batch_size: The batch size to use for the estimator.
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -990,28 +1022,25 @@ def pairwise(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-
-          Example:
-
-          .. code-block:: python
-
-              [
-                {"learning_rate": 0.5, },
-                {"learning_rate": 0.05, },
-              ]
-
-          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
     :param dtype: Allows specifying the precision which should be used to fit data.
 
         Should be "float32" for single precision or "float64" for double precision.
-    :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test"
+    :param pval_correction: Choose between global and test-wise correction.
+        Can be:
+
+        - "global": correct all p-values in one operation
+        - "by_test": correct the p-values of each test individually
+    :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test".
+    :param is_sig_zerovar:
+        Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+        the p-value is set to np.nan.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
-        logger.info("additional kwargs: %s", str(kwargs))
+        logging.getLogger("diffxpy").info("additional kwargs: %s", str(kwargs))
 
     if lazy and not (test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest'):
         raise ValueError("lazy evaluation of pairwise tests only possible if test is z-test")
@@ -1087,6 +1116,7 @@ def pairwise(
                     batch_size=batch_size,
                     training_strategy=training_strategy,
                     quick_scale=quick_scale,
+                    is_sig_zerovar=is_sig_zerovar,
                     dtype=dtype,
                     **kwargs
                 )
@@ -1112,19 +1142,20 @@ def pairwise(
 
 
 def versus_rest(
-        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
-        gene_names: str = None,
+        gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
-        pval_correction: str = "global",
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        is_sig_zerovar: bool = True,
         quick_scale: bool = None,
         dtype="float64",
+        pval_correction: str = "global",
         keep_full_test_objs: bool = False,
         **kwargs
 ):
@@ -1144,22 +1175,22 @@ def versus_rest(
     is one group and the remaining groups are allocated to the second reference
     group):
 
-    - lrt(log-likelihood ratio test):
+    - "lrt" - log-likelihood ratio test):
         Requires the fitting of 2 generalized linear models (full and reduced).
 
         * full model location parameter: ~ 1 + group
         * full model scale parameter: ~ 1 + group
         * reduced model location parameter: ~ 1
         * reduced model scale parameter: ~ 1 + group
-    - Wald test:
+    - "wald" - Wald test:
         Requires the fitting of 1 generalized linear models.
         model location parameter: ~ 1 + group
         model scale parameter: ~ 1 + group
         Test the group coefficient of the location parameter model against 0.
-    - t-test:
+    - "t-test" - Welch's t-test:
         Doesn't require fitting of generalized linear models.
         Welch's t-test between both observation groups.
-    - wilcoxon:
+    - "rank" - Wilcoxon rank sum (Mann-Whitney U) test:
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
@@ -1175,17 +1206,14 @@ def versus_rest(
         which do not correpond to one-hot encoded discrete factors.
         This makes sense for number of genes, time, pseudotime or space
         for example.
-    :param test: str, statistical test to use. Possible options:
+    :param test: str, statistical test to use. Possible options (see function description):
 
         - 'wald'
         - 'lrt'
         - 't-test'
-        - 'wilcoxon'
+        - 'rank'
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
-    :param noise_model: str, noise model to use in model-based unit_test. Possible options:
-
-        - 'nb': default
     :param pval_correction: Choose between global and test-wise correction.
         Can be:
 
@@ -1193,7 +1221,10 @@ def versus_rest(
         - "by_test": correct the p-values of each test individually
     :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data
-    :param batch_size: the batch size to use for the estimator
+    :param noise_model: str, noise model to use in model-based unit_test. Possible options:
+
+        - 'nb': default
+    :param batch_size: The batch size to use for the estimator.
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1201,28 +1232,24 @@ def versus_rest(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
-
-          Example:
-
-          .. code-block:: python
-
-              [
-                {"learning_rate": 0.5, },
-                {"learning_rate": 0.05, },
-              ]
-
-          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
-        Useful in scenarios where fitting the exact `scale` is not
+        Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
     :param dtype: Allows specifying the precision which should be used to fit data.
 
         Should be "float32" for single precision or "float64" for double precision.
-    :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test"
+    :param pval_correction: Choose between global and test-wise correction.
+        Can be:
+
+        - "global": correct all p-values in one operation
+        - "by_test": correct the p-values of each test individually
+    :param is_sig_zerovar:
+        Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+        the p-value is set to np.nan.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
-        logger.info("additional kwargs: %s", str(kwargs))
+        logging.getLogger("diffxpy").info("additional kwargs: %s", str(kwargs))
 
     # Do not store all models but only p-value and q-value matrix:
     # genes x groups
@@ -1255,6 +1282,7 @@ def versus_rest(
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             size_factors=size_factors,
+            is_sig_zerovar=is_sig_zerovar,
             dtype=dtype,
             **kwargs
         )
@@ -1277,10 +1305,11 @@ def versus_rest(
 
 
 def partition(
-        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
-        partition: Union[str, np.ndarray, list],
-        gene_names: str = None,
-        sample_description: pd.DataFrame = None):
+        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        parts: Union[str, np.ndarray, list],
+        gene_names: Union[np.ndarray, list] = None,
+        sample_description: pd.DataFrame = None
+):
     r"""
     Perform differential expression test for each group. This class handles
     the partitioning of the data set, the differential test callls and
@@ -1293,18 +1322,21 @@ def partition(
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
         Input data matrix (observations x features) or (cells x genes).
+    :param parts: str, array
 
+            - column in data.obs/sample_description which contains the split of observations into the two groups.
+            - array of length `num_observations` containing group labels
     :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
     """
     return (_Partition(
         data=data,
-        partition=partition,
+        parts=parts,
         gene_names=gene_names,
         sample_description=sample_description))
 
 
-class _Partition():
+class _Partition:
     """
     Perform differential expression test for each group. This class handles
     the partitioning of the data set, the differential test callls and
@@ -1317,13 +1349,14 @@ class _Partition():
     def __init__(
             self,
             data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
-            partition: Union[str, np.ndarray, list],
-            gene_names: str = None,
-            sample_description: pd.DataFrame = None):
+            parts: Union[str, np.ndarray, list],
+            gene_names: Union[np.ndarray, list] = None,
+            sample_description: pd.DataFrame = None
+    ):
         """
         :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
             Input data matrix (observations x features) or (cells x genes).
-        :param partition: str, array
+        :param parts: str, array
 
             - column in data.obs/sample_description which contains the split of observations into the two groups.
             - array of length `num_observations` containing group labels
@@ -1333,7 +1366,7 @@ class _Partition():
         self.X = parse_data(data, gene_names)
         self.gene_names = parse_gene_names(data, gene_names)
         self.sample_description = parse_sample_description(data, sample_description)
-        self.partition = parse_grouping(data, sample_description, partition)
+        self.partition = parse_grouping(data, sample_description, parts)
         self.partitions = np.unique(self.partition)
         self.partition_idx = [np.where(self.partition == x)[0] for x in self.partitions]
 
@@ -1342,14 +1375,17 @@ class _Partition():
             grouping: Union[str],
             as_numeric: Union[List[str], Tuple[str], str] = (),
             test=None,
-            noise_model: str = None,
             size_factors: np.ndarray = None,
+            noise_model: str = None,
             batch_size: int = None,
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+            is_sig_zerovar: bool = True,
             **kwargs
     ) -> _DifferentialExpressionTestMulti:
         """
-        See annotation of de.test.two_sample()
+        Performs a two-sample test within each partition of a data set.
+
+        See also annotation of de.test.two_sample()
 
         :param grouping: str
 
@@ -1365,11 +1401,13 @@ class _Partition():
             - 'wald': default
             - 'lrt'
             - 't-test'
-            - 'wilcoxon'
+            - 'rank'
+        :param size_factors: 1D array of transformed library size factors for each cell in the
+            same order as in data
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
-        :param batch_size: the batch size to use for the estimator
+        :param batch_size: The batch size to use for the estimator.
         :param training_strategy: {str, function, list} training strategy to use. Can be:
 
             - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1377,17 +1415,9 @@ class _Partition():
               `training_strategy(estimator)`.
             - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
               method arguments.
-
-              Example:
-
-              .. code-block:: python
-
-                  [
-                    {"learning_rate": 0.5, },
-                    {"learning_rate": 0.05, },
-                  ]
-
-              This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
+        :param is_sig_zerovar:
+            Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+            the p-value is set to np.nan.
         :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
         """
         DETestsSingle = []
@@ -1403,6 +1433,7 @@ class _Partition():
                 size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
                 training_strategy=training_strategy,
+                is_sig_zerovar=is_sig_zerovar,
                 **kwargs
             ))
         return DifferentialExpressionTestByPartition(
@@ -1414,22 +1445,35 @@ class _Partition():
     def t_test(
             self,
             grouping: Union[str],
+            is_logged: bool,
+            is_sig_zerovar: bool = True,
             dtype="float64"
     ):
         """
-        See annotation of de.test.t_test()
+        Performs a Welch's t-test within each partition of a data set.
+
+        See also annotation of de.test.t_test()
 
         :param grouping: str
 
             - column in data.obs/sample_description which contains the split of observations into the two groups.
+        :param is_logged:
+            Whether data is already logged. If True, log-fold changes are computed as fold changes on this data.
+            If False, log-fold changes are computed as log-fold changes on this data.
+        :param is_sig_zerovar:
+            Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+            the p-value is set to np.nan.
+        :param dtype:
         """
         DETestsSingle = []
         for i, idx in enumerate(self.partition_idx):
             DETestsSingle.append(t_test(
                 data=self.X[idx, :],
                 grouping=grouping,
+                is_logged=is_logged,
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
+                is_sig_zerovar=is_sig_zerovar,
                 dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
@@ -1438,18 +1482,25 @@ class _Partition():
             ave=np.mean(self.X, axis=0),
             correction_type="by_test")
 
-    def wilcoxon(
+    def rank_test(
             self,
             grouping: Union[str],
+            is_sig_zerovar: bool = True,
             dtype="float64"
     ):
         """
-        See annotation of de.test.wilcoxon()
+        Performs a Wilcoxon rank sum test within each partition of a data set.
+
+        See also annotation of de.test.rank_test()
 
         :param grouping: str, array
 
             - column in data.obs/sample_description which contains the split of observations into the two groups.
             - array of length `num_observations` containing group labels
+        :param is_sig_zerovar:
+            Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+            the p-value is set to np.nan.
+        :param dtype:
         """
         DETestsSingle = []
         for i, idx in enumerate(self.partition_idx):
@@ -1458,6 +1509,7 @@ class _Partition():
                 grouping=grouping,
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
+                is_sig_zerovar=is_sig_zerovar,
                 dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
@@ -1468,44 +1520,68 @@ class _Partition():
 
     def lrt(
             self,
-            reduced_formula_loc: str = None,
             full_formula_loc: str = None,
-            reduced_formula_scale: str = None,
+            reduced_formula_loc: str = None,
             full_formula_scale: str = "~1",
+            reduced_formula_scale: str = None,
             as_numeric: Union[List[str], Tuple[str], str] = (),
-            noise_model="nb",
+            init_a: Union[str] = "AUTO",
+            init_b: Union[str] = "AUTO",
             size_factors: np.ndarray = None,
+            noise_model="nb",
             batch_size: int = None,
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             **kwargs
     ):
         """
-        See annotation of de.test.lrt()
+        Performs a likelihood-ratio test within each partition of a data set.
 
-        :param reduced_formula_loc: formula
-            Reduced model formula for location and scale parameter models.
-            If not specified, `reduced_formula` will be used instead.
+        See also annotation of de.test.lrt()
+
         :param full_formula_loc: formula
             Full model formula for location parameter model.
             If not specified, `full_formula` will be used instead.
-        :param reduced_formula_scale: formula
-            Reduced model formula for scale parameter model.
+        :param reduced_formula_loc: formula
+            Reduced model formula for location and scale parameter models.
             If not specified, `reduced_formula` will be used instead.
         :param full_formula_scale: formula
             Full model formula for scale parameter model.
             If not specified, `reduced_formula_scale` will be used instead.
+        :param reduced_formula_scale: formula
+            Reduced model formula for scale parameter model.
+            If not specified, `reduced_formula` will be used instead.
         :param as_numeric:
             Which columns of sample_description to treat as numeric and
             not as categorical. This yields columns in the design matrix
             which do not correpond to one-hot encoded discrete factors.
             This makes sense for number of genes, time, pseudotime or space
             for example.
+        :param init_a: (Optional) Low-level initial values for a.
+            Can be:
+
+            - str:
+                * "auto": automatically choose best initialization
+                * "standard": initialize intercept with observed mean
+                * "init_model": initialize with another model (see `ìnit_model` parameter)
+                * "closed_form": try to initialize with closed form
+
+            Note that unlike in the lrt without partitions, this does not support np.ndarrays.
+        :param init_b: (Optional) Low-level initial values for b
+            Can be:
+
+            - str:
+                * "auto": automatically choose best initialization
+                * "standard": initialize with zeros
+                * "init_model": initialize with another model (see `ìnit_model` parameter)
+                * "closed_form": try to initialize with closed form
+
+            Note that unlike in the lrt without partitions, this does not support np.ndarrays.
+        :param size_factors: 1D array of transformed library size factors for each cell in the
+            same order as in data
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
-        :param size_factors: 1D array of transformed library size factors for each cell in the
-            same order as in data
-        :param batch_size: the batch size to use for the estimator
+        :param batch_size: The batch size to use for the estimator.
         :param training_strategy: {str, function, list} training strategy to use. Can be:
 
             - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1513,17 +1589,6 @@ class _Partition():
               `training_strategy(estimator)`.
             - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
               method arguments.
-
-              Example:
-
-              .. code-block:: python
-
-                  [
-                    {"learning_rate": 0.5, },
-                    {"learning_rate": 0.05, },
-                  ]
-
-              This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
         :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
         """
         DETestsSingle = []
@@ -1534,6 +1599,9 @@ class _Partition():
                 full_formula_loc=full_formula_loc,
                 reduced_formula_scale=reduced_formula_scale,
                 full_formula_scale=full_formula_scale,
+                as_numeric=as_numeric,
+                init_a=init_a,
+                init_b=init_b,
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
@@ -1555,6 +1623,8 @@ class _Partition():
             formula_loc: str = None,
             formula_scale: str = "~1",
             as_numeric: Union[List[str], Tuple[str], str] = (),
+            constraints_loc: np.ndarray = None,
+            constraints_scale: np.ndarray = None,
             noise_model: str = "nb",
             size_factors: np.ndarray = None,
             batch_size: int = None,
@@ -1562,32 +1632,56 @@ class _Partition():
             **kwargs
     ):
         """
-        This function performs a wald test within each partition of a data set.
-        See annotation of de.test.wald()
+        Performs a wald test within each partition of a data set.
 
+        See also annotation of de.test.wald()
+
+        :param factor_loc_totest: str, list of strings
+            List of factors of formula to test with Wald test.
+            E.g. "condition" or ["batch", "condition"] if formula_loc would be "~ 1 + batch + condition"
+        :param coef_to_test:
+            If there are more than two groups specified by `factor_loc_totest`,
+            this parameter allows to specify the group which should be tested.
+            Alternatively, if factor_loc_totest is not given, this list sets
+            the exact coefficients which are to be tested.
         :param formula_loc: formula
             model formula for location and scale parameter models.
             If not specified, `formula` will be used instead.
         :param formula_scale: formula
             model formula for scale parameter model.
             If not specified, `formula` will be used instead.
-        :param factor_loc_totest: str
-            Factor of formula to test with Wald test.
-            E.g. "condition" if formula_loc would be "~ 1 + batch + condition"
-        :param coef_to_test: If there are more than two groups specified by `factor_loc_totest`,
-            this parameter allows to specify the group which should be tested
         :param as_numeric:
             Which columns of sample_description to treat as numeric and
             not as categorical. This yields columns in the design matrix
             which do not correpond to one-hot encoded discrete factors.
             This makes sense for number of genes, time, pseudotime or space
             for example.
+        :param constraints_loc: : Constraints for location model.
+            Array with constraints in rows and model parameters in columns.
+            Each constraint contains non-zero entries for the a of parameters that
+            has to sum to zero. This constraint is enforced by binding one parameter
+            to the negative sum of the other parameters, effectively representing that
+            parameter as a function of the other parameters. This dependent
+            parameter is indicated by a -1 in this array, the independent parameters
+            of that constraint (which may be dependent at an earlier constraint)
+            are indicated by a 1. It is highly recommended to only use this option
+            together with prebuilt design matrix for the location model, dmat_loc.
+        :param constraints_scale: : Constraints for scale model.
+            Array with constraints in rows and model parameters in columns.
+            Each constraint contains non-zero entries for the a of parameters that
+            has to sum to zero. This constraint is enforced by binding one parameter
+            to the negative sum of the other parameters, effectively representing that
+            parameter as a function of the other parameters. This dependent
+            parameter is indicated by a -1 in this array, the independent parameters
+            of that constraint (which may be dependent at an earlier constraint)
+            are indicated by a 1. It is highly recommended to only use this option
+            together with prebuilt design matrix for the scale model, dmat_scale.
+        :param size_factors: 1D array of transformed library size factors for each cell in the
+            same order as in data
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
-        :param size_factors: 1D array of transformed library size factors for each cell in the
-            same order as in data
-        :param batch_size: the batch size to use for the estimator
+        :param batch_size: The batch size to use for the estimator.
         :param training_strategy: {str, function, list} training strategy to use. Can be:
 
             - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1595,17 +1689,6 @@ class _Partition():
               `training_strategy(estimator)`.
             - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
               method arguments.
-
-              Example:
-
-              .. code-block:: python
-
-                  [
-                    {"learning_rate": 0.5, },
-                    {"learning_rate": 0.05, },
-                  ]
-
-              This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
         :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
         """
         DETestsSingle = []
@@ -1617,6 +1700,8 @@ class _Partition():
                 formula_loc=formula_loc,
                 formula_scale=formula_scale,
                 as_numeric=as_numeric,
+                constraints_loc=constraints_loc,
+                constraints_scale=constraints_scale,
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 noise_model=noise_model,
@@ -1633,7 +1718,7 @@ class _Partition():
 
 
 def continuous_1d(
-        data: Union[anndata.AnnData, anndata.base.Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
         continuous: str,
         df: int = 5,
         factor_loc_totest: Union[str, List[str]] = None,
@@ -1643,8 +1728,10 @@ def continuous_1d(
         test: str = 'wald',
         init_a: Union[np.ndarray, str] = "standard",
         init_b: Union[np.ndarray, str] = "standard",
-        gene_names=None,
+        gene_names: Union[np.ndarray, list] = None,
         sample_description=None,
+        constraints_loc: Union[dict, None] = None,
+        constraints_scale: Union[dict, None] = None,
         noise_model: str = 'nb',
         size_factors: np.ndarray = None,
         batch_size: int = None,
@@ -1658,7 +1745,7 @@ def continuous_1d(
 
     This function wraps the selected statistical test for
     scenarios with continuous covariates and performs the necessary
-    spline basis transformation of the continuous covariate so that the
+    spline basis transformation of the continuous co-variate so that the
     problem can be framed as a GLM.
 
     Note that direct supply of dmats is not enabled as this function wraps
@@ -1666,6 +1753,11 @@ def continuous_1d(
     covariates. Advanced users who want to control dmat can directly
     perform these spline basis transforms outside of diffxpy and feed the
     dmat directly to one of the test routines wald() or lrt().
+
+    The constraint interface only-supports dictionary-formatted constraints and
+    string-formatted constraints but not array-formatted constraint matrices as
+    design matrices are built within this function and the shape of constraint
+    matrices depends on the output of this function.
 
     :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
         Input data matrix (observations x features) or (cells x genes).
@@ -1679,11 +1771,6 @@ def continuous_1d(
     :param factor_loc_totest:
         List of factors of formula to test with Wald test.
         E.g. "condition" or ["batch", "condition"] if formula_loc would be "~ 1 + batch + condition"
-    :param formula: formula
-        Model formula for location and scale parameter models.
-        Refer to continuous covariate by the name givne in the parameter continuous,
-        this will be propagated across all coefficients which represent this covariate
-        in the spline basis space.
     :param formula_loc: formula
         Model formula for location and scale parameter models.
         If not specified, `formula` will be used instead.
@@ -1697,11 +1784,10 @@ def continuous_1d(
         this will be propagated across all coefficients which represent this covariate
         in the spline basis space.
     :param as_numeric:
-        Which columns of sample_description to treat as numeric and
-        not as categorical. This yields columns in the design matrix
-        which do not correpond to one-hot encoded discrete factors.
-        This makes sense for number of genes, time, pseudotime or space
-        for example.
+        Which columns of sample_description to treat as numeric and not as categorical.
+        This yields columns in the design matrix which do not correpond to one-hot encoded discrete factors.
+        This makes sense for library depth for example. Do not use this for the covariate that you
+        want to extrpolate with using a spline-basis!
     :param test: str, statistical test to use. Possible options:
 
         - 'wald': default
@@ -1720,8 +1806,59 @@ def continuous_1d(
             * "auto": automatically choose best initialization
             * "standard": initialize with zeros
         - np.ndarray: direct initialization of 'b'
-    :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
+    :param gene_names: optional list/array of gene names which will be used if `data` does
+        not implicitly store these
     :param sample_description: optional pandas.DataFrame containing sample annotations
+    :param constraints_loc: Constraints for location model. Can be one of the following:
+
+        - dict:
+            Every element of the dictionary corresponds to one set of equality constraints.
+            Each set has to be be an entry of the form {..., x: y, ...}
+            where x is the factor to be constrained and y is a factor by which levels of x are grouped
+            and then constrained. Set y="1" to constrain all levels of x to sum to one,
+            a single equality constraint.
+
+                E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
+                    zero. This is applicable if repeats of a an experiment within each condition
+                    are independent so that the set-up ~1+condition+batch is perfectly confounded.
+
+            Can only group by non-constrained effects right now, use constraint_matrix_from_string
+            for other cases.
+        - list of strings or tuple of strings:
+            String encoded equality constraints.
+
+                E.g. ["batch1 + batch2 + batch3 = 0"]
+        - None:
+            No constraints are used, this is equivalent to using an identity matrix as a
+            constraint matrix.
+
+        Note that np.ndarray encoded full constraint matrices are not supported here as the design
+        matrices are built within this function.
+    :param constraints_scale: Constraints for scale model. Can be following:
+
+        - dict:
+            Every element of the dictionary corresponds to one set of equality constraints.
+            Each set has to be be an entry of the form {..., x: y, ...}
+            where x is the factor to be constrained and y is a factor by which levels of x are grouped
+            and then constrained. Set y="1" to constrain all levels of x to sum to one,
+            a single equality constraint.
+
+                E.g.: {"batch": "condition"} Batch levels within each condition are constrained to sum to
+                    zero. This is applicable if repeats of a an experiment within each condition
+                    are independent so that the set-up ~1+condition+batch is perfectly confounded.
+
+            Can only group by non-constrained effects right now, use constraint_matrix_from_string
+            for other cases.
+        - list of strings or tuple of strings:
+            String encoded equality constraints.
+
+                E.g. ["batch1 + batch2 + batch3 = 0"]
+        - None:
+            No constraints are used, this is equivalent to using an identity matrix as a
+            constraint matrix.
+
+        Note that np.ndarray encoded full constraint matrices are not supported here as the design
+        matrices are built within this function.
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
@@ -1732,9 +1869,9 @@ def continuous_1d(
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
         - function: Can be used to implement custom training function will be called as
-          `training_strategy(estimator)`.
-        - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
-          method arguments.
+            `training_strategy(estimator)`.
+        - list of keyword dicts containing method arguments: Will call Estimator.train()
+            once with each dict of method arguments.
 
           Example:
 
@@ -1754,7 +1891,7 @@ def continuous_1d(
         Should be "float32" for single precision or "float64" for double precision.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
-    if formula_loc is  None:
+    if formula_loc is None:
         raise ValueError("supply fomula_loc")
     # Set testing default to continuous covariate if not supplied:
     if factor_loc_totest is None:
@@ -1824,10 +1961,10 @@ def continuous_1d(
         else:
             factor_loc_totest_new = factor_loc_totest
 
-        logger.debug("model formulas assembled in de.test.continuos():")
-        logger.debug("factor_loc_totest_new: " + ",".join(factor_loc_totest_new))
-        logger.debug("formula_loc_new: " + formula_loc_new)
-        logger.debug("formula_scale_new: " + formula_scale_new)
+        logging.getLogger("diffxpy").debug("model formulas assembled in de.test.continuos():")
+        logging.getLogger("diffxpy").debug("factor_loc_totest_new: " + ",".join(factor_loc_totest_new))
+        logging.getLogger("diffxpy").debug("formula_loc_new: " + formula_loc_new)
+        logging.getLogger("diffxpy").debug("formula_scale_new: " + formula_scale_new)
 
         de_test = wald(
             data=X,
@@ -1840,6 +1977,8 @@ def continuous_1d(
             init_b=init_b,
             gene_names=gene_names,
             sample_description=sample_description,
+            constraints_loc=constraints_loc,
+            constraints_scale=constraints_scale,
             noise_model=noise_model,
             size_factors=size_factors,
             batch_size=batch_size,
@@ -1850,6 +1989,7 @@ def continuous_1d(
         )
         de_test = DifferentialExpressionTestWaldCont(
             de_test=de_test,
+            noise_model=noise_model,
             size_factors=size_factors,
             continuous_coords=sample_description[continuous].values,
             spline_coefs=new_coefs
@@ -1873,11 +2013,11 @@ def continuous_1d(
         full_formula_scale = formula_scale_new
         reduced_formula_scale = formula_scale_new
 
-        logger.debug("model formulas assembled in de.test.continuous():")
-        logger.debug("full_formula_loc: " + full_formula_loc)
-        logger.debug("reduced_formula_loc: " + reduced_formula_loc)
-        logger.debug("full_formula_scale: " + full_formula_scale)
-        logger.debug("reduced_formula_scale: " + reduced_formula_scale)
+        logging.getLogger("diffxpy").debug("model formulas assembled in de.test.continuous():")
+        logging.getLogger("diffxpy").debug("full_formula_loc: " + full_formula_loc)
+        logging.getLogger("diffxpy").debug("reduced_formula_loc: " + reduced_formula_loc)
+        logging.getLogger("diffxpy").debug("full_formula_scale: " + full_formula_scale)
+        logging.getLogger("diffxpy").debug("reduced_formula_scale: " + reduced_formula_scale)
 
         de_test = lrt(
             data=X,
@@ -1905,6 +2045,6 @@ def continuous_1d(
             spline_coefs=new_coefs
         )
     else:
-        raise ValueError('base.continuous(): Parameter `test` not recognized.')
+        raise ValueError('continuous(): Parameter `test` not recognized.')
 
     return de_test
