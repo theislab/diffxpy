@@ -1609,7 +1609,8 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             sample_description: pd.DataFrame,
             grouping,
             gene_names,
-            is_logged
+            is_logged,
+            is_sig_zerovar: bool = True
     ):
         super().__init__()
         self._X = data
@@ -1647,6 +1648,16 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             n0=x0.shape[0],
             n1=x1.shape[0]
         )
+        pval[np.where(np.logical_and(
+            np.logical_and(mean_x0 == mean_x1, self._mean > 0),
+            np.logical_not(self._var_geq_zero)
+        ))[0]] = 1.0
+        if is_sig_zerovar:
+            pval[np.where(np.logical_and(
+                mean_x0 != mean_x1,
+                np.logical_not(self._var_geq_zero)
+            ))[0]] = 0.0
+
         self._pval = pval
 
         if is_logged:
@@ -1732,7 +1743,8 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
             sample_description: pd.DataFrame,
             grouping,
             gene_names,
-            is_logged
+            is_logged,
+            is_sig_zerovar: bool = True
     ):
         super().__init__()
         self._X = data
@@ -1772,6 +1784,15 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
                 x0=x0.X[:, idx_run].toarray(),
                 x1=x1.X[:, idx_run].toarray()
             )
+        pval[np.where(np.logical_and(
+            np.logical_and(mean_x0 == mean_x1, self._mean > 0),
+            np.logical_not(self._var_geq_zero)
+        ))[0]] = 1.0
+        if is_sig_zerovar:
+            pval[np.where(np.logical_and(
+                mean_x0 != mean_x1,
+                np.logical_not(self._var_geq_zero)
+            ))[0]] = 0.0
 
         self._pval = pval
 

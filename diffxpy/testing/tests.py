@@ -669,6 +669,7 @@ def t_test(
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         is_logged: bool = False,
+        is_sig_zerovar: bool = True,
         dtype="float64"
 ):
     """
@@ -686,6 +687,9 @@ def t_test(
     :param is_logged:
         Whether data is already logged. If True, log-fold changes are computed as fold changes on this data.
         If False, log-fold changes are computed as log-fold changes on this data.
+    :param is_sig_zerovar:
+        Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+        the p-value is set to np.nan.
     """
     gene_names = parse_gene_names(data, gene_names)
     X = parse_data(data, gene_names)
@@ -698,7 +702,8 @@ def t_test(
         sample_description=sample_description,
         grouping=grouping,
         gene_names=gene_names,
-        is_logged=is_logged
+        is_logged=is_logged,
+        is_sig_zerovar=is_sig_zerovar
     )
 
     return de_test
@@ -709,7 +714,8 @@ def rank_test(
         grouping: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
-        is_logged=False,
+        is_logged: bool = False,
+        is_sig_zerovar: bool = True,
         dtype="float64"
 ):
     """
@@ -727,6 +733,9 @@ def rank_test(
     :param is_logged:
         Whether data is already logged. If True, log-fold changes are computed as fold changes on this data.
         If False, log-fold changes are computed as log-fold changes on this data.
+    :param is_sig_zerovar:
+        Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+        the p-value is set to np.nan.
     """
     gene_names = parse_gene_names(data, gene_names)
     X = parse_data(data, gene_names)
@@ -739,7 +748,8 @@ def rank_test(
         sample_description=sample_description,
         grouping=grouping,
         gene_names=gene_names,
-        is_logged=is_logged
+        is_logged=is_logged,
+        is_sig_zerovar=is_sig_zerovar
     )
 
     return de_test
@@ -756,6 +766,7 @@ def two_sample(
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        is_sig_zerovar: bool = True,
         quick_scale: bool = None,
         dtype="float64",
         **kwargs
@@ -824,6 +835,9 @@ def two_sample(
           `training_strategy(estimator)`.
         - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
           method arguments.
+    :param is_sig_zerovar:
+        Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+        the p-value is set to np.nan.
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
@@ -898,6 +912,7 @@ def two_sample(
             data=X,
             gene_names=gene_names,
             grouping=grouping,
+            is_sig_zerovar=is_sig_zerovar,
             dtype=dtype
         )
     elif test.lower() == 'rank':
@@ -905,6 +920,7 @@ def two_sample(
             data=X,
             gene_names=gene_names,
             grouping=grouping,
+            is_sig_zerovar=is_sig_zerovar,
             dtype=dtype
         )
     else:
@@ -925,6 +941,7 @@ def pairwise(
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        is_sig_zerovar: bool = True,
         quick_scale: bool = None,
         dtype="float64",
         pval_correction: str = "global",
@@ -1016,7 +1033,10 @@ def pairwise(
 
         - "global": correct all p-values in one operation
         - "by_test": correct the p-values of each test individually
-    :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test"
+    :param keep_full_test_objs: [Debugging] keep the individual test objects; currently valid for test != "z-test".
+    :param is_sig_zerovar:
+        Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+        the p-value is set to np.nan.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
@@ -1096,6 +1116,7 @@ def pairwise(
                     batch_size=batch_size,
                     training_strategy=training_strategy,
                     quick_scale=quick_scale,
+                    is_sig_zerovar=is_sig_zerovar,
                     dtype=dtype,
                     **kwargs
                 )
@@ -1131,6 +1152,7 @@ def versus_rest(
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+        is_sig_zerovar: bool = True,
         quick_scale: bool = None,
         dtype="float64",
         pval_correction: str = "global",
@@ -1221,6 +1243,9 @@ def versus_rest(
 
         - "global": correct all p-values in one operation
         - "by_test": correct the p-values of each test individually
+    :param is_sig_zerovar:
+        Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+        the p-value is set to np.nan.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if len(kwargs) != 0:
@@ -1257,6 +1282,7 @@ def versus_rest(
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             size_factors=size_factors,
+            is_sig_zerovar=is_sig_zerovar,
             dtype=dtype,
             **kwargs
         )
@@ -1353,6 +1379,7 @@ class _Partition:
             noise_model: str = None,
             batch_size: int = None,
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
+            is_sig_zerovar: bool = True,
             **kwargs
     ) -> _DifferentialExpressionTestMulti:
         """
@@ -1388,6 +1415,9 @@ class _Partition:
               `training_strategy(estimator)`.
             - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
               method arguments.
+        :param is_sig_zerovar:
+            Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+            the p-value is set to np.nan.
         :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
         """
         DETestsSingle = []
@@ -1403,6 +1433,7 @@ class _Partition:
                 size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
                 training_strategy=training_strategy,
+                is_sig_zerovar=is_sig_zerovar,
                 **kwargs
             ))
         return DifferentialExpressionTestByPartition(
@@ -1415,6 +1446,7 @@ class _Partition:
             self,
             grouping: Union[str],
             is_logged: bool,
+            is_sig_zerovar: bool = True,
             dtype="float64"
     ):
         """
@@ -1428,6 +1460,9 @@ class _Partition:
         :param is_logged:
             Whether data is already logged. If True, log-fold changes are computed as fold changes on this data.
             If False, log-fold changes are computed as log-fold changes on this data.
+        :param is_sig_zerovar:
+            Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+            the p-value is set to np.nan.
         :param dtype:
         """
         DETestsSingle = []
@@ -1438,6 +1473,7 @@ class _Partition:
                 is_logged=is_logged,
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
+                is_sig_zerovar=is_sig_zerovar,
                 dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
@@ -1449,6 +1485,7 @@ class _Partition:
     def rank_test(
             self,
             grouping: Union[str],
+            is_sig_zerovar: bool = True,
             dtype="float64"
     ):
         """
@@ -1460,6 +1497,9 @@ class _Partition:
 
             - column in data.obs/sample_description which contains the split of observations into the two groups.
             - array of length `num_observations` containing group labels
+        :param is_sig_zerovar:
+            Whether to assign p-value of 0 to a gene which has zero variance in both groups but not the same mean. If False,
+            the p-value is set to np.nan.
         :param dtype:
         """
         DETestsSingle = []
@@ -1469,6 +1509,7 @@ class _Partition:
                 grouping=grouping,
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
+                is_sig_zerovar=is_sig_zerovar,
                 dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
