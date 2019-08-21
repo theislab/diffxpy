@@ -33,7 +33,7 @@ def likelihood_ratio_test(
     delta_df = df_full - df_reduced
     # Compute the deviance test statistic.
     delta_dev = 2 * (ll_full - ll_reduced)
-    # Compute the p-values based on the deviance and its expection based on the chi-square distribution.
+    # Compute the p-values based on the deviance and its expectation based on the chi-square distribution.
     pvals = 1 - scipy.stats.chi2(delta_df).cdf(delta_dev)
     return pvals
 
@@ -251,6 +251,8 @@ def wald_test_chisq(
     if theta_mle.shape[0] != theta_covar.shape[1]:
         raise ValueError(
             'stats.wald_test(): theta_mle and theta_covar have to contain the same number of parameters')
+    if len(theta_covar.shape) != 3:
+        raise ValueError('stats.wald_test(): theta_covar should have 3 dimensions but has %i' % len(theta_covar.shape))
     if theta_mle.shape[1] != theta_covar.shape[0]:
         raise ValueError('stats.wald_test(): theta_mle and theta_covar have to contain the same number of genes')
     if theta_covar.shape[1] != theta_covar.shape[2]:

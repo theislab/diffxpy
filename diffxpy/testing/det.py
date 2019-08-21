@@ -791,8 +791,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         if len(self.coef_loc_totest) == 1:
             self.theta_mle = self.theta_mle[0]  # Make xarray one dimensional for stats.wald_test.
             self.theta_sd = self.model_estim.fisher_inv[:, self.coef_loc_totest[0], self.coef_loc_totest[0]]
-            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd,
-                                         where=self.theta_sd < np.nextafter(0, np.inf))
+            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test(
                 theta_mle=self.theta_mle,
@@ -801,12 +800,11 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             )
         else:
             self.theta_sd = np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1).copy()
-            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd,
-                                         where=self.theta_sd < np.nextafter(0, np.inf))
+            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test_chisq(
                 theta_mle=self.theta_mle,
-                theta_covar=self.model_estim.fisher_inv[:, self.coef_loc_totest, self.coef_loc_totest],
+                theta_covar=self.model_estim.fisher_inv[:, self.coef_loc_totest, :][:, :, self.coef_loc_totest],
                 theta0=0
             )
 
