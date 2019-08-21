@@ -1,16 +1,14 @@
-from typing import Union, List, Dict, Callable, Tuple
-
 import anndata
+try:
+    from anndata.base import Raw
+except ImportError:
+    from anndata import Raw
 import logging
 import numpy as np
 import pandas as pd
 import patsy
 import scipy.sparse
-
-try:
-    from anndata.base import Raw
-except ImportError:
-    from anndata import Raw
+from typing import Union, List, Dict, Callable, Tuple
 
 from batchglm import data as data_utils
 from batchglm.models.base import _EstimatorBase, _InputDataBase
