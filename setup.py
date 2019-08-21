@@ -21,7 +21,7 @@ setup(
         'scipy>=1.2.1',
         'pandas',
         'patsy>=0.5.0',
-        'batchglm>=0.6.1',
+        'batchglm>=0.6.3',
         'statsmodels',
     ],
     extras_require={
