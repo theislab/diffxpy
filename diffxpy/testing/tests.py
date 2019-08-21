@@ -209,7 +209,7 @@ def lrt(
         noise_model="nb",
         size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray] = None,
         batch_size: int = None,
-        training_strategy: Union[str, List[Dict[str, object]], Callable] = "DEFAULT",
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = False,
         dtype="float64",
         **kwargs

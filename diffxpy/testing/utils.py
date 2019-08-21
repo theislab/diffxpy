@@ -103,6 +103,7 @@ def parse_grouping(data, sample_description, grouping):
 
 
 def split_x(data, grouping):
+    grouping = np.asarray(grouping)
     groups = np.unique(grouping)
     x0 = data[np.where(grouping == groups[0])[0]]
     x1 = data[np.where(grouping == groups[1])[0]]

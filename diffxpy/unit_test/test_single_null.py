@@ -101,7 +101,7 @@ class _TestSingleNull:
             training_strategy="DEFAULT",
             dtype="float64"
         )
-        summary = test.summary()
+        _ = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
@@ -248,6 +248,7 @@ class TestSingleNullStandard(_TestSingleNull, unittest.TestCase):
     Noise model-independent unit tests that test whether a test generates uniformly
     distributed p-values if data are sampled from the null model.
     """
+
     def test_null_distribution_ttest(
             self,
             n_cells: int = 2000,
@@ -291,7 +292,7 @@ class TestSingleNullStandard(_TestSingleNull, unittest.TestCase):
         )
 
 
-class TestSingleNullNB(_TestSingleNull, unittest.TestCase):
+class TestSingleNullNb(_TestSingleNull, unittest.TestCase):
     """
     Negative binomial noise model unit tests that test whether a test generates uniformly
     distributed p-values if data are sampled from the null model.
@@ -365,7 +366,7 @@ class TestSingleNullNB(_TestSingleNull, unittest.TestCase):
         )
 
 
-class TestSingleNullNORM(_TestSingleNull, unittest.TestCase):
+class TestSingleNullNorm(_TestSingleNull, unittest.TestCase):
     """
     Normal noise model unit tests that test whether a test generates uniformly
     distributed p-values if data are sampled from the null model.

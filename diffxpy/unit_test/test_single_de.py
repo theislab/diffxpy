@@ -5,7 +5,7 @@ import numpy as np
 import diffxpy.api as de
 
 
-class _TestSingleDE:
+class _TestSingleDe:
 
     def _prepare_data(
             self,
@@ -109,7 +109,7 @@ class _TestSingleDE:
         )
 
         test = de.test.t_test(
-            data=sim.x,
+            data=sim.input_data,
             grouping="condition",
             sample_description=sim.sample_description
         )
@@ -191,7 +191,7 @@ class _TestSingleDE:
         return True
 
 
-class TestSingleDE_STANDARD(_TestSingleDE, unittest.TestCase):
+class TestSingleDeStandard(_TestSingleDe, unittest.TestCase):
     """
     Noise model-independent tests unit tests that tests false positive and false negative rates.
     """
@@ -235,7 +235,7 @@ class TestSingleDE_STANDARD(_TestSingleDE, unittest.TestCase):
         )
 
 
-class TestSingleDE_NB(_TestSingleDE, unittest.TestCase):
+class TestSingleDeNb(_TestSingleDe, unittest.TestCase):
     """
     Negative binomial noise model unit tests that tests false positive and false negative rates.
     """
@@ -281,7 +281,7 @@ class TestSingleDE_NB(_TestSingleDE, unittest.TestCase):
         )
 
 
-class TestSingleDE_NORM(_TestSingleDE, unittest.TestCase):
+class TestSingleDeNorm(_TestSingleDe, unittest.TestCase):
     """
     Normal noise model unit tests that tests false positive and false negative rates.
     """

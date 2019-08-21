@@ -14,7 +14,7 @@ try:
 except ImportError:
     anndata = None
 
-from batchglm.models.base import _EstimatorBase
+from batchglm.models.base import _EstimatorBase, _InputDataBase
 
 from ..stats import stats
 from . import correction
@@ -1518,6 +1518,10 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             is_sig_zerovar: bool = True
     ):
         super().__init__()
+        if isinstance(data, anndata.AnnData) or isinstance(data, anndata.Raw):
+            data = data.X
+        elif isinstance(data, _InputDataBase):
+            data = data.x
         self._x = data
         self.sample_description = sample_description
         self.grouping = grouping
@@ -1652,6 +1656,10 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
             is_sig_zerovar: bool = True
     ):
         super().__init__()
+        if isinstance(data, anndata.AnnData) or isinstance(data, anndata.Raw):
+            data = data.X
+        elif isinstance(data, _InputDataBase):
+            data = data.x
         self._x = data
         self.sample_description = sample_description
         self.grouping = grouping
@@ -1680,8 +1688,8 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
         # TODO: can this be done on sparse?
         pval = np.zeros([data.shape[1]]) + np.nan
         pval[idx_run] = stats.mann_whitney_u_test(
-            x0=x0.x[:, idx_run].toarray(),
-            x1=x1.x[:, idx_run].toarray()
+            x0=np.asarray(x0[:, idx_run]),
+            x1=np.asarray(x1[:, idx_run])
         )
         pval[np.where(np.logical_and(
             np.logical_and(mean_x0 == mean_x1, self._mean > 0),
