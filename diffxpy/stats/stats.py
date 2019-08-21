@@ -1,8 +1,8 @@
-from typing import Union
-
 import numpy as np
 import numpy.linalg
+import scipy.sparse
 import scipy.stats
+from typing import Union
 
 
 def likelihood_ratio_test(
@@ -39,19 +39,18 @@ def likelihood_ratio_test(
 
 
 def mann_whitney_u_test(
-        x0: np.ndarray,
-        x1: np.ndarray,
+        x0: Union[np.ndarray, scipy.sparse.csr_matrix],
+        x1: Union[np.ndarray, scipy.sparse.csr_matrix]
 ):
     """
-    Perform Wilcoxon rank sum test (Mann-Whitney U test) along second axis
-    (for each gene).
+    Perform Wilcoxon rank sum test (Mann-Whitney U test) along second axis, ie. for each gene.
 
     The Wilcoxon rank sum test is a non-parameteric test
     to compare two groups of observations.
 
-    :param x0: np.array (observations x genes)
+    :param x0: (observations x genes)
         Observations in first group by gene
-    :param x1:  np.array (observations x genes)
+    :param x1: (observations x genes)
         Observations in second group by gene.
     """
     axis = 1
@@ -66,8 +65,8 @@ def mann_whitney_u_test(
 
     pvals = np.asarray([
         scipy.stats.mannwhitneyu(
-            x=x0[:, i].flatten(),
-            y=x1[:, i].flatten(),
+            x=np.asarray(x0[:, i].todense()).flatten() if isinstance(x0, scipy.sparse.csr_matrix) else x0[:, i],
+            y=np.asarray(x1[:, i].todense()).flatten() if isinstance(x0, scipy.sparse.csr_matrix) else x1[:, i],
             use_continuity=True,
             alternative="two-sided"
         ).pvalue for i in range(x0.shape[1])
