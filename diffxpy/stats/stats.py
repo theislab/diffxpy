@@ -56,14 +56,13 @@ def mann_whitney_u_test(
     """
     axis = 1
     if np.any(np.ndim(x0) != np.ndim(x1)):
-        raise ValueError('stats.wilcoxon(): number of dimensions is not allowed to differ between x0 and x1!')
+        raise ValueError('number of dimensions is not allowed to differ between x0 and x1')
     # Reshape into 2D array if only one test is performed.
     if np.ndim(x0) == 1:
         x0 = x0.reshape([x0.shape[0], 1])
         x1 = x1.reshape([x1.shape[0], 1])
     if np.any(x0.shape[axis] != x1.shape[axis]):
-        raise ValueError(
-            'stats.wilcoxon(): the first axis (number of tests) is not allowed to differ between x0 and x1!')
+        raise ValueError('the first axis (number of tests) is not allowed to differ between x0 and x1')
 
     pvals = np.asarray([
         scipy.stats.mannwhitneyu(

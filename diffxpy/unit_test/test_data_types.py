@@ -15,44 +15,38 @@ class TestDataTypesSingle(unittest.TestCase):
     def _test_wald(self, data, sample_description, gene_names=None):
         test = de.test.wald(
             data=data,
-            factor_loc_totest="condition",
-            formula_loc="~ 1 + condition",
             sample_description=sample_description,
             gene_names=gene_names,
-            quick_scale=True,
-            training_strategy="DEFAULT",
-            dtype="float64"
+            factor_loc_totest="condition",
+            formula_loc="~ 1 + condition"
         )
         _ = test.summary()
 
     def _test_lrt(self, data, sample_description, gene_names=None):
         test = de.test.lrt(
             data=data,
-            full_formula_loc="~ 1 + condition",
-            reduced_formula_loc="~ 1",
             sample_description=sample_description,
             gene_names=gene_names,
-            quick_scale=True,
-            training_strategy="DEFAULT",
-            dtype="float64"
+            full_formula_loc="~ 1 + condition",
+            reduced_formula_loc="~ 1"
         )
         _ = test.summary()
 
     def _test_t_test(self, data, sample_description, gene_names=None):
         test = de.test.t_test(
             data=data,
-            grouping="condition",
             sample_description=sample_description,
-            gene_names=gene_names
+            gene_names=gene_names,
+            grouping="condition"
         )
         _ = test.summary()
 
     def _test_rank(self, data, sample_description, gene_names=None):
         test = de.test.rank_test(
             data=data,
-            grouping="condition",
             sample_description=sample_description,
-            gene_names=gene_names
+            gene_names=gene_names,
+            grouping="condition"
         )
         _ = test.summary()
 

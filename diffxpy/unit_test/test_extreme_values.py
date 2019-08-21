@@ -3,7 +3,6 @@ import logging
 
 import numpy as np
 import pandas as pd
-import scipy.stats as stats
 
 from batchglm.api.models.glm_nb import Simulator
 import diffxpy.api as de
@@ -19,6 +18,8 @@ class TestExtremeValues(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
+        np.random.seed(1)
+        de.pkg_constants.DE_TREAT_ZEROVAR_TT_AS_SIG = True
         sim = Simulator(num_observations=1000, num_features=10)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
@@ -30,14 +31,14 @@ class TestExtremeValues(unittest.TestCase):
         })
 
         test = de.test.t_test(
-            data=sim.X,
-            grouping="condition",
+            data=sim.input_data,
             sample_description=random_sample_description,
+            grouping="condition",
             is_sig_zerovar=True
         )
 
         assert np.isnan(test.pval[0]) and test.pval[1] == 1, \
-            "rank test did not assign p-value of zero to groups with zero variance and same mean, %f, %f" % \
+            "t test did not assign p-value of zero to groups with zero variance and same mean, %f, %f" % \
             (test.pval[0], test.pval[1])
         return True
 
@@ -49,6 +50,8 @@ class TestExtremeValues(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
+        np.random.seed(1)
+        de.pkg_constants.DE_TREAT_ZEROVAR_TT_AS_SIG = True
         sim = Simulator(num_observations=1000, num_features=10)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
@@ -60,9 +63,9 @@ class TestExtremeValues(unittest.TestCase):
         })
 
         test = de.test.rank_test(
-            data=sim.X,
-            grouping="condition",
+            data=sim.input_data,
             sample_description=random_sample_description,
+            grouping="condition",
             is_sig_zerovar=True
         )
 
