@@ -18,7 +18,9 @@ class TestDataTypesSingle(unittest.TestCase):
             sample_description=sample_description,
             gene_names=gene_names,
             factor_loc_totest="condition",
-            formula_loc="~ 1 + condition"
+            formula_loc="~ 1 + condition",
+            noise_model="nb",
+            batch_size=5
         )
         _ = test.summary()
 
@@ -28,7 +30,8 @@ class TestDataTypesSingle(unittest.TestCase):
             sample_description=sample_description,
             gene_names=gene_names,
             full_formula_loc="~ 1 + condition",
-            reduced_formula_loc="~ 1"
+            reduced_formula_loc="~ 1",
+            noise_model="nb"
         )
         _ = test.summary()
 
@@ -50,7 +53,7 @@ class TestDataTypesSingle(unittest.TestCase):
         )
         _ = test.summary()
 
-    def simulate(self, n_cells: int = 20, n_genes: int = 2):
+    def simulate(self, n_cells: int = 200, n_genes: int = 2):
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
