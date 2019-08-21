@@ -17,12 +17,11 @@ setup(
     long_description_content_type="text/markdown",
     packages=find_packages(),
     install_requires=[
-        'numpy>=1.14.0',
-        'scipy',
+        'numpy==1.16.4',
+        'scipy>=1.2.1',
         'pandas',
         'patsy>=0.5.0',
         'batchglm>=0.6.1',
-        'xarray',
         'statsmodels',
     ],
     extras_require={

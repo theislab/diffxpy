@@ -3,7 +3,6 @@ from typing import Union
 import numpy as np
 import numpy.linalg
 import scipy.stats
-import xarray as xr
 
 
 def likelihood_ratio_test(
@@ -264,8 +263,6 @@ def wald_test_chisq(
 
     theta_diff = theta_mle - theta0
     # Convert to nd.array to avoid gufunc error.
-    if isinstance(theta_diff, xr.DataArray):
-        theta_diff = theta_diff.values
     wald_statistic = np.array([
         np.matmul(
             np.matmul(

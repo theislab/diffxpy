@@ -22,11 +22,11 @@ class TestExtremeValues(unittest.TestCase):
         sim = Simulator(num_observations=1000, num_features=10)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
-        sim.data.X[:, 0] = 0
-        sim.data.X[:, 1] = 5
+        sim.input_data.x[:, 0] = 0
+        sim.input_data.x[:, 1] = 5
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.num_observations)
+            "condition": np.random.randint(2, size=sim.nobs)
         })
 
         test = de.test.t_test(
@@ -52,11 +52,11 @@ class TestExtremeValues(unittest.TestCase):
         sim = Simulator(num_observations=1000, num_features=10)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
-        sim.data.X[:, 0] = 0
-        sim.data.X[:, 1] = 5
+        sim.input_data.x[:, 0] = 0
+        sim.input_data.x[:, 1] = 5
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.num_observations)
+            "condition": np.random.randint(2, size=sim.nobs)
         })
 
         test = de.test.rank_test(

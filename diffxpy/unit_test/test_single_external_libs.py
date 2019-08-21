@@ -62,7 +62,7 @@ class TestSingleExternalLibs(unittest.TestCase):
         sim = self._prepare_data(n_cells=n_cells, n_genes=n_genes)
 
         test = de.test.t_test(
-            data=sim.X,
+            data=sim.x,
             grouping="condition",
             sample_description=sim.sample_description,
             dtype="float64"
@@ -92,7 +92,7 @@ class TestSingleExternalLibs(unittest.TestCase):
         sim = self._prepare_data(n_cells=n_cells, n_genes=n_genes)
 
         test = de.test.rank_test(
-            data=sim.X,
+            data=sim.x,
             grouping="condition",
             sample_description=sim.sample_description,
             dtype="float64"

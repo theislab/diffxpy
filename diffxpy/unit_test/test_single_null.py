@@ -37,21 +37,21 @@ class _TestSingleNull:
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.num_observations),
-            "batch": np.random.randint(2, size=sim.num_observations)
+            "condition": np.random.randint(2, size=sim.nobs),
+            "batch": np.random.randint(2, size=sim.nobs)
         })
 
         test = de.test.wald(
-            data=sim.X,
+            data=sim.input_data,
+            sample_description=random_sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition + batch",
-            sample_description=random_sample_description,
             batch_size=500,
             noise_model=noise_model,
             training_strategy="DEFAULT",
             dtype="float64"
         )
-        summary = test.summary()
+        _ = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
@@ -89,14 +89,14 @@ class _TestSingleNull:
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(4, size=sim.num_observations)
+            "condition": np.random.randint(4, size=sim.nobs)
         })
 
         test = de.test.wald(
-            data=sim.X,
+            data=sim.input_data,
+            sample_description=random_sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition",
-            sample_description=random_sample_description,
             noise_model=noise_model,
             training_strategy="DEFAULT",
             dtype="float64"
@@ -139,21 +139,21 @@ class _TestSingleNull:
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.num_observations)
+            "condition": np.random.randint(2, size=sim.nobs)
         })
 
         test = de.test.lrt(
-            data=sim.X,
+            data=sim.input_data,
+            sample_description=random_sample_description,
             full_formula_loc="~ 1 + condition",
             full_formula_scale="~ 1",
             reduced_formula_loc="~ 1",
             reduced_formula_scale="~ 1",
-            sample_description=random_sample_description,
             noise_model=noise_model,
             training_strategy="DEFAULT",
             dtype="float64"
         )
-        summary = test.summary()
+        _ = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
@@ -184,17 +184,16 @@ class _TestSingleNull:
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.num_observations)
+            "condition": np.random.randint(2, size=sim.nobs)
         })
 
         test = de.test.t_test(
-            data=sim.X,
-            grouping="condition",
+            data=sim.input_data,
             sample_description=random_sample_description,
-            is_logged=False,
-            dtype="float64"
+            grouping="condition",
+            is_logged=False
         )
-        summary = test.summary()
+        _ = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
@@ -225,16 +224,15 @@ class _TestSingleNull:
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.num_observations)
+            "condition": np.random.randint(2, size=sim.nobs)
         })
 
         test = de.test.rank_test(
-            data=sim.X,
-            grouping="condition",
+            data=sim.input_data,
             sample_description=random_sample_description,
-            dtype="float64"
+            grouping="condition"
         )
-        summary = test.summary()
+        _ = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
@@ -265,6 +263,7 @@ class TestSingleNullStandard(_TestSingleNull, unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
+        np.random.seed(1)
         return self._test_null_distribution_ttest(
             n_cells=n_cells,
             n_genes=n_genes
@@ -285,6 +284,7 @@ class TestSingleNullStandard(_TestSingleNull, unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
+        np.random.seed(1)
         return self._test_null_distribution_rank(
             n_cells=n_cells,
             n_genes=n_genes
@@ -312,6 +312,7 @@ class TestSingleNullNB(_TestSingleNull, unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
+        np.random.seed(1)
         return self._test_null_distribution_wald(
             n_cells=n_cells,
             n_genes=n_genes,
@@ -334,6 +335,7 @@ class TestSingleNullNB(_TestSingleNull, unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
+        np.random.seed(1)
         return self._test_null_distribution_wald_multi(
             n_cells=n_cells,
             n_genes=n_genes,
@@ -355,6 +357,7 @@ class TestSingleNullNB(_TestSingleNull, unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
+        np.random.seed(1)
         return self._test_null_distribution_lrt(
             n_cells=n_cells,
             n_genes=n_genes,
@@ -382,6 +385,7 @@ class TestSingleNullNORM(_TestSingleNull, unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
+        np.random.seed(1)
         return self._test_null_distribution_wald(
             n_cells=n_cells,
             n_genes=n_genes,
@@ -404,6 +408,7 @@ class TestSingleNullNORM(_TestSingleNull, unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
+        np.random.seed(1)
         return self._test_null_distribution_wald_multi(
             n_cells=n_cells,
             n_genes=n_genes,
@@ -425,11 +430,13 @@ class TestSingleNullNORM(_TestSingleNull, unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
+        np.random.seed(1)
         return self._test_null_distribution_lrt(
             n_cells=n_cells,
             n_genes=n_genes,
             noise_model="norm"
         )
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,8 +1,6 @@
 import unittest
 import logging
 import numpy as np
-import pandas as pd
-import scipy.stats as stats
 
 import diffxpy.api as de
 
@@ -35,16 +33,16 @@ class _TestSingleDE:
             rand_fn_ave=lambda shape: np.random.poisson(500, shape) + 1,
             rand_fn=lambda shape: np.abs(np.random.uniform(1, 0.5, shape))
         )
-        sim.params["a_var"][1, :num_non_de] = 0
-        sim.params["b_var"][1, :num_non_de] = 0
-        sim.params["isDE"] = ("features",), np.arange(n_genes) >= num_non_de
+        sim.a_var[1, :num_non_de] = 0
+        sim.b_var[1, :num_non_de] = 0
+        self.isDE = np.arange(n_genes) >= num_non_de
         sim.generate_data()
 
         return sim
 
     def _eval(self, sim, test):
-        idx_de = np.where(sim.params["isDE"] == True)[0]
-        idx_nonde = np.where(sim.params["isDE"] == False)[0]
+        idx_de = np.where(self.isDE)[0]
+        idx_nonde = np.where(np.logical_not(self.isDE))[0]
 
         frac_de_of_non_de = np.sum(test.qval[idx_nonde] < 0.05) / len(idx_nonde)
         frac_de_of_de = np.sum(test.qval[idx_de] < 0.05) / len(idx_de)
@@ -82,10 +80,9 @@ class _TestSingleDE:
         )
 
         test = de.test.rank_test(
-            data=sim.X,
-            grouping="condition",
+            data=sim.input_data,
             sample_description=sim.sample_description,
-            dtype="float64"
+            grouping="condition"
         )
 
         self._eval(sim=sim, test=test)
@@ -112,10 +109,9 @@ class _TestSingleDE:
         )
 
         test = de.test.t_test(
-            data=sim.X,
+            data=sim.x,
             grouping="condition",
-            sample_description=sim.sample_description,
-            dtype="float64"
+            sample_description=sim.sample_description
         )
 
         self._eval(sim=sim, test=test)
@@ -144,10 +140,10 @@ class _TestSingleDE:
         )
 
         test = de.test.wald(
-            data=sim.X,
+            data=sim.input_data,
+            sample_description=sim.sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition",
-            sample_description=sim.sample_description,
             noise_model=noise_model,
             training_strategy="DEFAULT",
             dtype="float64"
@@ -179,12 +175,12 @@ class _TestSingleDE:
         )
 
         test = de.test.lrt(
-            data=sim.X,
+            data=sim.input_data,
+            sample_description=sim.sample_description,
             full_formula_loc="~ 1 + condition",
             full_formula_scale="~ 1",
             reduced_formula_loc="~ 1",
             reduced_formula_scale="~ 1",
-            sample_description=sim.sample_description,
             noise_model=noise_model,
             training_strategy="DEFAULT",
             dtype="float64"
@@ -209,6 +205,11 @@ class TestSingleDE_STANDARD(_TestSingleDE, unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
         return self._test_t_test_de(
             n_cells=n_cells,
             n_genes=n_genes
@@ -223,6 +224,11 @@ class TestSingleDE_STANDARD(_TestSingleDE, unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
         return self._test_rank_de(
             n_cells=n_cells,
             n_genes=n_genes
@@ -243,6 +249,11 @@ class TestSingleDE_NB(_TestSingleDE, unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
         return self._test_wald_de(
             n_cells=n_cells,
             n_genes=n_genes,
@@ -258,6 +269,11 @@ class TestSingleDE_NB(_TestSingleDE, unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
         return self._test_lrt_de(
             n_cells=n_cells,
             n_genes=n_genes,
@@ -279,6 +295,11 @@ class TestSingleDE_NORM(_TestSingleDE, unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
         return self._test_wald_de(
             n_cells=n_cells,
             n_genes=n_genes,
@@ -294,6 +315,11 @@ class TestSingleDE_NORM(_TestSingleDE, unittest.TestCase):
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
         return self._test_lrt_de(
             n_cells=n_cells,
             n_genes=n_genes,

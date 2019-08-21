@@ -45,26 +45,22 @@ class TestConstrained(unittest.TestCase):
         # Build constraints:
         constraints_loc = de.utils.constraint_matrix_from_string(
             dmat=dmat_est_loc,
-            constraints=["bio1+bio2=0", "bio3+bio4=0"],
-            dims=["design_loc_params", "loc_params"]
+            constraints=["bio1+bio2=0", "bio3+bio4=0"]
         )
         constraints_scale = de.utils.constraint_matrix_from_string(
             dmat=dmat_est_scale,
-            constraints=["bio1+bio2=0", "bio3+bio4=0"],
-            dims=["design_scale_params", "scale_params"]
+            constraints=["bio1+bio2=0", "bio3+bio4=0"]
         )
 
         test = de.test.wald(
-            data=sim.X,
+            data=sim.x,
             dmat_loc=dmat_est_loc,
             dmat_scale=dmat_est_scale,
             constraints_loc=constraints_loc,
             constraints_scale=constraints_scale,
             coef_to_test=["treatment1"]
         )
-        summary = test.summary()
-
-        return True
+        _ = test.summary()
 
     def test_forfatal_from_dict(self):
         """
@@ -102,16 +98,14 @@ class TestConstrained(unittest.TestCase):
         )
 
         test = de.test.wald(
-            data=sim.X,
+            data=sim.x,
             dmat_loc=dmat_loc,
             dmat_scale=dmat_scale,
             constraints_loc=constraints_loc,
             constraints_scale=constraints_scale,
             coef_to_test=["cond[T.cond1]"]
         )
-        summary = test.summary()
-
-        return True
+        _ = test.summary()
 
     def test_null_distribution_wald_constrained(self, n_genes: int = 100):
         """
@@ -155,14 +149,14 @@ class TestConstrained(unittest.TestCase):
         )
 
         test = de.test.wald(
-            data=sim.X,
+            data=sim.x,
             dmat_loc=dmat_loc,
             dmat_scale=dmat_scale,
             constraints_loc=constraints_loc,
             constraints_scale=constraints_scale,
             coef_to_test=["cond[T.cond1]"]
         )
-        summary = test.summary()
+        _ = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
@@ -230,13 +224,12 @@ class TestConstrained(unittest.TestCase):
                          "bio5+bio6=0",
                          "bio7+bio8=0",
                          "tech1+tech2=0",
-                         "tech3+tech4=0"],
-            dims=["design_loc_params", "loc_params"]
+                         "tech3+tech4=0"]
         )
         constraints_scale = None
 
         test = de.test.wald(
-            data=sim.X,
+            data=sim.x,
             dmat_loc=dmat_est_loc,
             dmat_scale=dmat_est_scale,
             constraints_loc=constraints_loc,
@@ -298,26 +291,24 @@ class TestConstrained(unittest.TestCase):
             dmat=dmat_est_loc,
             constraints=["bio1+bio2=0",
                          "bio3+bio4=0",
-                         "bio5+bio6=0"],
-            dims=["design_loc_params", "loc_params"]
+                         "bio5+bio6=0"]
         )
         constraints_scale = de.utils.constraint_matrix_from_string(
             dmat=dmat_est_scale,
             constraints=["bio1+bio2=0",
                          "bio3+bio4=0",
-                         "bio5+bio6=0"],
-            dims=["design_scale_params", "scale_params"]
+                         "bio5+bio6=0"]
         )
 
         test = de.test.wald(
-            data=sim.X,
+            data=sim.x,
             dmat_loc=dmat_est_loc,
             dmat_scale=dmat_est_scale,
             constraints_loc=constraints_loc,
             constraints_scale=constraints_scale,
             coef_to_test=["treatment1", "treatment2"]
         )
-        summary = test.summary()
+        _ = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue

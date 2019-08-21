@@ -30,8 +30,8 @@ class TestContinuous(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "pseudotime": np.random.random(size=sim.num_observations),
-            "batch": np.random.randint(2, size=sim.num_observations)
+            "pseudotime": np.random.random(size=sim.nobs),
+            "batch": np.random.randint(2, size=sim.nobs)
         })
 
         test = de.test.continuous_1d(
@@ -89,7 +89,7 @@ class TestContinuous(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "pseudotime": np.random.random(size=sim.num_observations)
+            "pseudotime": np.random.random(size=sim.nobs)
         })
 
         test = de.test.continuous_1d(
@@ -135,7 +135,7 @@ class TestContinuous(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "pseudotime": np.random.random(size=sim.num_observations)
+            "pseudotime": np.random.random(size=sim.nobs)
         })
 
         test = de.test.continuous_1d(
