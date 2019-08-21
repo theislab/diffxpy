@@ -69,3 +69,18 @@ Enrichment tests
    :toctree: .
 
    enrich.test
+
+Fit model to gene expression: fit
+---------------------------------
+
+Diffxpy allows the user to fit models to gene expression only without conducting Wald or likelihood ratio tests.
+Note that one can also extract similar model fits from differential expression test output objects if Wald or likelihood ratio test were used.
+Alternatively, residuals can also be directly computed. 
+As for differential expression tests, the fitting can be distributed across multiple partitions of the data set (such as conditions or cell types).
+
+.. autosummary::
+   :toctree: .
+
+   fit.model
+   fit.residuals
+   fit.partition
