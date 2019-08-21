@@ -27,14 +27,17 @@ class _TestSingleNull:
         """
         if noise_model == "nb":
             from batchglm.api.models.glm_nb import Simulator
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         elif noise_model == "norm":
             from batchglm.api.models.glm_norm import Simulator
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        sim.generate_params(rand_fn_scale=rand_fn_scale)
+        sim.generate_data()
 
         random_sample_description = pd.DataFrame({
             "condition": np.random.randint(2, size=sim.nobs),

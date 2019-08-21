@@ -21,8 +21,12 @@ class _TestSingleDe:
         """
         if noise_model == "nb":
             from batchglm.api.models.glm_nb import Simulator
+            rand_fn_loc = lambda shape: np.random.uniform(5, 10, shape)
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         elif noise_model == "norm":
             from batchglm.api.models.glm_norm import Simulator
+            rand_fn_loc = lambda shape: np.random.uniform(500, 1000, shape)
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
@@ -30,22 +34,21 @@ class _TestSingleDe:
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=2)
         sim.generate_params(
-            rand_fn_ave=lambda shape: np.random.poisson(500, shape) + 1,
-            rand_fn=lambda shape: np.abs(np.random.uniform(1, 0.5, shape))
+            rand_fn_loc=rand_fn_loc,
+            rand_fn_scale=rand_fn_scale
         )
         sim.a_var[1, :num_non_de] = 0
         sim.b_var[1, :num_non_de] = 0
         self.isDE = np.arange(n_genes) >= num_non_de
         sim.generate_data()
-
         return sim
 
     def _eval(self, sim, test):
         idx_de = np.where(self.isDE)[0]
         idx_nonde = np.where(np.logical_not(self.isDE))[0]
 
-        frac_de_of_non_de = np.sum(test.qval[idx_nonde] < 0.05) / len(idx_nonde)
-        frac_de_of_de = np.sum(test.qval[idx_de] < 0.05) / len(idx_de)
+        frac_de_of_non_de = np.mean(test.qval[idx_nonde] < 0.05)
+        frac_de_of_de = np.mean(test.qval[idx_de] < 0.05)
 
         logging.getLogger("diffxpy").info(
             'fraction of non-DE genes with q-value < 0.05: %.1f%%' %
