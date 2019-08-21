@@ -19,7 +19,6 @@ class TestExtremeValues(unittest.TestCase):
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         np.random.seed(1)
-        de.pkg_constants.DE_TREAT_ZEROVAR_TT_AS_SIG = True
         sim = Simulator(num_observations=1000, num_features=10)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
@@ -51,7 +50,6 @@ class TestExtremeValues(unittest.TestCase):
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         np.random.seed(1)
-        de.pkg_constants.DE_TREAT_ZEROVAR_TT_AS_SIG = True
         sim = Simulator(num_observations=1000, num_features=10)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()

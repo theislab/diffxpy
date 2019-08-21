@@ -1561,6 +1561,10 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             np.logical_and(mean_x0 == mean_x1, self._mean > 0),
             np.logical_not(self._var_geq_zero)
         ))[0]] = 1.0
+        # Depening on user choice via is_sig_zerovar:
+        # Set p-value to 0 if LFC was non-zero and variances are zero,
+        # this causes division by zero in the test statistic. This
+        # is a highly significant result if one believes the variance estimate.
         if is_sig_zerovar:
             pval[np.where(np.logical_and(
                 mean_x0 != mean_x1,
@@ -1573,28 +1577,6 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             self._logfc = mean_x1 - mean_x0
         else:
             self._logfc = np.log(mean_x1) - np.log(mean_x0)
-        # Return 0 if LFC was non-zero and variances are zero,
-        # this causes division by zero in the test statistic. This
-        # is a highly significant result if one believes the variance estimate.
-        # This is the default which can be changed and can be changed
-        # via DIFFXPY_TREAT_ZEROVAR_TT_AS_SIG.
-        pval[np.where(np.logical_and(np.logical_and(
-            np.logical_not(self._var_geq_zero),
-            self._ave_nonzero),
-            np.abs(self._logfc) < np.nextafter(0, 1)
-        ))] = 0
-        if pkg_constants.DE_TREAT_ZEROVAR_TT_AS_SIG:
-            pval[np.where(np.logical_and(np.logical_and(
-                np.logical_not(self._var_geq_zero),
-                self._ave_nonzero),
-                np.abs(self._logfc) >= np.nextafter(0, 1)
-            ))] = 1
-        else:
-            pval[np.where(np.logical_and(np.logical_and(
-                np.logical_not(self._var_geq_zero),
-                self._ave_nonzero),
-                np.abs(self._logfc) >= np.nextafter(0, 1)
-            ))] = 0
 
     @property
     def gene_ids(self) -> np.ndarray:
@@ -1695,6 +1677,10 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
             np.logical_and(mean_x0 == mean_x1, self._mean > 0),
             np.logical_not(self._var_geq_zero)
         ))[0]] = 1.0
+        # Depening on user choice via is_sig_zerovar:
+        # Set p-value to 0 if LFC was non-zero and variances are zero,
+        # this causes division by zero in the test statistic. This
+        # is a highly significant result if one believes the variance estimate.
         if is_sig_zerovar:
             pval[np.where(np.logical_and(
                 mean_x0 != mean_x1,
