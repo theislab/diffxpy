@@ -127,6 +127,7 @@ def _fit(
     }
 
     if isinstance(training_strategy, str) and training_strategy.lower() == 'bfgs':
+        assert False, "depreceated"
         lib_size = np.zeros(data.shape[0])
         if noise_model == "nb" or noise_model == "negative_binomial":
             estim = Estim_BFGS(X=data, design_loc=design_loc, design_scale=design_scale,
@@ -143,8 +144,6 @@ def _fit(
         else:
             raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
 
-        logging.getLogger("diffxpy").info("Fitting model...")
-        logging.getLogger("diffxpy").debug(" * Assembling input data...")
         input_data = InputDataGLM(
             data=data,
             design_loc=design_loc,
@@ -155,7 +154,6 @@ def _fit(
             feature_names=gene_names,
         )
 
-        logging.getLogger("diffxpy").debug(" * Set up Estimator...")
         constructor_args = {}
         if batch_size is not None:
             constructor_args["batch_size"] = batch_size
@@ -173,12 +171,9 @@ def _fit(
             dtype=dtype,
             **constructor_args
         )
-
-        logging.getLogger("diffxpy").debug(" * Initializing Estimator...")
         estim.initialize()
 
-        logging.getLogger("diffxpy").debug(" * Run estimation...")
-        # training:
+        # Training:
         if callable(training_strategy):
             # call training_strategy if it is a function
             training_strategy(estim)
@@ -186,9 +181,7 @@ def _fit(
             estim.train_sequence(training_strategy=training_strategy)
 
         if close_session:
-            logging.getLogger("diffxpy").debug(" * Finalize estimation...")
             estim.finalize()
-        logging.getLogger("diffxpy").debug(" * Model fitting done.")
 
     return estim
 
