@@ -2,9 +2,8 @@ import anndata
 import numpy as np
 import pandas as pd
 import patsy
-import scipy
+import scipy.sparse
 from typing import List, Tuple, Union
-import xarray as xr
 
 try:
     from anndata.base import Raw
@@ -12,37 +11,30 @@ except ImportError:
     from anndata import Raw
 
 from batchglm import data as data_utils
+from batchglm.models.base import _InputDataBase
 # Relay util functions for diffxpy api.
 # design_matrix, preview_coef_names and constraint_system_from_star are redefined here.
 from batchglm.data import constraint_matrix_from_string, constraint_matrix_from_dict
-from batchglm.data import design_matrix_from_xarray, design_matrix_from_anndata
 from batchglm.data import view_coef_names
 
 
-def parse_gene_names(data, gene_names):
+def parse_gene_names(
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
+        gene_names: Union[list, np.ndarray, None]
+):
     if gene_names is None:
         if anndata is not None and (isinstance(data, anndata.AnnData) or isinstance(data, Raw)):
             gene_names = data.var_names
-        elif isinstance(data, xr.DataArray):
-            gene_names = data["features"]
-        elif isinstance(data, xr.Dataset):
-            gene_names = data["features"]
+        elif isinstance(data, _InputDataBase):
+            gene_names = data.features
         else:
             raise ValueError("Missing gene names")
 
     return np.asarray(gene_names)
 
 
-def parse_data(data, gene_names) -> xr.DataArray:
-    X = data_utils.xarray_from_data(data, dims=("observations", "features"))
-    if gene_names is not None:
-        X.coords["features"] = gene_names
-
-    return X
-
-
 def parse_sample_description(
-        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
         sample_description: Union[pd.DataFrame, None]
 ) -> pd.DataFrame:
     """
@@ -54,33 +46,32 @@ def parse_sample_description(
     """
     if sample_description is None:
         if anndata is not None and isinstance(data, anndata.AnnData):
-            sample_description = data_utils.sample_description_from_anndata(
-                dataset=data,
-            )
-        elif isinstance(data, xr.Dataset):
-            sample_description = data_utils.sample_description_from_xarray(
-                dataset=data,
-                dim="observations",
-            )
+            sample_description = data.obs
         else:
             raise ValueError(
-                "Please specify `sample_description` or provide `data` as xarray.Dataset or anndata.AnnData " +
+                "Please specify `sample_description` or provide `data` as anndata.AnnData " +
                 "with corresponding sample annotations"
             )
 
     if anndata is not None and isinstance(data, Raw):
         # Raw does not have attribute shape.
         assert data.X.shape[0] == sample_description.shape[0], \
-            "data matrix and sample description must contain same number of cells"
+            "data matrix and sample description must contain same number of cells: %i, %i" % \
+            (data.X.shape[0], sample_description.shape[0])
+    elif isinstance(data, _InputDataBase):
+        assert data.x.shape[0] == sample_description.shape[0], \
+            "data matrix and sample description must contain same number of cells: %i, %i" % \
+            (data.x.shape[0], sample_description.shape[0])
     else:
         assert data.shape[0] == sample_description.shape[0], \
-            "data matrix and sample description must contain same number of cells"
+            "data matrix and sample description must contain same number of cells: %i, %i" % \
+            (data.shape[0], sample_description.shape[0])
     return sample_description
 
 
 def parse_size_factors(
         size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray],
-        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
         sample_description: pd.DataFrame
 ) -> Union[np.ndarray, None]:
     """
@@ -111,7 +102,8 @@ def parse_grouping(data, sample_description, grouping):
     return np.squeeze(np.asarray(grouping))
 
 
-def split_X(data, grouping):
+def split_x(data, grouping):
+    grouping = np.asarray(grouping)
     groups = np.unique(grouping)
     x0 = data[np.where(grouping == groups[0])[0]]
     x1 = data[np.where(grouping == groups[1])[0]]
@@ -126,14 +118,14 @@ def dmat_unique(dmat, sample_description):
 
 
 def design_matrix(
-        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray,
+        data: Union[anndata.AnnData, Raw, np.ndarray,
                     scipy.sparse.csr_matrix] = None,
         sample_description: Union[None, pd.DataFrame] = None,
         formula: Union[None, str] = None,
         as_numeric: Union[List[str], Tuple[str], str] = (),
         dmat: Union[pd.DataFrame, None] = None,
         return_type: str = "xarray"
-) -> Union[patsy.design_info.DesignMatrix, xr.Dataset, pd.DataFrame]:
+) -> Union[patsy.design_info.DesignMatrix, pd.DataFrame]:
     """ Create a design matrix from some sample description.
 
     This function defaults to perform formatting if dmat is directly supplied as a pd.DataFrame.
@@ -155,8 +147,6 @@ def design_matrix(
 
         - "patsy": return plain patsy.design_info.DesignMatrix object
         - "dataframe": return pd.DataFrame with observations as rows and params as columns
-        - "xarray": return xr.Dataset with design matrix as ds["design"] and the sample description embedded as
-            one variable per column
     :param dmat: model design matrix
     """
     if data is None and sample_description is None and dmat is None:
@@ -217,13 +207,12 @@ def preview_coef_names(
 
 
 def constraint_system_from_star(
-        dmat: Union[None, np.ndarray, xr.DataArray, xr.Dataset] = None,
+        dmat: Union[None, np.ndarray] = None,
         sample_description: Union[None, pd.DataFrame] = None,
         formula: Union[None, str] = None,
         as_numeric: Union[List[str], Tuple[str], str] = (),
         constraints: dict = {},
-        dims: Union[Tuple[str, str], List[str]] = (),
-        return_type: str = "xarray",
+        return_type: str = "patsy",
 ) -> Tuple:
     """
     Create a design matrix and a constraint matrix.
@@ -251,17 +240,12 @@ def constraint_system_from_star(
 
         Can only group by non-constrained effects right now, use constraint_matrix_from_string
         for other cases.
-    :param dims: Dimension names of xarray.
-
-        E.g.: ["design_loc_params", "loc_params"] or ["design_scale_params", "scale_params"]
     :param return_type: type of the returned value.
 
         - "patsy": return plain patsy.design_info.DesignMatrix object
         - "dataframe": return pd.DataFrame with observations as rows and params as columns
-        - "xarray": return xr.Dataset with design matrix as ds["design"] and the sample description embedded as
-            one variable per column
         This option is overridden if constraints are supplied as dict.
-    :return: a model design matrix and a constraint matrix formatted as xr.DataArray
+    :return: a model design matrix and a constraint matrix
     """
     if isinstance(as_numeric, str):
         as_numeric = [as_numeric]
@@ -279,6 +263,5 @@ def constraint_system_from_star(
         formula=formula,
         as_categorical=as_categorical,
         constraints=constraints,
-        dims=dims,
         return_type=return_type
     )

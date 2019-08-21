@@ -1,7 +1,6 @@
 import unittest
 import logging
 import numpy as np
-import pandas as pd
 import scipy.stats as stats
 
 from batchglm.api.models.glm_nb import Simulator
@@ -18,10 +17,7 @@ class TestSingleExternalLibs(unittest.TestCase):
         """
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=2)
-        sim.generate_params(
-            rand_fn_ave=lambda shape: np.random.poisson(500, shape) + 1,
-            rand_fn=lambda shape: np.abs(np.random.uniform(1, 0.5, shape))
-        )
+        sim.generate_params()
         sim.generate_data()
 
         return sim
@@ -45,8 +41,8 @@ class TestSingleExternalLibs(unittest.TestCase):
             'mean absolute log p-value deviation: %f' %
             float(mean_dev)
         )
-        assert max_dev < 1e-3, "maximum deviation too large"
-        assert max_log_dev < 1e-1, "maximum deviation in log space too large"
+        assert max_dev < 1e-3, "maximum deviation too large: %f" % max_dev
+        assert max_log_dev < 1e-1, "maximum deviation in log space too large: %f" % max_log_dev
 
     def test_t_test_ref(self, n_cells: int = 2000, n_genes: int = 100):
         """
@@ -59,23 +55,25 @@ class TestSingleExternalLibs(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.INFO)
 
+        np.random.seed(1)
         sim = self._prepare_data(n_cells=n_cells, n_genes=n_genes)
-
         test = de.test.t_test(
-            data=sim.X,
+            data=sim.input_data,
             grouping="condition",
-            sample_description=sim.sample_description,
-            dtype="float64"
+            sample_description=sim.sample_description
         )
 
         # Run scipy t-tests as a reference.
         conds = np.unique(sim.sample_description["condition"].values)
         ind_a = np.where(sim.sample_description["condition"] == conds[0])[0]
         ind_b = np.where(sim.sample_description["condition"] == conds[1])[0]
-        scipy_pvals = stats.ttest_ind(a=sim.X[ind_a, :], b=sim.X[ind_b, :], axis=0, equal_var=False).pvalue
-
+        scipy_pvals = stats.ttest_ind(
+            a=sim.x[ind_a, :],
+            b=sim.x[ind_b, :],
+            axis=0,
+            equal_var=False
+        ).pvalue
         self._eval(test=test, ref_pvals=scipy_pvals)
-
         return True
 
     def test_rank_ref(self, n_cells: int = 2000, n_genes: int = 100):
@@ -89,13 +87,12 @@ class TestSingleExternalLibs(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.INFO)
 
+        np.random.seed(1)
         sim = self._prepare_data(n_cells=n_cells, n_genes=n_genes)
-
         test = de.test.rank_test(
-            data=sim.X,
+            data=sim.input_data,
             grouping="condition",
-            sample_description=sim.sample_description,
-            dtype="float64"
+            sample_description=sim.sample_description
         )
 
         # Run scipy t-tests as a reference.
@@ -103,13 +100,15 @@ class TestSingleExternalLibs(unittest.TestCase):
         ind_a = np.where(sim.sample_description["condition"] == conds[0])[0]
         ind_b = np.where(sim.sample_description["condition"] == conds[1])[0]
         scipy_pvals = np.array([
-            stats.mannwhitneyu(x=sim.X[ind_a, i], y=sim.X[ind_b, i],
-                               use_continuity=True, alternative="two-sided").pvalue
-            for i in range(sim.X.shape[1])
-            ])
-
+            stats.mannwhitneyu(
+                x=sim.x[ind_a, i],
+                y=sim.x[ind_b, i],
+                use_continuity=True,
+                alternative="two-sided"
+            ).pvalue
+            for i in range(sim.x.shape[1])
+        ])
         self._eval(test=test, ref_pvals=scipy_pvals)
-
         return True
 
 

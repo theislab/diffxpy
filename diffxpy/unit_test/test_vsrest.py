@@ -29,11 +29,11 @@ class TestVsRest(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.num_observations)
+            "condition": np.random.randint(n_groups, size=sim.nobs)
         })
 
         test = de.test.versus_rest(
-            data=sim.X,
+            data=sim.x,
             grouping="condition",
             test="wald",
             noise_model="nb",
@@ -72,11 +72,11 @@ class TestVsRest(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.num_observations)
+            "condition": np.random.randint(2, size=sim.nobs)
         })
 
         test = de.test.versus_rest(
-            data=sim.X,
+            data=sim.x,
             grouping="condition",
             test="lrt",
             noise_model="nb",
@@ -115,11 +115,11 @@ class TestVsRest(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.num_observations)
+            "condition": np.random.randint(n_groups, size=sim.nobs)
         })
 
         test = de.test.versus_rest(
-            data=sim.X,
+            data=sim.x,
             grouping="condition",
             test="rank",
             sample_description=random_sample_description,
@@ -155,11 +155,11 @@ class TestVsRest(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.num_observations)
+            "condition": np.random.randint(n_groups, size=sim.nobs)
         })
 
         test = de.test.versus_rest(
-            data=sim.X,
+            data=sim.x,
             grouping="condition",
             test="t-test",
             sample_description=random_sample_description,

@@ -1,9 +1,8 @@
-from typing import Union
-
 import numpy as np
 import numpy.linalg
+import scipy.sparse
 import scipy.stats
-import xarray as xr
+from typing import Union
 
 
 def likelihood_ratio_test(
@@ -34,42 +33,40 @@ def likelihood_ratio_test(
     delta_df = df_full - df_reduced
     # Compute the deviance test statistic.
     delta_dev = 2 * (ll_full - ll_reduced)
-    # Compute the p-values based on the deviance and its expection based on the chi-square distribution.
+    # Compute the p-values based on the deviance and its expectation based on the chi-square distribution.
     pvals = 1 - scipy.stats.chi2(delta_df).cdf(delta_dev)
     return pvals
 
 
 def mann_whitney_u_test(
-        x0: np.ndarray,
-        x1: np.ndarray,
+        x0: Union[np.ndarray, scipy.sparse.csr_matrix],
+        x1: Union[np.ndarray, scipy.sparse.csr_matrix]
 ):
     """
-    Perform Wilcoxon rank sum test (Mann-Whitney U test) along second axis
-    (for each gene).
+    Perform Wilcoxon rank sum test (Mann-Whitney U test) along second axis, ie. for each gene.
 
     The Wilcoxon rank sum test is a non-parameteric test
     to compare two groups of observations.
 
-    :param x0: np.array (observations x genes)
+    :param x0: (observations x genes)
         Observations in first group by gene
-    :param x1:  np.array (observations x genes)
+    :param x1: (observations x genes)
         Observations in second group by gene.
     """
     axis = 1
     if np.any(np.ndim(x0) != np.ndim(x1)):
-        raise ValueError('stats.wilcoxon(): number of dimensions is not allowed to differ between x0 and x1!')
+        raise ValueError('number of dimensions is not allowed to differ between x0 and x1')
     # Reshape into 2D array if only one test is performed.
     if np.ndim(x0) == 1:
         x0 = x0.reshape([x0.shape[0], 1])
         x1 = x1.reshape([x1.shape[0], 1])
     if np.any(x0.shape[axis] != x1.shape[axis]):
-        raise ValueError(
-            'stats.wilcoxon(): the first axis (number of tests) is not allowed to differ between x0 and x1!')
+        raise ValueError('the first axis (number of tests) is not allowed to differ between x0 and x1')
 
     pvals = np.asarray([
         scipy.stats.mannwhitneyu(
-            x=x0[:, i].flatten(),
-            y=x1[:, i].flatten(),
+            x=np.asarray(x0[:, i].todense()).flatten() if isinstance(x0, scipy.sparse.csr_matrix) else x0[:, i],
+            y=np.asarray(x1[:, i].todense()).flatten() if isinstance(x0, scipy.sparse.csr_matrix) else x1[:, i],
             use_continuity=True,
             alternative="two-sided"
         ).pvalue for i in range(x0.shape[1])
@@ -252,6 +249,8 @@ def wald_test_chisq(
     if theta_mle.shape[0] != theta_covar.shape[1]:
         raise ValueError(
             'stats.wald_test(): theta_mle and theta_covar have to contain the same number of parameters')
+    if len(theta_covar.shape) != 3:
+        raise ValueError('stats.wald_test(): theta_covar should have 3 dimensions but has %i' % len(theta_covar.shape))
     if theta_mle.shape[1] != theta_covar.shape[0]:
         raise ValueError('stats.wald_test(): theta_mle and theta_covar have to contain the same number of genes')
     if theta_covar.shape[1] != theta_covar.shape[2]:
@@ -264,8 +263,6 @@ def wald_test_chisq(
 
     theta_diff = theta_mle - theta0
     # Convert to nd.array to avoid gufunc error.
-    if isinstance(theta_diff, xr.DataArray):
-        theta_diff = theta_diff.values
     wald_statistic = np.array([
         np.matmul(
             np.matmul(

@@ -29,11 +29,11 @@ class TestPairwiseNull(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.num_observations)
+            "condition": np.random.randint(n_groups, size=sim.nobs)
         })
 
         test = de.test.pairwise(
-            data=sim.X,
+            data=sim.x,
             grouping="condition",
             test="z-test",
             noise_model="nb",
@@ -69,11 +69,11 @@ class TestPairwiseNull(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(4, size=sim.num_observations)
+            "condition": np.random.randint(4, size=sim.nobs)
         })
 
         test = de.test.pairwise(
-            data=sim.X,
+            data=sim.x,
             grouping="condition",
             test='z-test',
             lazy=True,
@@ -112,11 +112,11 @@ class TestPairwiseNull(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.num_observations)
+            "condition": np.random.randint(n_groups, size=sim.nobs)
         })
 
         test = de.test.pairwise(
-            data=sim.X,
+            data=sim.x,
             grouping="condition",
             test="lrt",
             noise_model="nb",
@@ -151,11 +151,11 @@ class TestPairwiseNull(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.num_observations)
+            "condition": np.random.randint(n_groups, size=sim.nobs)
         })
 
         test = de.test.pairwise(
-            data=sim.X,
+            data=sim.x,
             grouping="condition",
             test="t-test",
             sample_description=random_sample_description,
@@ -189,11 +189,11 @@ class TestPairwiseNull(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.num_observations)
+            "condition": np.random.randint(n_groups, size=sim.nobs)
         })
 
         test = de.test.pairwise(
-            data=sim.X,
+            data=sim.x,
             grouping="condition",
             test="wilcoxon",
             sample_description=random_sample_description,
@@ -239,7 +239,7 @@ class TestPairwiseDE(unittest.TestCase):
         sample_description = sim.sample_description
 
         test = de.test.pairwise(
-            data=sim.X,
+            data=sim.x,
             grouping="condition",
             test="z-test",
             noise_model="nb",

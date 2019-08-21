@@ -7,7 +7,7 @@ from batchglm.api.models.glm_nb import Simulator
 import diffxpy.api as de
 
 
-class TestNumeric(unittest.TestCase):
+class TestNumericCovar(unittest.TestCase):
 
     def test(self):
         """
@@ -25,11 +25,11 @@ class TestNumeric(unittest.TestCase):
         sim.generate_data()
 
         sample_description = sim.sample_description
-        sample_description["numeric1"] = np.random.random(size=sim.num_observations)
-        sample_description["numeric2"] = np.random.random(size=sim.num_observations)
+        sample_description["numeric1"] = np.random.random(size=sim.nobs)
+        sample_description["numeric2"] = np.random.random(size=sim.nobs)
 
         test = de.test.wald(
-            data=sim.X,
+            data=sim.input_data,
             sample_description=sample_description,
             formula_loc="~ 1 + condition + numeric1 + numeric2",
             formula_scale="~ 1",

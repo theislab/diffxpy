@@ -3,104 +3,25 @@ import logging
 from typing import Union, Dict, Tuple, List, Set
 import pandas as pd
 from random import sample
+import scipy.sparse
 
 import numpy as np
-import xarray as xr
 import patsy
 
-from .utils import split_X, dmat_unique
+from .utils import split_x, dmat_unique
 
 try:
     import anndata
 except ImportError:
     anndata = None
 
-from batchglm.xarray_sparse.base import SparseXArrayDataArray
-from batchglm.models.glm_nb import Model as GeneralizedLinearModel
+from batchglm.models.base import _EstimatorBase, _InputDataBase
 
 from ..stats import stats
 from . import correction
 from diffxpy import pkg_constants
 
 logger = logging.getLogger("diffxpy")
-
-
-class _Estimation(GeneralizedLinearModel, metaclass=abc.ABCMeta):
-    """
-    Dummy class specifying all needed methods / parameters necessary for a model
-    fitted for DifferentialExpressionTest.
-    Useful for type hinting.
-    """
-
-    @property
-    @abc.abstractmethod
-    def X(self) -> np.ndarray:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def design_loc(self) -> np.ndarray:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def design_scale(self) -> np.ndarray:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def constraints_loc(self) -> np.ndarray:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def constraints_scale(self) -> np.ndarray:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def num_observations(self) -> int:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def num_features(self) -> int:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def features(self) -> np.ndarray:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def observations(self) -> np.ndarray:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def log_likelihood(self, **kwargs) -> np.ndarray:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def loss(self, **kwargs) -> np.ndarray:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def gradients(self, **kwargs) -> np.ndarray:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def hessians(self, **kwargs) -> np.ndarray:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def fisher_inv(self, **kwargs) -> np.ndarray:
-        pass
 
 
 class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
@@ -132,7 +53,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
     @property
     @abc.abstractmethod
-    def X(self):
+    def x(self):
         pass
 
     @abc.abstractmethod
@@ -169,24 +90,22 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
     def _ave(self):
         """
-        Returns a xr.DataArray containing the mean expression by gene
+        Returns the mean expression by gene.
 
-        :return: xr.DataArray
+        :return: np.ndarray
         """
         pass
 
     @property
     def log_likelihood(self):
         if self._log_likelihood is None:
-            self._log_likelihood = self._ll().compute()
+            self._log_likelihood = self._ll()
         return self._log_likelihood
 
     @property
     def mean(self):
         if self._mean is None:
             self._mean = self._ave()
-            if isinstance(self._mean, xr.DataArray):  # Could also be np.ndarray coming out of XArraySparseDataArray
-                self._mean = self._mean.compute()
         return self._mean
 
     @property
@@ -340,10 +259,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         logfc = np.reshape(self.log2_fold_change(), -1)
         # Clipping throws errors if not performed in actual data format (ndarray or DataArray):
-        if isinstance(logfc, xr.DataArray):
-            logfc = logfc.clip(-log2_fc_threshold, log2_fc_threshold)
-        else:
-            logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
+        logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
 
         fig, ax = plt.subplots()
 
@@ -389,6 +305,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             plt.show()
 
         plt.close(fig)
+        plt.ion()
 
         if return_axs:
             return ax
@@ -450,10 +367,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
 
         logfc = np.reshape(self.log2_fold_change(), -1)
         # Clipping throws errors if not performed in actual data format (ndarray or DataArray):
-        if isinstance(logfc, xr.DataArray):
-            logfc = logfc.clip(-log2_fc_threshold, log2_fc_threshold)
-        else:
-            logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
+        logfc = np.clip(logfc, -log2_fc_threshold, log2_fc_threshold, logfc)
 
         fig, ax = plt.subplots()
 
@@ -554,17 +468,17 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
     sample_description: pd.DataFrame
     full_design_loc_info: patsy.design_info
-    full_estim: _Estimation
+    full_estim: _EstimatorBase
     reduced_design_loc_info: patsy.design_info
-    reduced_estim: _Estimation
+    reduced_estim: _EstimatorBase
 
     def __init__(
             self,
             sample_description: pd.DataFrame,
             full_design_loc_info: patsy.design_info,
-            full_estim,
+            full_estim: _EstimatorBase,
             reduced_design_loc_info: patsy.design_info,
-            reduced_estim
+            reduced_estim: _EstimatorBase
     ):
         super().__init__()
         self.sample_description = sample_description
@@ -575,19 +489,19 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.full_estim.features)
+        return np.asarray(self.full_estim.input_data.features)
 
     @property
-    def X(self):
-        return self.full_estim.X
+    def x(self):
+        return self.full_estim.x
 
     @property
     def reduced_model_gradient(self):
-        return self.reduced_estim.gradients
+        return self.reduced_estim.jacobian
 
     @property
     def full_model_gradient(self):
-        return self.full_estim.gradients
+        return self.full_estim.jacobian
 
     def _test(self):
         if np.any(self.full_estim.log_likelihood < self.reduced_estim.log_likelihood):
@@ -596,27 +510,29 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         return stats.likelihood_ratio_test(
             ll_full=self.full_estim.log_likelihood,
             ll_reduced=self.reduced_estim.log_likelihood,
-            df_full=self.full_estim.constraints_loc.shape[1] + self.full_estim.constraints_scale.shape[1],
-            df_reduced=self.reduced_estim.constraints_loc.shape[1] + self.reduced_estim.constraints_scale.shape[1],
+            df_full=self.full_estim.input_data.constraints_loc.shape[1] +
+                    self.full_estim.input_data.constraints_scale.shape[1],
+            df_reduced=self.reduced_estim.input_data.constraints_loc.shape[1] +
+                       self.reduced_estim.input_data.constraints_scale.shape[1],
         )
 
     def _ave(self):
         """
-        Returns a xr.DataArray containing the mean expression by gene
+        Returns the mean expression by gene
 
-        :return: xr.DataArray
+        :return: np.ndarray
         """
 
-        return np.mean(self.full_estim.X, axis=0)
+        return np.asarray(np.mean(self.full_estim.x, axis=0)).flatten()
 
     def _log_fold_change(self, factors: Union[Dict, Tuple, Set, List], base=np.e):
         """
-        Returns a xr.DataArray containing the locations for the different categories of the factors
+        Returns the locations for the different categories of the factors
 
         :param factors: the factors to select.
             E.g. `condition` or `batch` if formula would be `~ 1 + batch + condition`
         :param base: the log base to use; default is the natural logarithm
-        :return: xr.DataArray
+        :return: np.ndarray
         """
 
         if not (isinstance(factors, list) or isinstance(factors, tuple) or isinstance(factors, set)):
@@ -626,7 +542,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
         di = self.full_design_loc_info
         sample_description = self.sample_description[[f.name() for f in di.subset(factors).factor_infos]]
-        dmat = self.full_estim.design_loc
+        dmat = self.full_estim.input_data.design_loc
 
         # make rows unique
         dmat, sample_description = dmat_unique(dmat, sample_description)
@@ -645,19 +561,11 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         # make the design matrix + sample description unique again
         dmat, sample_description = dmat_unique(dmat, sample_description)
 
-        locations = self.full_estim.inverse_link_loc(dmat.dot(self.full_estim.par_link_loc))
+        locations = self.full_estim.model.inverse_link_loc(np.matmul(dmat, self.full_estim.model.a))
         locations = np.log(locations) / np.log(base)
 
         dist = np.expand_dims(locations, axis=0)
         dist = np.transpose(dist, [1, 0, 2]) - dist
-        dist = xr.DataArray(dist, dims=("minuend", "subtrahend", "gene"))
-        # retval = xr.Dataset({"logFC": retval})
-
-        dist.coords["gene"] = self.gene_ids
-
-        for col in sample_description:
-            dist.coords["minuend_" + col] = (("minuend",), sample_description[col])
-            dist.coords["subtrahend_" + col] = (("subtrahend",), sample_description[col])
 
         # # If this is a pairwise comparison, return only one fold change per gene
         # if dist.shape[:2] == (2, 2):
@@ -695,7 +603,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
                 return None
             else:
                 dists = self._log_fold_change(factors=factors, base=base)
-                return dists[1, 0].values
+                return dists[1, 0]
         else:
             dists = self._log_fold_change(factors=factors, base=base)
             return dists
@@ -709,12 +617,12 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
         di = self.full_design_loc_info
         sample_description = self.sample_description[[f.name() for f in di.factor_infos]]
-        dmat = self.full_estim.design_loc
+        dmat = self.full_estim.input_data.design_loc
 
         dmat, sample_description = dmat_unique(dmat, sample_description)
 
-        retval = self.full_estim.inverse_link_loc(dmat.dot(self.full_estim.par_link_loc))
-        retval = pd.DataFrame(retval, columns=self.full_estim.features)
+        retval = self.full_estim.model.inverse_link_loc(np.matmul(dmat, self.full_estim.model.a))
+        retval = pd.DataFrame(retval, columns=self.full_estim.input_data.features)
         for col in sample_description:
             retval[col] = sample_description[col]
 
@@ -731,12 +639,12 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
         di = self.full_design_loc_info
         sample_description = self.sample_description[[f.name() for f in di.factor_infos]]
-        dmat = self.full_estim.design_scale
+        dmat = self.full_estim.input_data.design_scale
 
         dmat, sample_description = dmat_unique(dmat, sample_description)
 
         retval = self.full_estim.inverse_link_scale(dmat.doc(self.full_estim.par_link_scale))
-        retval = pd.DataFrame(retval, columns=self.full_estim.features)
+        retval = pd.DataFrame(retval, columns=self.full_estim.input_data.features)
         for col in sample_description:
             retval[col] = sample_description[col]
 
@@ -781,7 +689,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     Single wald test per gene.
     """
 
-    model_estim: _Estimation
+    model_estim: _EstimatorBase
     sample_description: pd.DataFrame
     coef_loc_totest: np.ndarray
     theta_mle: np.ndarray
@@ -791,7 +699,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
     def __init__(
             self,
-            model_estim: _Estimation,
+            model_estim: _EstimatorBase,
             col_indices: np.ndarray,
             noise_model: str,
             sample_description: pd.DataFrame
@@ -809,28 +717,32 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         self._store_ols = None
 
         try:
-            if model_estim._error_codes is not None:
-                self._error_codes = model_estim._error_codes
+            if self.model_estim.error_codes is not None:
+                self._error_codes = self.model_estim.error_codes
+            else:
+                self._error_codes = None
         except Exception as e:
             self._error_codes = None
 
         try:
-            if model_estim._niter is not None:
-                self._niter = model_estim._niter
+            if self.model_estim.niter is not None:
+                self._niter = self.model_estim.niter
+            else:
+                self._niter = None
         except Exception as e:
             self._niter = None
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.model_estim.features)
+        return np.asarray(self.model_estim.input_data.features)
 
     @property
-    def X(self):
-        return self.model_estim.X
+    def x(self):
+        return self.model_estim.x
 
     @property
     def model_gradient(self):
-        return self.model_estim.gradients
+        return self.model_estim.jacobian
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -854,35 +766,34 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
     def _ll(self):
         """
-        Returns a xr.DataArray containing the log likelihood of each gene
+        Returns the log likelihood of each gene
 
-        :return: xr.DataArray
+        :return: np.ndarray
         """
         return self.model_estim.log_likelihood
 
     def _ave(self):
         """
-        Returns a xr.DataArray containing the mean expression by gene
+        Returns the mean expression by gene
 
-        :return: xr.DataArray
+        :return: np.ndarray
         """
-        return self.X.mean(axis=0)
+        return np.asarray(self.x.mean(axis=0)).flatten()
 
     def _test(self):
         """
-        Returns a xr.DataArray containing the p-value for differential expression for each gene
+        Returns the p-value for differential expression for each gene
 
-        :return: xr.DataArray
+        :return: np.ndarray
         """
         # Check whether single- or multiple parameters are tested.
         # For a single parameter, the wald statistic distribution is approximated
         # with a normal distribution, for multiple parameters, a chi-square distribution is used.
         self.theta_mle = self.model_estim.a_var[self.coef_loc_totest]
         if len(self.coef_loc_totest) == 1:
-            self.theta_mle = self.theta_mle[0]  # Make xarray one dimensional for stats.wald_test.
-            self.theta_sd = self.model_estim.fisher_inv[:, self.coef_loc_totest[0], self.coef_loc_totest[0]].values
-            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd,
-                                         where=self.theta_sd < np.nextafter(0, np.inf))
+            self.theta_mle = self.theta_mle[0]
+            self.theta_sd = self.model_estim.fisher_inv[:, self.coef_loc_totest[0], self.coef_loc_totest[0]]
+            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test(
                 theta_mle=self.theta_mle,
@@ -891,12 +802,11 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             )
         else:
             self.theta_sd = np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1).copy()
-            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd,
-                                         where=self.theta_sd < np.nextafter(0, np.inf))
+            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test_chisq(
                 theta_mle=self.theta_mle,
-                theta_covar=self.model_estim.fisher_inv[:, self.coef_loc_totest, self.coef_loc_totest],
+                theta_covar=self.model_estim.fisher_inv[:, self.coef_loc_totest, :][:, :, self.coef_loc_totest],
                 theta0=0
             )
 
@@ -944,12 +854,19 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     def plot_vs_ttest(
             self,
             log10=False,
+            show: bool = True,
+            save: Union[str, None] = None,
+            suffix: str = "_plot_vs_ttest.png",
             return_axs: bool = False
     ):
         """
         Normalizes data by size factors if any were used in model.
 
         :param log10:
+        :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
+        :param save: Path+file name stem to save plots to.
+            File will be save+suffix. Does not save if save is None.
+        :param suffix: Suffix for file name to save plot to. Also use this to set the file type.
         :param return_axs: Whether to return axis objects.
 
         :return:
@@ -958,12 +875,17 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         import seaborn as sns
         from .tests import t_test
 
-        grouping = np.asarray(self.model_estim.design_loc[:, self.coef_loc_totest])
+        plt.ioff()
+
+        grouping = np.asarray(self.model_estim.input_data.design_loc[:, self.coef_loc_totest])
         # Normalize by size factors that were used in regression.
-        sf = np.broadcast_to(np.expand_dims(self.model_estim.size_factors, axis=1),
-                             shape=self.model_estim.X.shape)
+        if self.model_estim.input_data.size_factors is not None:
+            sf = np.broadcast_to(np.expand_dims(self.model_estim.input_data.size_factors, axis=1),
+                                 shape=self.model_estim.x.shape)
+        else:
+            sf = np.ones(shape=(self.model_estim.x.shape[0], 1))
         ttest = t_test(
-            data=self.model_estim.X.multiply(1 / sf, copy=True),
+            data=self.model_estim.x / sf,
             grouping=grouping,
             gene_names=self.gene_ids,
         )
@@ -979,6 +901,16 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         sns.scatterplot(x=ttest_pvals, y=pvals, ax=ax)
 
         ax.set(xlabel="t-test", ylabel='wald test')
+
+        # Save, show and return figure.
+        if save is not None:
+            plt.savefig(save + suffix)
+
+        if show:
+            plt.show()
+
+        plt.close(fig)
+        plt.ion()
 
         if return_axs:
             return ax
@@ -1019,11 +951,13 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         import matplotlib.pyplot as plt
         from matplotlib import gridspec
         from matplotlib import rcParams
-        from batchglm.api.models.glm_norm import Estimator, InputData
+        from batchglm.api.models.glm_norm import Estimator, InputDataGLM
+
+        plt.ioff()
 
         # Run OLS model fit to have comparison coefficients.
         if self._store_ols is None:
-            input_data_ols = InputData.new(
+            input_data_ols = InputDataGLM(
                 data=self.model_estim.input_data.data,
                 design_loc=self.model_estim.input_data.design_loc,
                 design_scale=self.model_estim.input_data.design_scale[:, [0]],
@@ -1048,10 +982,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # Prepare parameter summary of both model fits.
         par_loc = self.model_estim.input_data.data.coords["design_loc_params"].values
 
-        a_var_ols = store_ols.a_var.values
+        a_var_ols = store_ols.a_var
         a_var_ols[1:, :] = (a_var_ols[1:, :] + a_var_ols[[0], :]) / a_var_ols[[0], :]
 
-        a_var_user = self.model_estim.a_var.values
+        a_var_user = self.model_estim.a_var
         # Translate coefficients from both fits to be multiplicative in identity space.
         if self.noise_model == "nb":
             a_var_user = np.exp(a_var_user)  # self.model_estim.inverse_link_loc(a_var_user)
@@ -1156,11 +1090,13 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         import matplotlib.pyplot as plt
         from matplotlib import gridspec
         from matplotlib import rcParams
-        from batchglm.api.models.glm_norm import Estimator, InputData
+        from batchglm.api.models.glm_norm import Estimator, InputDataGLM
+
+        plt.ioff()
 
         # Run OLS model fit to have comparison coefficients.
         if self._store_ols is None:
-            input_data_ols = InputData.new(
+            input_data_ols = InputDataGLM(
                 data=self.model_estim.input_data.data,
                 design_loc=self.model_estim.input_data.design_loc,
                 design_scale=self.model_estim.input_data.design_scale[:, [0]],
@@ -1203,19 +1139,16 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         pred_n_cells = sample(
             population=list(np.arange(0, self.model_estim.X.shape[0])),
-            k=np.min([20, self.model_estim.design_loc.shape[0]])
+            k=np.min([20, self.model_estim.input_data.design_loc.shape[0]])
         )
 
-        if isinstance(self.model_estim.X, SparseXArrayDataArray):
-            x = np.asarray(self.model_estim.X.X[pred_n_cells, :].todense()).flatten()
-        else:
-            x = np.asarray(self.model_estim.X[pred_n_cells, :]).flatten()
+        x = np.asarray(self.model_estim.X[pred_n_cells, :]).flatten()
 
-        y_user = self.model_estim.inverse_link_loc(
-            np.matmul(self.model_estim.design_loc[pred_n_cells, :].values, self.model_estim.a_var.values).flatten()
+        y_user = self.model_estim.model.inverse_link_loc(
+            np.matmul(self.model_estim.input_data.design_loc[pred_n_cells, :], self.model_estim.a_var).flatten()
         )
         y_ols = store_ols.inverse_link_loc(
-            np.matmul(store_ols.design_loc[pred_n_cells, :].values, store_ols.a_var.values).flatten()
+            np.matmul(store_ols.design_loc[pred_n_cells, :], store_ols.a_var).flatten()
         )
         if log1p_transform:
             x = np.log(x+1)
@@ -1309,15 +1242,15 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         :param log1p_transform: Whether to log transform observations
             before estimating the distribution with boxplot. Model estimates are adjusted accordingly.
         :param incl_fits: Whether to include fits in plot.
-        :return summaries_genes: List with data frame for seabron in it.
+        :return summaries_genes: List with data frame for seaborn in it.
         """
 
         summaries_genes = []
         for i, g in enumerate(gene_names):
-            assert g in self.model_estim.features, "gene %g not found" % g
-            g_idx = self.model_estim.features.tolist().index(g)
+            assert g in self.model_estim.input_data.features, "gene %g not found" % g
+            g_idx = self.model_estim.input_data.features.index(g)
             # Raw data for boxplot:
-            y = self.model_estim.X[:, g_idx]
+            y = self.model_estim.x[:, g_idx]
             # Model fits:
             loc = self.model_estim.location[:, g_idx]
             scale = self.model_estim.scale[:, g_idx]
@@ -1613,16 +1546,20 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             is_sig_zerovar: bool = True
     ):
         super().__init__()
-        self._X = data
+        if isinstance(data, anndata.AnnData) or isinstance(data, anndata.Raw):
+            data = data.X
+        elif isinstance(data, _InputDataBase):
+            data = data.x
+        self._x = data
         self.sample_description = sample_description
         self.grouping = grouping
         self._gene_names = np.asarray(gene_names)
 
-        x0, x1 = split_X(data, grouping)
+        x0, x1 = split_x(data, grouping)
 
         # Only compute p-values for genes with non-zero observations and non-zero group-wise variance.
-        mean_x0 = x0.mean(axis=0).astype(dtype=np.float)
-        mean_x1 = x1.mean(axis=0).astype(dtype=np.float)
+        mean_x0 = np.asarray(np.mean(x0, axis=0)).flatten().astype(dtype=np.float)
+        mean_x1 = np.asarray(np.mean(x1, axis=0)).flatten().astype(dtype=np.float)
         # Avoid unnecessary mean computation:
         self._mean = np.average(
             a=np.vstack([mean_x0, mean_x1]),
@@ -1632,8 +1569,13 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             returned=False
         )
         self._ave_nonzero = self._mean != 0  # omit all-zero features
-        var_x0 = np.asarray(x0.var(axis=0)).flatten().astype(dtype=np.float)
-        var_x1 = np.asarray(x1.var(axis=0)).flatten().astype(dtype=np.float)
+        if isinstance(x0, scipy.sparse.csr_matrix):
+            # Efficient analytic expression of variance without densification.
+            var_x0 = np.asarray(np.mean(x0.power(2), axis=0)).flatten().astype(dtype=np.float) - np.square(mean_x0)
+            var_x1 = np.asarray(np.mean(x1.power(2), axis=0)).flatten().astype(dtype=np.float) - np.square(mean_x1)
+        else:
+            var_x0 = np.asarray(np.var(x0, axis=0)).flatten().astype(dtype=np.float)
+            var_x1 = np.asarray(np.var(x1, axis=0)).flatten().astype(dtype=np.float)
         self._var_geq_zero = np.logical_or(
             var_x0 > 0,
             var_x1 > 0
@@ -1652,6 +1594,10 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             np.logical_and(mean_x0 == mean_x1, self._mean > 0),
             np.logical_not(self._var_geq_zero)
         ))[0]] = 1.0
+        # Depening on user choice via is_sig_zerovar:
+        # Set p-value to 0 if LFC was non-zero and variances are zero,
+        # this causes division by zero in the test statistic. This
+        # is a highly significant result if one believes the variance estimate.
         if is_sig_zerovar:
             pval[np.where(np.logical_and(
                 mean_x0 != mean_x1,
@@ -1664,36 +1610,14 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             self._logfc = mean_x1 - mean_x0
         else:
             self._logfc = np.log(mean_x1) - np.log(mean_x0)
-        # Return 0 if LFC was non-zero and variances are zero,
-        # this causes division by zero in the test statistic. This
-        # is a highly significant result if one believes the variance estimate.
-        # This is the default which can be changed and can be changed
-        # via DIFFXPY_TREAT_ZEROVAR_TT_AS_SIG.
-        pval[np.where(np.logical_and(np.logical_and(
-            np.logical_not(self._var_geq_zero),
-            self._ave_nonzero),
-            np.abs(self._logfc) < np.nextafter(0, 1)
-        ))] = 0
-        if pkg_constants.DE_TREAT_ZEROVAR_TT_AS_SIG:
-            pval[np.where(np.logical_and(np.logical_and(
-                np.logical_not(self._var_geq_zero),
-                self._ave_nonzero),
-                np.abs(self._logfc) >= np.nextafter(0, 1)
-            ))] = 1
-        else:
-            pval[np.where(np.logical_and(np.logical_and(
-                np.logical_not(self._var_geq_zero),
-                self._ave_nonzero),
-                np.abs(self._logfc) >= np.nextafter(0, 1)
-            ))] = 0
 
     @property
     def gene_ids(self) -> np.ndarray:
         return self._gene_names
 
     @property
-    def X(self):
-        return self._X
+    def x(self):
+        return self._x
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -1747,15 +1671,19 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
             is_sig_zerovar: bool = True
     ):
         super().__init__()
-        self._X = data
+        if isinstance(data, anndata.AnnData) or isinstance(data, anndata.Raw):
+            data = data.X
+        elif isinstance(data, _InputDataBase):
+            data = data.x
+        self._x = data
         self.sample_description = sample_description
         self.grouping = grouping
         self._gene_names = np.asarray(gene_names)
 
-        x0, x1 = split_X(data, grouping)
+        x0, x1 = split_x(data, grouping)
 
-        mean_x0 = x0.mean(axis=0).astype(dtype=np.float)
-        mean_x1 = x1.mean(axis=0).astype(dtype=np.float)
+        mean_x0 = np.asarray(np.mean(x0, axis=0)).flatten().astype(dtype=np.float)
+        mean_x1 = np.asarray(np.mean(x1, axis=0)).flatten().astype(dtype=np.float)
         # Avoid unnecessary mean computation:
         self._mean = np.average(
             a=np.vstack([mean_x0, mean_x1]),
@@ -1764,30 +1692,33 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
             axis=0,
             returned=False
         )
-        var_x0 = np.asarray(x0.var(axis=0)).flatten().astype(dtype=np.float)
-        var_x1 = np.asarray(x1.var(axis=0)).flatten().astype(dtype=np.float)
+        if isinstance(x0, scipy.sparse.csr_matrix):
+            # Efficient analytic expression of variance without densification.
+            var_x0 = np.asarray(np.mean(x0.power(2), axis=0)).flatten().astype(dtype=np.float) - np.square(mean_x0)
+            var_x1 = np.asarray(np.mean(x1.power(2), axis=0)).flatten().astype(dtype=np.float) - np.square(mean_x1)
+        else:
+            var_x0 = np.asarray(np.var(x0, axis=0)).flatten().astype(dtype=np.float)
+            var_x1 = np.asarray(np.var(x1, axis=0)).flatten().astype(dtype=np.float)
         self._var_geq_zero = np.logical_or(
             var_x0 > 0,
             var_x1 > 0
         )
         idx_run = np.where(np.logical_and(self._mean != 0, self._var_geq_zero))[0]
 
-        # TODO: can this be done on sparse?
+        # TODO: can this be done directly on sparse?
         pval = np.zeros([data.shape[1]]) + np.nan
-        if isinstance(x0, xr.DataArray):
-            pval[idx_run] = stats.mann_whitney_u_test(
-                x0=x0.data[:, idx_run],
-                x1=x1.data[:, idx_run]
-            )
-        else:
-            pval[idx_run] = stats.mann_whitney_u_test(
-                x0=x0.X[:, idx_run].toarray(),
-                x1=x1.X[:, idx_run].toarray()
-            )
+        pval[idx_run] = stats.mann_whitney_u_test(
+            x0=x0[:, idx_run],
+            x1=x1[:, idx_run]
+        )
         pval[np.where(np.logical_and(
             np.logical_and(mean_x0 == mean_x1, self._mean > 0),
             np.logical_not(self._var_geq_zero)
         ))[0]] = 1.0
+        # Depening on user choice via is_sig_zerovar:
+        # Set p-value to 0 if LFC was non-zero and variances are zero,
+        # this causes division by zero in the test statistic. This
+        # is a highly significant result if one believes the variance estimate.
         if is_sig_zerovar:
             pval[np.where(np.logical_and(
                 mean_x0 != mean_x1,
@@ -1806,8 +1737,8 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
         return self._gene_names
 
     @property
-    def X(self):
-        return self._X
+    def x(self):
+        return self._x
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -1855,7 +1786,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
 
         grouping = self.grouping
         ttest = t_test(
-            data=self.X,
+            data=self.x,
             grouping=grouping,
             gene_names=self.gene_ids,
         )
@@ -1967,7 +1898,7 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         return self._gene_ids
 
     @property
-    def X(self):
+    def x(self):
         return None
 
     @property
@@ -2159,11 +2090,17 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
     Pairwise unit_test between more than 2 groups per gene.
     """
 
-    model_estim: _Estimation
+    model_estim: _EstimatorBase
     theta_mle: np.ndarray
     theta_sd: np.ndarray
 
-    def __init__(self, model_estim: _Estimation, grouping, groups, correction_type: str):
+    def __init__(
+            self,
+            model_estim: _EstimatorBase,
+            grouping,
+            groups,
+            correction_type: str
+    ):
         super().__init__(correction_type=correction_type)
         self.model_estim = model_estim
         self.grouping = grouping
@@ -2182,7 +2119,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
 
     def _test(self, **kwargs):
         groups = self.groups
-        num_features = self.model_estim.X.shape[1]
+        num_features = self.model_estim.x.shape[1]
 
         pvals = np.tile(np.NaN, [len(groups), len(groups), num_features])
         pvals[np.eye(pvals.shape[0]).astype(bool)] = 1
@@ -2202,28 +2139,28 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.model_estim.features)
+        return np.asarray(self.model_estim.input_data.features)
 
     @property
-    def X(self):
-        return self.model_estim.X
+    def x(self):
+        return self.model_estim.x
 
     @property
     def log_likelihood(self):
-        return np.sum(self.model_estim.log_probs(), axis=0)
+        return self.model_estim.log_likelihood
 
     @property
     def model_gradient(self):
-        return self.model_estim.gradients
+        return self.model_estim.jacobian
 
     def _ave(self):
         """
-        Returns a xr.DataArray containing the mean expression by gene
+        Returns the mean expression by gene
 
-        :return: xr.DataArray
+        :return: np.ndarray
         """
 
-        return np.mean(self.model_estim.X, axis=0)
+        return np.mean(self.model_estim.x, axis=0)
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -2231,7 +2168,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         """
         if self._logfc is None:
             groups = self.groups
-            num_features = self.model_estim.X.shape[1]
+            num_features = self.model_estim.x.shape[1]
 
             logfc = np.tile(np.NaN, [len(groups), len(groups), num_features])
             logfc[np.eye(logfc.shape[0]).astype(bool)] = 0
@@ -2356,11 +2293,16 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
     memory.
     """
 
-    model_estim: _Estimation
+    model_estim: _EstimatorBase
     _theta_mle: np.ndarray
     _theta_sd: np.ndarray
 
-    def __init__(self, model_estim: _Estimation, grouping, groups, correction_type="global"):
+    def __init__(
+            self,
+            model_estim: _EstimatorBase,
+            grouping, groups,
+            correction_type="global"
+    ):
         super().__init__(correction_type=correction_type)
         self.model_estim = model_estim
         self.grouping = grouping
@@ -2370,7 +2312,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
             self.groups = groups.tolist()
 
         # values of parameter estimates: coefficients x genes array with one coefficient per group
-        self._theta_mle = model_estim.par_link_loc
+        self._theta_mle = model_estim.a_var
         # standard deviation of estimates: coefficients x genes array with one coefficient per group
         # theta_sd = sqrt(diagonal(fisher_inv))
         self._theta_sd = np.sqrt(np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1)).T
@@ -2410,7 +2352,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         pass
 
     def _test_pairs(self, groups0, groups1):
-        num_features = self.model_estim.X.shape[1]
+        num_features = self.model_estim.x.shape[1]
 
         pvals = np.tile(np.NaN, [len(groups0), len(groups1), num_features])
 
@@ -2430,28 +2372,28 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.model_estim.features)
+        return np.asarray(self.model_estim.input_data.features)
 
     @property
-    def X(self):
-        return self.model_estim.X
+    def x(self):
+        return self.model_estim.x
 
     @property
     def log_likelihood(self):
-        return np.sum(self.model_estim.log_probs(), axis=0)
+        return self.model_estim.log_likelihood
 
     @property
     def model_gradient(self):
-        return self.model_estim.gradients
+        return self.model_estim.jacobian
 
     def _ave(self):
         """
-        Returns a xr.DataArray containing the mean expression by gene
+        Returns the mean expression by gene
 
-        :return: xr.DataArray
+        :return: np.ndarray
         """
 
-        return np.mean(self.model_estim.X, axis=0)
+        return np.mean(self.model_estim.x, axis=0)
 
     @property
     def pval(self, **kwargs):
@@ -2459,7 +2401,8 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         This function is not available in lazy results evaluation as it would
         require all pairwise tests to be performed.
         """
-        pass
+        raise ValueError("This function is not available in lazy results evaluation as it would "
+                         "require all pairwise tests to be performed.")
 
     @property
     def qval(self, **kwargs):
@@ -2467,7 +2410,8 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         This function is not available in lazy results evaluation as it would
         require all pairwise tests to be performed.
         """
-        pass
+        raise ValueError("This function is not available in lazy results evaluation as it would "
+                         "require all pairwise tests to be performed.")
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -2499,9 +2443,9 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         pass
 
     def _check_groups(self, groups0, groups1):
-        if isinstance(groups0, list)==False:
+        if not isinstance(groups0, list):
             groups0 = [groups0]
-        if isinstance(groups1, list)==False:
+        if not isinstance(groups1, list):
             groups1 = [groups1]
         for g in groups0:
             if g not in self.groups:
@@ -2587,7 +2531,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         logfc = np.zeros(shape=(len(groups0), len(groups1), num_features))
         for i, g0 in enumerate(groups0):
             for j, g1 in enumerate(groups1):
-                logfc[i, j, :] = self._theta_mle[g0, :].values - self._theta_mle[g1, :].values
+                logfc[i, j, :] = self._theta_mle[g0, :] - self._theta_mle[g1, :]
 
         if base == np.e:
             return logfc
@@ -2718,7 +2662,16 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
     Tests between between each group and the rest for more than 2 groups per gene.
     """
 
-    def __init__(self, gene_ids, pval, logfc, ave, groups, tests, correction_type: str):
+    def __init__(
+            self,
+            gene_ids,
+            pval,
+            logfc,
+            ave,
+            groups,
+            tests,
+            correction_type: str
+    ):
         super().__init__(correction_type=correction_type)
         self._gene_ids = np.asarray(gene_ids)
         self._pval = pval
@@ -2744,7 +2697,7 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
         return self._gene_ids
 
     @property
-    def X(self) -> Union[np.ndarray, None]:
+    def x(self) -> Union[np.ndarray, None]:
         return None
 
     def log_fold_change(self, base=np.e, **kwargs):
@@ -2853,7 +2806,7 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
         return self._gene_ids
 
     @property
-    def X(self) -> np.ndarray:
+    def x(self) -> np.ndarray:
         return None
 
     def log_fold_change(self, base=np.e, **kwargs):
@@ -2903,7 +2856,7 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
 
 class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
     _de_test: _DifferentialExpressionTestSingle
-    _model_estim: _Estimation
+    _model_estim: _EstimatorBase
     _size_factors: np.ndarray
     _continuous_coords: np.ndarray
     _spline_coefs: list
@@ -2911,7 +2864,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
     def __init__(
             self,
             de_test: _DifferentialExpressionTestSingle,
-            model_estim: _Estimation,
+            model_estim: _EstimatorBase,
             size_factors: np.ndarray,
             continuous_coords: np.ndarray,
             spline_coefs: list,
@@ -2929,8 +2882,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         return self._de_test.gene_ids
 
     @property
-    def X(self):
-        return self._de_test.X
+    def x(self):
+        return self._de_test.x
 
     @property
     def pval(self) -> np.ndarray:
@@ -2948,8 +2901,14 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
     def log_likelihood(self) -> np.ndarray:
         return self._de_test.log_likelihood
 
-    def summary(self, nonnumeric=False, qval_thres=None, fc_upper_thres=None,
-                fc_lower_thres=None, mean_thres=None) -> pd.DataFrame:
+    def summary(
+            self,
+            nonnumeric=False,
+            qval_thres=None,
+            fc_upper_thres=None,
+            fc_lower_thres=None,
+            mean_thres=None
+    ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
 
@@ -2987,7 +2946,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :return: Log-fold change of fitted expression value by gene.
         """
         if genes is None:
-            genes = np.asarray(range(self.X.shape[1]))
+            genes = np.asarray(range(self.x.shape[1]))
         else:
             genes = self._idx_genes(genes)
 
@@ -3016,7 +2975,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :param genes: List of genes to filter.
         :return: Filtered list of genes
         """
-        genes_found = np.array([x < self.X.shape[1] for x in genes])
+        genes_found = np.array([x < self.x.shape[1] for x in genes])
         if any(genes_found == False):
             logger.info("did not find some genes, omitting")
             genes = genes[genes_found]
@@ -3062,13 +3021,13 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         """
         idx = np.asarray(idx)
         if non_numeric:
-            mu = np.matmul(self._model_estim.design_loc.values,
+            mu = np.matmul(self._model_estim.input_data.design_loc,
                            self._model_estim.par_link_loc[:, idx])
             if self._size_factors is not None:
                 mu = mu + self._size_factors
         else:
             idx_basis = self._spline_par_loc_idx(intercept=True)
-            mu = np.matmul(self._model_estim.design_loc[:, idx_basis].values,
+            mu = np.matmul(self._model_estim.input_data.design_loc[:, idx_basis],
                            self._model_estim.par_link_loc[idx_basis, idx])
 
         mu = np.exp(mu)
@@ -3189,7 +3148,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             ax = plt.subplot(gs[i])
             axs.append(ax)
 
-            y = self.X[:, g]
+            y = self.x[:, g]
             yhat = self._continuous_model(idx=g, non_numeric=non_numeric)
             if log:
                 y = np.log(y + 1)

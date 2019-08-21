@@ -1,20 +1,17 @@
-from typing import Union, List, Dict, Callable, Tuple
-
 import anndata
+try:
+    from anndata.base import Raw
+except ImportError:
+    from anndata import Raw
 import logging
 import numpy as np
 import pandas as pd
 import patsy
 import scipy.sparse
-import xarray as xr
-
-try:
-    from anndata.base import Raw
-except ImportError:
-    from anndata import Raw
+from typing import Union, List, Dict, Callable, Tuple
 
 from batchglm import data as data_utils
-from batchglm.xarray_sparse import SparseXArrayDataSet
+from batchglm.models.base import _EstimatorBase, _InputDataBase
 from diffxpy import pkg_constants
 from diffxpy.models.batch_bfgs.optim import Estim_BFGS
 from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, \
@@ -22,11 +19,8 @@ from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, 
     DifferentialExpressionTestZTestLazy, DifferentialExpressionTestZTest, DifferentialExpressionTestPairwise, \
     DifferentialExpressionTestVsRest, _DifferentialExpressionTestMulti, DifferentialExpressionTestByPartition, \
     DifferentialExpressionTestWaldCont, DifferentialExpressionTestLRTCont
-from .utils import parse_gene_names, parse_data, parse_sample_description, parse_size_factors, parse_grouping, \
+from .utils import parse_gene_names, parse_sample_description, parse_size_factors, parse_grouping, \
     constraint_system_from_star
-
-# Use this to suppress matrix subclass PendingDepreceationWarnings from numpy:
-np.warnings.filterwarnings("ignore")
 
 
 def _fit(
@@ -46,7 +40,7 @@ def _fit(
         quick_scale: bool = None,
         close_session=True,
         dtype="float64"
-):
+) -> _EstimatorBase:
     """
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
@@ -133,6 +127,7 @@ def _fit(
     }
 
     if isinstance(training_strategy, str) and training_strategy.lower() == 'bfgs':
+        assert False, "depreceated"
         lib_size = np.zeros(data.shape[0])
         if noise_model == "nb" or noise_model == "negative_binomial":
             estim = Estim_BFGS(X=data, design_loc=design_loc, design_scale=design_scale,
@@ -143,15 +138,13 @@ def _fit(
             raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
     else:
         if noise_model == "nb" or noise_model == "negative_binomial":
-            from batchglm.api.models.glm_nb import Estimator, InputData
+            from batchglm.api.models.glm_nb import Estimator, InputDataGLM
         elif noise_model == "norm" or noise_model == "normal":
-            from batchglm.api.models.glm_norm import Estimator, InputData
+            from batchglm.api.models.glm_norm import Estimator, InputDataGLM
         else:
             raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
 
-        logging.getLogger("diffxpy").info("Fitting model...")
-        logging.getLogger("diffxpy").debug(" * Assembling input data...")
-        input_data = InputData.new(
+        input_data = InputDataGLM(
             data=data,
             design_loc=design_loc,
             design_scale=design_scale,
@@ -161,7 +154,6 @@ def _fit(
             feature_names=gene_names,
         )
 
-        logging.getLogger("diffxpy").debug(" * Set up Estimator...")
         constructor_args = {}
         if batch_size is not None:
             constructor_args["batch_size"] = batch_size
@@ -179,12 +171,9 @@ def _fit(
             dtype=dtype,
             **constructor_args
         )
-
-        logging.getLogger("diffxpy").debug(" * Initializing Estimator...")
         estim.initialize()
 
-        logging.getLogger("diffxpy").debug(" * Run estimation...")
-        # training:
+        # Training:
         if callable(training_strategy):
             # call training_strategy if it is a function
             training_strategy(estim)
@@ -192,17 +181,13 @@ def _fit(
             estim.train_sequence(training_strategy=training_strategy)
 
         if close_session:
-            logging.getLogger("diffxpy").debug(" * Finalize estimation...")
-            model = estim.finalize()
-        else:
-            model = estim
-        logging.getLogger("diffxpy").debug(" * Model fitting done.")
+            estim.finalize()
 
-    return model
+    return estim
 
 
 def lrt(
-        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
         full_formula_loc: str,
         reduced_formula_loc: str,
         full_formula_scale: str = "~1",
@@ -215,7 +200,7 @@ def lrt(
         noise_model="nb",
         size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray] = None,
         batch_size: int = None,
-        training_strategy: Union[str, List[Dict[str, object]], Callable] = "DEFAULT",
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = False,
         dtype="float64",
         **kwargs
@@ -306,11 +291,10 @@ def lrt(
         as_numeric = [as_numeric]
 
     gene_names = parse_gene_names(data, gene_names)
-    X = parse_data(data, gene_names)
     sample_description = parse_sample_description(data, sample_description)
     size_factors = parse_size_factors(
         size_factors=size_factors,
-        data=X,
+        data=data,
         sample_description=sample_description
     )
 
@@ -341,7 +325,7 @@ def lrt(
 
     reduced_model = _fit(
         noise_model=noise_model,
-        data=X,
+        data=data,
         design_loc=reduced_design_loc,
         design_scale=reduced_design_scale,
         constraints_loc=None,
@@ -358,7 +342,7 @@ def lrt(
     )
     full_model = _fit(
         noise_model=noise_model,
-        data=X,
+        data=data,
         design_loc=full_design_loc,
         design_scale=full_design_scale,
         constraints_loc=None,
@@ -387,7 +371,7 @@ def lrt(
 
 
 def wald(
-        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
         factor_loc_totest: Union[str, List[str]] = None,
         coef_to_test: Union[str, List[str]] = None,
         formula_loc: Union[None, str] = None,
@@ -397,8 +381,8 @@ def wald(
         init_b: Union[np.ndarray, str] = "AUTO",
         gene_names: Union[np.ndarray, list] = None,
         sample_description: Union[None, pd.DataFrame] = None,
-        dmat_loc: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
-        dmat_scale: Union[patsy.design_info.DesignMatrix, xr.Dataset] = None,
+        dmat_loc: Union[patsy.design_info.DesignMatrix] = None,
+        dmat_scale: Union[patsy.design_info.DesignMatrix] = None,
         constraints_loc: Union[None, List[str], Tuple[str, str], dict, np.ndarray] = None,
         constraints_scale: Union[None, List[str], Tuple[str, str], dict, np.ndarray] = None,
         noise_model: str = "nb",
@@ -566,12 +550,11 @@ def wald(
 
     # # Parse input data formats:
     gene_names = parse_gene_names(data, gene_names)
-    X = parse_data(data, gene_names)
     if dmat_loc is None and dmat_scale is None:
         sample_description = parse_sample_description(data, sample_description)
     size_factors = parse_size_factors(
         size_factors=size_factors,
-        data=X,
+        data=data,
         sample_description=sample_description
     )
 
@@ -582,7 +565,6 @@ def wald(
         formula=formula_loc,
         as_numeric=as_numeric,
         constraints=constraints_loc,
-        dims=["design_loc_params", "loc_params"],
         return_type="patsy"
     )
     logging.getLogger("diffxpy").debug("building scale model")
@@ -592,7 +574,6 @@ def wald(
         formula=formula_scale,
         as_numeric=as_numeric,
         constraints=constraints_scale,
-        dims=["design_scale_params", "scale_params"],
         return_type="patsy"
     )
 
@@ -637,7 +618,7 @@ def wald(
 
     model = _fit(
         noise_model=noise_model,
-        data=X,
+        data=data,
         design_loc=design_loc,
         design_scale=design_scale,
         constraints_loc=constraints_loc,
@@ -664,19 +645,18 @@ def wald(
 
 
 def t_test(
-        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
         grouping,
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         is_logged: bool = False,
-        is_sig_zerovar: bool = True,
-        dtype="float64"
+        is_sig_zerovar: bool = True
 ):
     """
     Perform Welch's t-test for differential expression
     between two groups on adata object for each gene.
 
-    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+    :param data: Array-like, or anndata.Anndata object containing observations.
         Input data matrix (observations x features) or (cells x genes).
     :param grouping: str, array
 
@@ -692,13 +672,10 @@ def t_test(
         the p-value is set to np.nan.
     """
     gene_names = parse_gene_names(data, gene_names)
-    X = parse_data(data, gene_names)
-    if isinstance(X, SparseXArrayDataSet):
-        X = X.X
     grouping = parse_grouping(data, sample_description, grouping)
 
     de_test = DifferentialExpressionTestTT(
-        data=X.astype(dtype),
+        data=data,
         sample_description=sample_description,
         grouping=grouping,
         gene_names=gene_names,
@@ -710,19 +687,18 @@ def t_test(
 
 
 def rank_test(
-        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
         grouping: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
         is_logged: bool = False,
-        is_sig_zerovar: bool = True,
-        dtype="float64"
+        is_sig_zerovar: bool = True
 ):
     """
     Perform Mann-Whitney rank test (Wilcoxon rank-sum test) for differential expression
     between two groups on adata object for each gene.
 
-    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+    :param data: Array-like, or anndata.Anndata object containing observations.
         Input data matrix (observations x features) or (cells x genes).
     :param grouping: str, array
 
@@ -738,13 +714,10 @@ def rank_test(
         the p-value is set to np.nan.
     """
     gene_names = parse_gene_names(data, gene_names)
-    X = parse_data(data, gene_names)
-    if isinstance(X, SparseXArrayDataSet):
-        X = X.X
     grouping = parse_grouping(data, sample_description, grouping)
 
     de_test = DifferentialExpressionTestRank(
-        data=X.astype(dtype),
+        data=data,
         sample_description=sample_description,
         grouping=grouping,
         gene_names=gene_names,
@@ -756,7 +729,7 @@ def rank_test(
 
 
 def two_sample(
-        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = "t-test",
@@ -802,7 +775,7 @@ def two_sample(
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
-    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+    :param data: Array-like, or anndata.Anndata object containing observations.
         Input data matrix (observations x features) or (cells x genes).
     :param grouping: str, array
 
@@ -851,7 +824,6 @@ def two_sample(
                          'The t-test is based on a gaussian noise model and wilcoxon is model free.')
 
     gene_names = parse_gene_names(data, gene_names)
-    X = parse_data(data, gene_names)
     grouping = parse_grouping(data, sample_description, grouping)
     sample_description = pd.DataFrame({"grouping": grouping})
 
@@ -867,7 +839,7 @@ def two_sample(
         formula_loc = '~ 1 + grouping'
         formula_scale = '~ 1 + grouping'
         de_test = wald(
-            data=X,
+            data=data,
             factor_loc_totest="grouping",
             as_numeric=as_numeric,
             coef_to_test=None,
@@ -891,7 +863,7 @@ def two_sample(
         reduced_formula_loc = '~ 1'
         reduced_formula_scale = '~ 1'
         de_test = lrt(
-            data=X,
+            data=data,
             full_formula_loc=full_formula_loc,
             reduced_formula_loc=reduced_formula_loc,
             full_formula_scale=full_formula_scale,
@@ -909,7 +881,7 @@ def two_sample(
         )
     elif test.lower() == 't-test' or test.lower() == "t_test" or test.lower() == "ttest":
         de_test = t_test(
-            data=X,
+            data=data,
             gene_names=gene_names,
             grouping=grouping,
             is_sig_zerovar=is_sig_zerovar,
@@ -917,7 +889,7 @@ def two_sample(
         )
     elif test.lower() == 'rank':
         de_test = rank_test(
-            data=X,
+            data=data,
             gene_names=gene_names,
             grouping=grouping,
             is_sig_zerovar=is_sig_zerovar,
@@ -930,7 +902,7 @@ def two_sample(
 
 
 def pairwise(
-        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'z-test',
@@ -982,7 +954,7 @@ def pairwise(
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
-    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+    :param data: Array-like, or anndata.Anndata object containing observations.
         Input data matrix (observations x features) or (cells x genes).
     :param grouping: str, array
 
@@ -1048,7 +1020,6 @@ def pairwise(
     # Do not store all models but only p-value and q-value matrix:
     # genes x groups x groups
     gene_names = parse_gene_names(data, gene_names)
-    X = parse_data(data, gene_names)
     sample_description = parse_sample_description(data, sample_description)
     grouping = parse_grouping(data, sample_description, grouping)
     sample_description = pd.DataFrame({"grouping": grouping})
@@ -1061,7 +1032,7 @@ def pairwise(
         )
         model = _fit(
             noise_model=noise_model,
-            data=X,
+            data=data,
             design_loc=dmat,
             design_scale=dmat,
             gene_names=gene_names,
@@ -1089,9 +1060,9 @@ def pairwise(
             )
     else:
         groups = np.unique(grouping)
-        pvals = np.tile(np.NaN, [len(groups), len(groups), X.shape[1]])
+        pvals = np.tile(np.NaN, [len(groups), len(groups), data.shape[1]])
         pvals[np.eye(pvals.shape[0]).astype(bool)] = 0
-        logfc = np.tile(np.NaN, [len(groups), len(groups), X.shape[1]])
+        logfc = np.tile(np.NaN, [len(groups), len(groups), data.shape[1]])
         logfc[np.eye(logfc.shape[0]).astype(bool)] = 0
 
         if keep_full_test_objs:
@@ -1105,7 +1076,7 @@ def pairwise(
 
                 sel = (grouping == g1) | (grouping == g2)
                 de_test_temp = two_sample(
-                    data=X[sel],
+                    data=data[sel],
                     grouping=grouping[sel],
                     as_numeric=as_numeric,
                     test=test,
@@ -1132,7 +1103,7 @@ def pairwise(
             gene_ids=gene_names,
             pval=pvals,
             logfc=logfc,
-            ave=np.mean(X, axis=0),
+            ave=np.mean(data, axis=0),
             groups=groups,
             tests=tests,
             correction_type=pval_correction
@@ -1142,7 +1113,7 @@ def pairwise(
 
 
 def versus_rest(
-        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
@@ -1194,7 +1165,7 @@ def versus_rest(
         Doesn't require fitting of generalized linear models.
         Wilcoxon rank sum (Mann-Whitney U) test between both observation groups.
 
-    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+    :param data: Array-like or anndata.Anndata object containing observations.
         Input data matrix (observations x features) or (cells x genes).
     :param grouping: str, array
 
@@ -1254,14 +1225,13 @@ def versus_rest(
     # Do not store all models but only p-value and q-value matrix:
     # genes x groups
     gene_names = parse_gene_names(data, gene_names)
-    X = parse_data(data, gene_names)
     sample_description = parse_sample_description(data, sample_description)
     grouping = parse_grouping(data, sample_description, grouping)
     sample_description = pd.DataFrame({"grouping": grouping})
 
     groups = np.unique(grouping)
-    pvals = np.zeros([1, len(groups), X.shape[1]])
-    logfc = np.zeros([1, len(groups), X.shape[1]])
+    pvals = np.zeros([1, len(groups), data.shape[1]])
+    logfc = np.zeros([1, len(groups), data.shape[1]])
 
     if keep_full_test_objs:
         tests = np.tile([None], [1, len(groups)])
@@ -1271,7 +1241,7 @@ def versus_rest(
     for i, g1 in enumerate(groups):
         test_grouping = np.where(grouping == g1, "group", "rest")
         de_test_temp = two_sample(
-            data=X,
+            data=data,
             grouping=test_grouping,
             as_numeric=as_numeric,
             test=test,
@@ -1295,7 +1265,7 @@ def versus_rest(
         gene_ids=gene_names,
         pval=pvals,
         logfc=logfc,
-        ave=np.mean(X, axis=0),
+        ave=np.mean(data, axis=0),
         groups=groups,
         tests=tests,
         correction_type=pval_correction
@@ -1305,7 +1275,7 @@ def versus_rest(
 
 
 def partition(
-        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
         parts: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None
@@ -1320,7 +1290,7 @@ def partition(
 
     Wraps _Partition so that doc strings are nice.
 
-    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+    :param data: Array-like or anndata.Anndata object containing observations.
         Input data matrix (observations x features) or (cells x genes).
     :param parts: str, array
 
@@ -1348,13 +1318,13 @@ class _Partition:
 
     def __init__(
             self,
-            data: Union[anndata.AnnData, xr.DataArray, xr.Dataset, np.ndarray],
+            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
             parts: Union[str, np.ndarray, list],
             gene_names: Union[np.ndarray, list] = None,
             sample_description: pd.DataFrame = None
     ):
         """
-        :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+        :param data: Array-like or anndata.Anndata object containing observations.
             Input data matrix (observations x features) or (cells x genes).
         :param parts: str, array
 
@@ -1363,7 +1333,14 @@ class _Partition:
         :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
         :param sample_description: optional pandas.DataFrame containing sample annotations
         """
-        self.X = parse_data(data, gene_names)
+        if isinstance(data, _InputDataBase):
+            self.x = data.x
+        elif isinstance(data, anndata.AnnData) or isinstance(data, Raw):
+            self.x = data.X
+        elif isinstance(data, np.ndarray):
+            self.x = data
+        else:
+            raise ValueError("data type %s not recognized" % type(data))
         self.gene_names = parse_gene_names(data, gene_names)
         self.sample_description = parse_sample_description(data, sample_description)
         self.partition = parse_grouping(data, sample_description, parts)
@@ -1423,7 +1400,7 @@ class _Partition:
         DETestsSingle = []
         for i, idx in enumerate(self.partition_idx):
             DETestsSingle.append(two_sample(
-                data=self.X[idx, :],
+                data=self.x[idx, :],
                 grouping=grouping,
                 as_numeric=as_numeric,
                 test=test,
@@ -1468,7 +1445,7 @@ class _Partition:
         DETestsSingle = []
         for i, idx in enumerate(self.partition_idx):
             DETestsSingle.append(t_test(
-                data=self.X[idx, :],
+                data=self.x[idx, :],
                 grouping=grouping,
                 is_logged=is_logged,
                 gene_names=self.gene_names,
@@ -1479,7 +1456,7 @@ class _Partition:
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,
             tests=DETestsSingle,
-            ave=np.mean(self.X, axis=0),
+            ave=np.mean(self.x, axis=0),
             correction_type="by_test")
 
     def rank_test(
@@ -1505,7 +1482,7 @@ class _Partition:
         DETestsSingle = []
         for i, idx in enumerate(self.partition_idx):
             DETestsSingle.append(rank_test(
-                data=self.X[idx, :],
+                data=self.x[idx, :],
                 grouping=grouping,
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
@@ -1515,7 +1492,7 @@ class _Partition:
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,
             tests=DETestsSingle,
-            ave=np.mean(self.X, axis=0),
+            ave=np.mean(self.x, axis=0),
             correction_type="by_test")
 
     def lrt(
@@ -1594,7 +1571,7 @@ class _Partition:
         DETestsSingle = []
         for i, idx in enumerate(self.partition_idx):
             DETestsSingle.append(lrt(
-                data=self.X[idx, :],
+                data=self.x[idx, :],
                 reduced_formula_loc=reduced_formula_loc,
                 full_formula_loc=full_formula_loc,
                 reduced_formula_scale=reduced_formula_scale,
@@ -1613,7 +1590,7 @@ class _Partition:
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,
             tests=DETestsSingle,
-            ave=np.mean(self.X, axis=0),
+            ave=np.mean(self.x, axis=0),
             correction_type="by_test")
 
     def wald(
@@ -1694,7 +1671,7 @@ class _Partition:
         DETestsSingle = []
         for i, idx in enumerate(self.partition_idx):
             DETestsSingle.append(wald(
-                data=self.X[idx, :],
+                data=self.x[idx, :],
                 factor_loc_totest=factor_loc_totest,
                 coef_to_test=coef_to_test,
                 formula_loc=formula_loc,
@@ -1713,12 +1690,12 @@ class _Partition:
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,
             tests=DETestsSingle,
-            ave=np.mean(self.X, axis=0),
+            ave=np.mean(self.x, axis=0),
             correction_type="by_test")
 
 
 def continuous_1d(
-        data: Union[anndata.AnnData, Raw, xr.DataArray, xr.Dataset, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix],
         continuous: str,
         df: int = 5,
         factor_loc_totest: Union[str, List[str]] = None,
@@ -1759,7 +1736,7 @@ def continuous_1d(
     design matrices are built within this function and the shape of constraint
     matrices depends on the output of this function.
 
-    :param data: Array-like, xr.DataArray, xr.Dataset or anndata.Anndata object containing observations.
+    :param data: Array-like or anndata.Anndata object containing observations.
         Input data matrix (observations x features) or (cells x genes).
     :param continuous: str
 
@@ -1906,7 +1883,6 @@ def continuous_1d(
     if isinstance(as_numeric, tuple):
         as_numeric = list(as_numeric)
 
-    X = parse_data(data, gene_names)
     gene_names = parse_gene_names(data, gene_names)
     sample_description = parse_sample_description(data, sample_description)
 
@@ -1967,7 +1943,7 @@ def continuous_1d(
         logging.getLogger("diffxpy").debug("formula_scale_new: " + formula_scale_new)
 
         de_test = wald(
-            data=X,
+            data=data,
             factor_loc_totest=factor_loc_totest_new,
             coef_to_test=None,
             formula_loc=formula_loc_new,
@@ -2020,7 +1996,7 @@ def continuous_1d(
         logging.getLogger("diffxpy").debug("reduced_formula_scale: " + reduced_formula_scale)
 
         de_test = lrt(
-            data=X,
+            data=data,
             full_formula_loc=full_formula_loc,
             reduced_formula_loc=reduced_formula_loc,
             full_formula_scale=full_formula_scale,

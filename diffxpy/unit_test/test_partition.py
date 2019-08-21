@@ -29,13 +29,13 @@ class TestPartitionNull(unittest.TestCase):
         sim.generate()
 
         sample_description = pd.DataFrame({
-            "covar1": np.random.randint(2, size=sim.num_observations),
-            "covar2": np.random.randint(2, size=sim.num_observations)
+            "covar1": np.random.randint(2, size=sim.nobs),
+            "covar2": np.random.randint(2, size=sim.nobs)
         })
         sample_description["cond"] = sim.sample_description["condition"].values
 
         partition = de.test.partition(
-            data=sim.X,
+            data=sim.x,
             parts="cond",
             sample_description=sample_description
         )
@@ -45,7 +45,7 @@ class TestPartitionNull(unittest.TestCase):
             training_strategy="DEFAULT",
             dtype="float64"
         )
-        summary = det.summary()
+        _ = det.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(det.pval.flatten(), 'uniform').pvalue
@@ -74,13 +74,13 @@ class TestPartitionNull(unittest.TestCase):
         sim.generate()
 
         sample_description = pd.DataFrame({
-            "covar1": np.random.randint(4, size=sim.num_observations),
-            "covar2": np.random.randint(2, size=sim.num_observations)
+            "covar1": np.random.randint(4, size=sim.nobs),
+            "covar2": np.random.randint(2, size=sim.nobs)
         })
         sample_description["cond"] = sim.sample_description["condition"].values
 
         partition = de.test.partition(
-            data=sim.X,
+            data=sim.x,
             parts="cond",
             sample_description=sample_description
         )
@@ -90,7 +90,7 @@ class TestPartitionNull(unittest.TestCase):
             training_strategy="DEFAULT",
             dtype="float64"
         )
-        summary = det.summary()
+        _ = det.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(det.pval.flatten(), 'uniform').pvalue
@@ -119,13 +119,13 @@ class TestPartitionNull(unittest.TestCase):
         sim.generate()
 
         sample_description = pd.DataFrame({
-            "covar1": np.random.randint(2, size=sim.num_observations),
-            "covar2": np.random.randint(2, size=sim.num_observations)
+            "covar1": np.random.randint(2, size=sim.nobs),
+            "covar2": np.random.randint(2, size=sim.nobs)
         })
         sample_description["cond"] = sim.sample_description["condition"].values
 
         partition = de.test.partition(
-            data=sim.X,
+            data=sim.x,
             parts="cond",
             sample_description=sample_description
         )
@@ -137,7 +137,7 @@ class TestPartitionNull(unittest.TestCase):
             training_strategy="DEFAULT",
             dtype="float64"
         )
-        summary = det.summary()
+        _ = det.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(det.pval.flatten(), 'uniform').pvalue
@@ -166,12 +166,12 @@ class TestPartitionNull(unittest.TestCase):
         sim.generate()
 
         sample_description = pd.DataFrame({
-            "covar1": np.random.randint(2, size=sim.num_observations)
+            "covar1": np.random.randint(2, size=sim.nobs)
         })
         sample_description["cond"] = sim.sample_description["condition"].values
 
         partition = de.test.partition(
-            data=sim.X,
+            data=sim.x,
             parts="cond",
             sample_description=sample_description
         )
@@ -209,12 +209,12 @@ class TestPartitionNull(unittest.TestCase):
         sim.generate()
 
         sample_description = pd.DataFrame({
-            "covar1": np.random.randint(2, size=sim.num_observations)
+            "covar1": np.random.randint(2, size=sim.nobs)
         })
         sample_description["cond"] = sim.sample_description["condition"].values
 
         partition = de.test.partition(
-            data=sim.X,
+            data=sim.x,
             parts="cond",
             sample_description=sample_description
         )
