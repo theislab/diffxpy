@@ -305,6 +305,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
             plt.show()
 
         plt.close(fig)
+        plt.ion()
 
         if return_axs:
             return ax
@@ -853,12 +854,19 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     def plot_vs_ttest(
             self,
             log10=False,
+            show: bool = True,
+            save: Union[str, None] = None,
+            suffix: str = "_plot_vs_ttest.png",
             return_axs: bool = False
     ):
         """
         Normalizes data by size factors if any were used in model.
 
         :param log10:
+        :param show: Whether (if save is not None) and where (save indicates dir and file stem) to display plot.
+        :param save: Path+file name stem to save plots to.
+            File will be save+suffix. Does not save if save is None.
+        :param suffix: Suffix for file name to save plot to. Also use this to set the file type.
         :param return_axs: Whether to return axis objects.
 
         :return:
@@ -867,12 +875,17 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         import seaborn as sns
         from .tests import t_test
 
+        plt.ioff()
+
         grouping = np.asarray(self.model_estim.input_data.design_loc[:, self.coef_loc_totest])
         # Normalize by size factors that were used in regression.
-        sf = np.broadcast_to(np.expand_dims(self.model_estim.input_data.size_factors, axis=1),
-                             shape=self.model_estim.x.shape)
+        if self.model_estim.input_data.size_factors is not None:
+            sf = np.broadcast_to(np.expand_dims(self.model_estim.input_data.size_factors, axis=1),
+                                 shape=self.model_estim.x.shape)
+        else:
+            sf = np.ones(shape=(self.model_estim.x.shape[0], 1))
         ttest = t_test(
-            data=self.model_estim.X.multiply(1 / sf, copy=True),
+            data=self.model_estim.x / sf,
             grouping=grouping,
             gene_names=self.gene_ids,
         )
@@ -888,6 +901,16 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         sns.scatterplot(x=ttest_pvals, y=pvals, ax=ax)
 
         ax.set(xlabel="t-test", ylabel='wald test')
+
+        # Save, show and return figure.
+        if save is not None:
+            plt.savefig(save + suffix)
+
+        if show:
+            plt.show()
+
+        plt.close(fig)
+        plt.ion()
 
         if return_axs:
             return ax
@@ -929,6 +952,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         from matplotlib import gridspec
         from matplotlib import rcParams
         from batchglm.api.models.glm_norm import Estimator, InputDataGLM
+
+        plt.ioff()
 
         # Run OLS model fit to have comparison coefficients.
         if self._store_ols is None:
@@ -1066,6 +1091,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         from matplotlib import gridspec
         from matplotlib import rcParams
         from batchglm.api.models.glm_norm import Estimator, InputDataGLM
+
+        plt.ioff()
 
         # Run OLS model fit to have comparison coefficients.
         if self._store_ols is None:
