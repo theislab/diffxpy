@@ -1325,7 +1325,7 @@ class _Partition:
 
     def __init__(
             self,
-            data: Union[anndata.AnnData, np.ndarray],
+            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
             parts: Union[str, np.ndarray, list],
             gene_names: Union[np.ndarray, list] = None,
             sample_description: pd.DataFrame = None
@@ -1340,7 +1340,14 @@ class _Partition:
         :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
         :param sample_description: optional pandas.DataFrame containing sample annotations
         """
-        self.x = data
+        if isinstance(data, _InputDataBase):
+            self.x = data.x
+        elif isinstance(data, anndata.AnnData) or isinstance(data, Raw):
+            self.x = data.X
+        elif isinstance(data, np.ndarray):
+            self.x = data
+        else:
+            raise ValueError("data type %s not recognized" % type(data))
         self.gene_names = parse_gene_names(data, gene_names)
         self.sample_description = parse_sample_description(data, sample_description)
         self.partition = parse_grouping(data, sample_description, parts)

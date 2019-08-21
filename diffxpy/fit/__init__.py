@@ -1,1 +1,1 @@
-from .fit import model, residuals
+from .fit import model, residuals, partition

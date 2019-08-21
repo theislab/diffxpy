@@ -1,1 +1,1 @@
-from diffxpy.fit import model, residuals
+from diffxpy.fit import model, residuals, partition
