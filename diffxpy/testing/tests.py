@@ -3,6 +3,7 @@ try:
     from anndata.base import Raw
 except ImportError:
     from anndata import Raw
+import batchglm.api as glm
 import logging
 import numpy as np
 import pandas as pd
@@ -10,8 +11,6 @@ import patsy
 import scipy.sparse
 from typing import Union, List, Dict, Callable, Tuple
 
-from batchglm import data as data_utils
-from batchglm.models.base import _EstimatorBase, _InputDataBase
 from diffxpy import pkg_constants
 from diffxpy.models.batch_bfgs.optim import Estim_BFGS
 from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, \
@@ -40,7 +39,7 @@ def _fit(
         quick_scale: bool = None,
         close_session=True,
         dtype="float64"
-) -> _EstimatorBase:
+) -> glm.typing.InputDataBaseTyping:
     """
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
@@ -187,7 +186,7 @@ def _fit(
 
 
 def lrt(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
         full_formula_loc: str,
         reduced_formula_loc: str,
         full_formula_scale: str = "~1",
@@ -298,25 +297,25 @@ def lrt(
         sample_description=sample_description
     )
 
-    full_design_loc = data_utils.design_matrix(
+    full_design_loc = glm.data.design_matrix(
         sample_description=sample_description,
         formula=full_formula_loc,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
         return_type="patsy"
     )
-    reduced_design_loc = data_utils.design_matrix(
+    reduced_design_loc = glm.data.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_loc,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
         return_type="patsy"
     )
-    full_design_scale = data_utils.design_matrix(
+    full_design_scale = glm.data.design_matrix(
         sample_description=sample_description,
         formula=full_formula_scale,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
         return_type="patsy"
     )
-    reduced_design_scale = data_utils.design_matrix(
+    reduced_design_scale = glm.data.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_scale,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
@@ -371,7 +370,7 @@ def lrt(
 
 
 def wald(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
         factor_loc_totest: Union[str, List[str]] = None,
         coef_to_test: Union[str, List[str]] = None,
         formula_loc: Union[None, str] = None,
@@ -597,7 +596,7 @@ def wald(
     elif coef_to_test is not None:
         # Directly select coefficients to test from design matrix (xarray):
         # Check that coefficients to test are not dependent parameters if constraints are given:
-        coef_loc_names = data_utils.view_coef_names(design_loc).tolist()
+        coef_loc_names = glm.data.view_coef_names(design_loc).tolist()
         if not np.all([x in coef_loc_names for x in coef_to_test]):
             raise ValueError(
                 "the requested test coefficients %s were found in model coefficients %s" %
@@ -645,7 +644,7 @@ def wald(
 
 
 def t_test(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
         grouping,
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
@@ -687,7 +686,7 @@ def t_test(
 
 
 def rank_test(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
         grouping: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
@@ -729,7 +728,7 @@ def rank_test(
 
 
 def two_sample(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = "t-test",
@@ -902,7 +901,7 @@ def two_sample(
 
 
 def pairwise(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'z-test',
@@ -1026,7 +1025,7 @@ def pairwise(
 
     if test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest':
         # -1 in formula removes intercept
-        dmat = data_utils.design_matrix(
+        dmat = glm.data.design_matrix(
             sample_description,
             formula="~ 1 - 1 + grouping"
         )
@@ -1113,7 +1112,7 @@ def pairwise(
 
 
 def versus_rest(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
@@ -1275,7 +1274,7 @@ def versus_rest(
 
 
 def partition(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
         parts: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None
@@ -1318,7 +1317,7 @@ class _Partition:
 
     def __init__(
             self,
-            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
+            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
             parts: Union[str, np.ndarray, list],
             gene_names: Union[np.ndarray, list] = None,
             sample_description: pd.DataFrame = None
@@ -1333,7 +1332,7 @@ class _Partition:
         :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
         :param sample_description: optional pandas.DataFrame containing sample annotations
         """
-        if isinstance(data, _InputDataBase):
+        if isinstance(data, glm.typing.InputDataBaseTyping):
             self.x = data.x
         elif isinstance(data, anndata.AnnData) or isinstance(data, Raw):
             self.x = data.X

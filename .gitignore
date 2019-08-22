@@ -14,6 +14,6 @@ resources/*
 */*.ipynb_checkpoints/
 **/.DS_Store
 docs/_templates/
-
+dist/
 !**/.gitignore
 

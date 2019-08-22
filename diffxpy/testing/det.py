@@ -1,22 +1,18 @@
 import abc
-import logging
-from typing import Union, Dict, Tuple, List, Set
-import pandas as pd
-from random import sample
-import scipy.sparse
-
-import numpy as np
-import patsy
-
-from .utils import split_x, dmat_unique
-
 try:
     import anndata
 except ImportError:
     anndata = None
+import batchglm.api as glm
+import logging
+import numpy as np
+import patsy
+import pandas as pd
+from random import sample
+import scipy.sparse
+from typing import Union, Dict, Tuple, List, Set
 
-from batchglm.models.base import _EstimatorBase, _InputDataBase
-
+from .utils import split_x, dmat_unique
 from ..stats import stats
 from . import correction
 from diffxpy import pkg_constants
@@ -468,17 +464,17 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
     sample_description: pd.DataFrame
     full_design_loc_info: patsy.design_info
-    full_estim: _EstimatorBase
+    full_estim: glm.typing.EstimatorBaseTyping
     reduced_design_loc_info: patsy.design_info
-    reduced_estim: _EstimatorBase
+    reduced_estim: glm.typing.EstimatorBaseTyping
 
     def __init__(
             self,
             sample_description: pd.DataFrame,
             full_design_loc_info: patsy.design_info,
-            full_estim: _EstimatorBase,
+            full_estim: glm.typing.EstimatorBaseTyping,
             reduced_design_loc_info: patsy.design_info,
-            reduced_estim: _EstimatorBase
+            reduced_estim: glm.typing.EstimatorBaseTyping
     ):
         super().__init__()
         self.sample_description = sample_description
@@ -689,7 +685,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     Single wald test per gene.
     """
 
-    model_estim: _EstimatorBase
+    model_estim: glm.typing.EstimatorBaseTyping
     sample_description: pd.DataFrame
     coef_loc_totest: np.ndarray
     theta_mle: np.ndarray
@@ -699,7 +695,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
     def __init__(
             self,
-            model_estim: _EstimatorBase,
+            model_estim: glm.typing.EstimatorBaseTyping,
             col_indices: np.ndarray,
             noise_model: str,
             sample_description: pd.DataFrame
@@ -1548,7 +1544,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         super().__init__()
         if isinstance(data, anndata.AnnData) or isinstance(data, anndata.Raw):
             data = data.X
-        elif isinstance(data, _InputDataBase):
+        elif isinstance(data, glm.typing.InputDataBaseTyping):
             data = data.x
         self._x = data
         self.sample_description = sample_description
@@ -1673,7 +1669,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
         super().__init__()
         if isinstance(data, anndata.AnnData) or isinstance(data, anndata.Raw):
             data = data.X
-        elif isinstance(data, _InputDataBase):
+        elif isinstance(data, glm.typing.InputDataBaseTyping):
             data = data.x
         self._x = data
         self.sample_description = sample_description
@@ -2090,13 +2086,13 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
     Pairwise unit_test between more than 2 groups per gene.
     """
 
-    model_estim: _EstimatorBase
+    model_estim: glm.typing.EstimatorBaseTyping
     theta_mle: np.ndarray
     theta_sd: np.ndarray
 
     def __init__(
             self,
-            model_estim: _EstimatorBase,
+            model_estim: glm.typing.EstimatorBaseTyping,
             grouping,
             groups,
             correction_type: str
@@ -2293,13 +2289,13 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
     memory.
     """
 
-    model_estim: _EstimatorBase
+    model_estim: glm.typing.EstimatorBaseTyping
     _theta_mle: np.ndarray
     _theta_sd: np.ndarray
 
     def __init__(
             self,
-            model_estim: _EstimatorBase,
+            model_estim: glm.typing.EstimatorBaseTyping,
             grouping, groups,
             correction_type="global"
     ):
@@ -2856,7 +2852,7 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
 
 class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
     _de_test: _DifferentialExpressionTestSingle
-    _model_estim: _EstimatorBase
+    _model_estim: glm.typing.EstimatorBaseTyping
     _size_factors: np.ndarray
     _continuous_coords: np.ndarray
     _spline_coefs: list
@@ -2864,7 +2860,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
     def __init__(
             self,
             de_test: _DifferentialExpressionTestSingle,
-            model_estim: _EstimatorBase,
+            model_estim: glm.typing.EstimatorBaseTyping,
             size_factors: np.ndarray,
             continuous_coords: np.ndarray,
             spline_coefs: list,
