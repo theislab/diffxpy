@@ -1,17 +1,16 @@
 import anndata
+try:
+    from anndata.base import Raw
+except ImportError:
+    from anndata import Raw
+import batchglm.api as glm
 import numpy as np
 import pandas as pd
 import patsy
 import scipy.sparse
 from typing import List, Tuple, Union
 
-try:
-    from anndata.base import Raw
-except ImportError:
-    from anndata import Raw
 
-from batchglm import data as data_utils
-from batchglm.models.base import _InputDataBase
 # Relay util functions for diffxpy api.
 # design_matrix, preview_coef_names and constraint_system_from_star are redefined here.
 from batchglm.data import constraint_matrix_from_string, constraint_matrix_from_dict
@@ -19,13 +18,13 @@ from batchglm.data import view_coef_names
 
 
 def parse_gene_names(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
         gene_names: Union[list, np.ndarray, None]
 ):
     if gene_names is None:
         if anndata is not None and (isinstance(data, anndata.AnnData) or isinstance(data, Raw)):
             gene_names = data.var_names
-        elif isinstance(data, _InputDataBase):
+        elif isinstance(data, glm.typing.InputDataBaseTyping):
             gene_names = data.features
         else:
             raise ValueError("Missing gene names")
@@ -34,7 +33,7 @@ def parse_gene_names(
 
 
 def parse_sample_description(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
         sample_description: Union[pd.DataFrame, None]
 ) -> pd.DataFrame:
     """
@@ -58,7 +57,7 @@ def parse_sample_description(
         assert data.X.shape[0] == sample_description.shape[0], \
             "data matrix and sample description must contain same number of cells: %i, %i" % \
             (data.X.shape[0], sample_description.shape[0])
-    elif isinstance(data, _InputDataBase):
+    elif isinstance(data, glm.typing.InputDataBaseTyping):
         assert data.x.shape[0] == sample_description.shape[0], \
             "data matrix and sample description must contain same number of cells: %i, %i" % \
             (data.x.shape[0], sample_description.shape[0])
@@ -71,7 +70,7 @@ def parse_sample_description(
 
 def parse_size_factors(
         size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray],
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, _InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
         sample_description: pd.DataFrame
 ) -> Union[np.ndarray, None]:
     """
@@ -162,7 +161,7 @@ def design_matrix(
     else:
         as_categorical = True
 
-    return data_utils.design_matrix(
+    return glm.data.design_matrix(
         sample_description=sample_description,
         formula=formula,
         as_categorical=as_categorical,
@@ -199,7 +198,7 @@ def preview_coef_names(
     if isinstance(as_numeric, tuple):
         as_numeric = list(as_numeric)
 
-    return data_utils.preview_coef_names(
+    return glm.data.preview_coef_names(
         sample_description=sample_description,
         formula=formula,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
@@ -257,7 +256,7 @@ def constraint_system_from_star(
     else:
         as_categorical = True
 
-    return data_utils.constraint_system_from_star(
+    return glm.data.constraint_system_from_star(
         dmat=dmat,
         sample_description=sample_description,
         formula=formula,
