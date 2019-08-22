@@ -11,10 +11,11 @@ Welcome to diffxpy's documentation!
    :caption: Contents:
 
    installation
-   tutorials
    api/index
+   tutorials
    parallelization
    training
+   models
    references
 
 

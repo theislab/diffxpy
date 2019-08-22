@@ -164,6 +164,10 @@ def model(
 
         Should be "float32" for single precision or "float64" for double precision.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
+    :return:
+        An estimator instance that contains all estimation relevant attributes and the model in estim.model.
+        The attributes of the model depend on the noise model and the covariates used.
+        We provide documentation for the model class in the model section of the documentation.
     """
     if len(kwargs) != 0:
         logging.getLogger("diffxpy").debug("additional kwargs: %s", str(kwargs))
