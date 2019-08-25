@@ -21,12 +21,12 @@ class Estim_BFGS_Model():
         self._observations = Estim_BFGS.x.shape[0]
         self._design_loc = Estim_BFGS.design_loc
         self._design_scale = Estim_BFGS.design_scale
-        self._loss = xr.DataArray(Estim_BFGS.full_loss(nproc))
+        self._loss = Estim_BFGS.full_loss(nproc)
         self._log_probs = -self._loss
         self._probs = np.exp(self._log_probs)
-        self._mles = xr.DataArray(np.transpose(Estim_BFGS.mles()))
-        self._gradient = xr.DataArray(np.zeros([Estim_BFGS.x.shape[1]]))
-        self._fisher_inv = xr.DataArray(Estim_BFGS.fisher_inv)
+        self._mles = np.transpose(Estim_BFGS.mles())
+        self._gradient = np.zeros([Estim_BFGS.x.shape[1]])
+        self._fisher_inv = Estim_BFGS.fisher_inv
         self._idx_loc = np.arange(0, Estim_BFGS.design_loc.shape[1])
         self._idx_scale = np.arange(Estim_BFGS.design_loc.shape[1],
                                     Estim_BFGS.design_loc.shape[1] + Estim_BFGS.design_scale.shape[1])
