@@ -581,10 +581,8 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
             - "dataframe":
               return a pandas.DataFrame with columns `gene`, `minuend_<group>`, `subtrahend_<group>` and `logFC`.
-            - "xarray":
-              return a xarray.DataArray with dimensions `(minuend, subtrahend, gene)`
 
-        :return: either pandas.DataFrame or xarray.DataArray
+        :return:
         """
         factors = set(self.full_design_loc_info.term_names) - set(self.reduced_design_loc_info.term_names)
 

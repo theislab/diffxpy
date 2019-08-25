@@ -594,7 +594,7 @@ def wald(
                 # there is no such column; modify design matrix to create one
                 design_loc[:, col_indices] = np.where(samples, 1, 0)
     elif coef_to_test is not None:
-        # Directly select coefficients to test from design matrix (xarray):
+        # Directly select coefficients to test from design matrix:
         # Check that coefficients to test are not dependent parameters if constraints are given:
         coef_loc_names = glm.data.view_coef_names(design_loc).tolist()
         if not np.all([x in coef_loc_names for x in coef_to_test]):

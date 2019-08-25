@@ -123,7 +123,7 @@ def design_matrix(
         formula: Union[None, str] = None,
         as_numeric: Union[List[str], Tuple[str], str] = (),
         dmat: Union[pd.DataFrame, None] = None,
-        return_type: str = "xarray"
+        return_type: str = "patsy"
 ) -> Union[patsy.design_info.DesignMatrix, pd.DataFrame]:
     """ Create a design matrix from some sample description.
 

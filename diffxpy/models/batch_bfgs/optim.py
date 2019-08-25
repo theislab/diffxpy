@@ -6,7 +6,6 @@ import numpy as np
 from numpy.linalg import pinv
 import numpy.random
 from multiprocessing import Pool
-import xarray as xr
 
 from .objectives import *
 
