@@ -18,13 +18,13 @@ from batchglm.data import view_coef_names
 
 
 def parse_gene_names(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         gene_names: Union[list, np.ndarray, None]
 ):
     if gene_names is None:
         if anndata is not None and (isinstance(data, anndata.AnnData) or isinstance(data, Raw)):
             gene_names = data.var_names
-        elif isinstance(data, glm.typing.InputDataBaseTyping):
+        elif isinstance(data, glm.typing.InputDataBase):
             gene_names = data.features
         else:
             raise ValueError("Missing gene names")
@@ -33,7 +33,7 @@ def parse_gene_names(
 
 
 def parse_sample_description(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         sample_description: Union[pd.DataFrame, None]
 ) -> pd.DataFrame:
     """
@@ -57,7 +57,7 @@ def parse_sample_description(
         assert data.X.shape[0] == sample_description.shape[0], \
             "data matrix and sample description must contain same number of cells: %i, %i" % \
             (data.X.shape[0], sample_description.shape[0])
-    elif isinstance(data, glm.typing.InputDataBaseTyping):
+    elif isinstance(data, glm.typing.InputDataBase):
         assert data.x.shape[0] == sample_description.shape[0], \
             "data matrix and sample description must contain same number of cells: %i, %i" % \
             (data.x.shape[0], sample_description.shape[0])
@@ -70,7 +70,7 @@ def parse_sample_description(
 
 def parse_size_factors(
         size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray],
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         sample_description: pd.DataFrame
 ) -> Union[np.ndarray, None]:
     """

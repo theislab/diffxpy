@@ -39,7 +39,7 @@ def _fit(
         quick_scale: bool = None,
         close_session=True,
         dtype="float64"
-) -> glm.typing.InputDataBaseTyping:
+) -> glm.typing.InputDataBase:
     """
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
@@ -186,7 +186,7 @@ def _fit(
 
 
 def lrt(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         full_formula_loc: str,
         reduced_formula_loc: str,
         full_formula_scale: str = "~1",
@@ -370,7 +370,7 @@ def lrt(
 
 
 def wald(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         factor_loc_totest: Union[str, List[str]] = None,
         coef_to_test: Union[str, List[str]] = None,
         formula_loc: Union[None, str] = None,
@@ -547,7 +547,7 @@ def wald(
     if isinstance(as_numeric, str):
         as_numeric = [as_numeric]
 
-    # # Parse input data formats:
+    # Parse input data formats:
     gene_names = parse_gene_names(data, gene_names)
     if dmat_loc is None and dmat_scale is None:
         sample_description = parse_sample_description(data, sample_description)
@@ -644,7 +644,7 @@ def wald(
 
 
 def t_test(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         grouping,
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
@@ -686,7 +686,7 @@ def t_test(
 
 
 def rank_test(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         grouping: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
@@ -728,7 +728,7 @@ def rank_test(
 
 
 def two_sample(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = "t-test",
@@ -883,16 +883,14 @@ def two_sample(
             data=data,
             gene_names=gene_names,
             grouping=grouping,
-            is_sig_zerovar=is_sig_zerovar,
-            dtype=dtype
+            is_sig_zerovar=is_sig_zerovar
         )
     elif test.lower() == 'rank':
         de_test = rank_test(
             data=data,
             gene_names=gene_names,
             grouping=grouping,
-            is_sig_zerovar=is_sig_zerovar,
-            dtype=dtype
+            is_sig_zerovar=is_sig_zerovar
         )
     else:
         raise ValueError('two_sample(): Parameter `test="%s"` not recognized.' % test)
@@ -901,7 +899,7 @@ def two_sample(
 
 
 def pairwise(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'z-test',
@@ -1036,6 +1034,8 @@ def pairwise(
             design_scale=dmat,
             gene_names=gene_names,
             size_factors=size_factors,
+            init_a="closed_form",
+            init_b="closed_form",
             batch_size=batch_size,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
@@ -1058,6 +1058,10 @@ def pairwise(
                 correction_type=pval_correction
             )
     else:
+        if isinstance(data, anndata.AnnData) or isinstance(data, anndata.Raw):
+            data = data.X
+        elif isinstance(data, glm.typing.InputDataBase):
+            data = data.x
         groups = np.unique(grouping)
         pvals = np.tile(np.NaN, [len(groups), len(groups), data.shape[1]])
         pvals[np.eye(pvals.shape[0]).astype(bool)] = 0
@@ -1073,16 +1077,19 @@ def pairwise(
             for j, g2 in enumerate(groups[(i + 1):]):
                 j = j + i + 1
 
-                sel = (grouping == g1) | (grouping == g2)
+                idx = np.where(np.logical_or(
+                    grouping == g1,
+                    grouping == g2
+                ))[0]
                 de_test_temp = two_sample(
-                    data=data[sel],
-                    grouping=grouping[sel],
+                    data=data[idx],
+                    grouping=grouping[idx],
                     as_numeric=as_numeric,
                     test=test,
                     gene_names=gene_names,
-                    sample_description=sample_description.iloc[sel],
+                    sample_description=sample_description.iloc[idx, :],
                     noise_model=noise_model,
-                    size_factors=size_factors[sel] if size_factors is not None else None,
+                    size_factors=size_factors[idx] if size_factors is not None else None,
                     batch_size=batch_size,
                     training_strategy=training_strategy,
                     quick_scale=quick_scale,
@@ -1112,7 +1119,7 @@ def pairwise(
 
 
 def versus_rest(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
@@ -1274,7 +1281,7 @@ def versus_rest(
 
 
 def partition(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         parts: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None
@@ -1317,7 +1324,7 @@ class _Partition:
 
     def __init__(
             self,
-            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBaseTyping],
+            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
             parts: Union[str, np.ndarray, list],
             gene_names: Union[np.ndarray, list] = None,
             sample_description: pd.DataFrame = None
@@ -1332,7 +1339,7 @@ class _Partition:
         :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
         :param sample_description: optional pandas.DataFrame containing sample annotations
         """
-        if isinstance(data, glm.typing.InputDataBaseTyping):
+        if isinstance(data, glm.typing.InputDataBase):
             self.x = data.x
         elif isinstance(data, anndata.AnnData) or isinstance(data, Raw):
             self.x = data.X
