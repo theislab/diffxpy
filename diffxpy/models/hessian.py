@@ -27,9 +27,9 @@ def hes_nb_glm_mean_block(
         Estimated mean parameters across cells for a given gene.
     :param mu: np.ndarray (cells,)
         Estimated dispersion parameters across cells for a given gene.
-    :param design_loc: np.ndarray, matrix, xarray (cells, #parameters location model)
+    :param design_loc: np.ndarray, matrix (cells, #parameters location model)
         Design matrix of location model.
-    :param design_scale: np.ndarray, matrix, xarray (cells, #parameters shape model)
+    :param design_scale: np.ndarray, matrix (cells, #parameters shape model)
         Design matrix of shape model.
     :param i: int
         Index of first dimension in fisher information matrix which is to be computed.
@@ -78,9 +78,9 @@ def hes_nb_glm_disp_block(
         Estimated mean parameters across cells for a given gene.
     :param mu: np.ndarray (cells,)
         Estimated dispersion parameters across cells for a given gene.
-    :param design_loc: np.ndarray, matrix, xarray (cells, #parameters location model)
+    :param design_loc: np.ndarray, matrix (cells, #parameters location model)
         Design matrix of location model.
-    :param design_scale: np.ndarray, matrix, xarray (cells, #parameters shape model)
+    :param design_scale: np.ndarray, matrix (cells, #parameters shape model)
         Design matrix of shape model.
     :param i: int
         Index of first dimension in fisher information matrix which is to be computed.
@@ -129,9 +129,9 @@ def hes_nb_glm_meandisp_block(
         Estimated mean parameters across cells for a given gene.
     :param mu: np.ndarray (cells,)
         Estimated dispersion parameters across cells for a given gene.
-    :param design_loc: np.ndarray, matrix, xarray (cells, #parameters location model)
+    :param design_loc: np.ndarray, matrix (cells, #parameters location model)
         Design matrix of location model.
-    :param design_scale: np.ndarray, matrix, xarray (cells, #parameters shape model)
+    :param design_scale: np.ndarray, matrix (cells, #parameters shape model)
         Design matrix of shape model.
     :param i: int
         Index of first dimension in fisher information matrix which is to be computed.
@@ -160,9 +160,9 @@ def hes_nb_glm_bygene(
         Estimated mean parameters across cells for a given gene.
     :param mu: np.ndarray (cells,)
         Estimated dispersion parameters across cells for a given gene.
-    :param design_loc: np.ndarray, matrix, xarray (cells, #parameters location model)
+    :param design_loc: np.ndarray, matrix (cells, #parameters location model)
         Design matrix of location model.
-    :param design_scale: np.ndarray, matrix, xarray (cells, #parameters shape model)
+    :param design_scale: np.ndarray, matrix (cells, #parameters shape model)
         Design matrix of shape model.
     
     :return: np.ndarray (#parameters location model + #parameters shape model, #parameters location model + #parameters shape model)
@@ -212,9 +212,9 @@ def theta_covar_bygene(
         Estimated mean parameters across cells for a given gene.
     :param mu: np.ndarray (cells,)
         Estimated dispersion parameters across cells for a given gene.
-    :param design_loc: np.ndarray, matrix, xarray (cells, #parameters location model)
+    :param design_loc: np.ndarray, matrix (cells, #parameters location model)
         Design matrix of location model.
-    :param design_scale: np.ndarray, matrix, xarray (cells, #parameters shape model)
+    :param design_scale: np.ndarray, matrix(cells, #parameters shape model)
         Design matrix of shape model.
     
     :return: np.ndarray (#parameters location model + #parameters shape model, #parameters location model + #parameters shape model)
@@ -243,9 +243,9 @@ def theta_sd_bygene(
         Estimated mean parameters across cells for a given gene.
     :param disp: np.ndarray (cells,)
         Estimated dispersion parameters across cells for a given gene.
-    :param design_loc: np.ndarray, matrix, xarray (cells, #parameters location model)
+    :param design_loc: np.ndarray, matrix (cells, #parameters location model)
         Design matrix of location model.
-    :param design_scale: np.ndarray, matrix, xarray (cells, #parameters shape model)
+    :param design_scale: np.ndarray, matrix (cells, #parameters shape model)
         Design matrix of shape model.
     
     :return: np.ndarray (#parameters location model + #parameters shape model,)
