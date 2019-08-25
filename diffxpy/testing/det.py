@@ -1544,7 +1544,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         super().__init__()
         if isinstance(data, anndata.AnnData) or isinstance(data, anndata.Raw):
             data = data.X
-        elif isinstance(data, glm.typing.InputDataBaseTyping):
+        elif isinstance(data, glm.typing.InputDataBase):
             data = data.x
         self._x = data
         self.sample_description = sample_description
@@ -1669,7 +1669,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
         super().__init__()
         if isinstance(data, anndata.AnnData) or isinstance(data, anndata.Raw):
             data = data.X
-        elif isinstance(data, glm.typing.InputDataBaseTyping):
+        elif isinstance(data, glm.typing.InputDataBase):
             data = data.x
         self._x = data
         self.sample_description = sample_description
@@ -2102,11 +2102,13 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         self.grouping = grouping
         self.groups = list(np.asarray(groups))
 
-        # values of parameter estimates: coefficients x genes array with one coefficient per group
-        self._theta_mle = model_estim.par_link_loc
-        # standard deviation of estimates: coefficients x genes array with one coefficient per group
-        # theta_sd = sqrt(diagonal(fisher_inv))
-        self._theta_sd = np.sqrt(np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1)).T
+        # Values of parameter estimates: coefficients x genes array with one coefficient per group
+        self._theta_mle = model_estim.a_var
+        # Standard deviation of estimates: coefficients x genes array with one coefficient per group
+        # Need .copy() here as nextafter needs mutabls copy.
+        theta_sd = np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1).T.copy()
+        theta_sd = np.nextafter(0, np.inf, out=theta_sd, where=theta_sd < np.nextafter(0, np.inf))
+        self._theta_sd = np.sqrt(theta_sd)
         self._logfc = None
 
         # Call tests in constructor.
@@ -2307,11 +2309,13 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         else:
             self.groups = groups.tolist()
 
-        # values of parameter estimates: coefficients x genes array with one coefficient per group
+        # Values of parameter estimates: coefficients x genes array with one coefficient per group
         self._theta_mle = model_estim.a_var
-        # standard deviation of estimates: coefficients x genes array with one coefficient per group
-        # theta_sd = sqrt(diagonal(fisher_inv))
-        self._theta_sd = np.sqrt(np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1)).T
+        # Standard deviation of estimates: coefficients x genes array with one coefficient per group
+        # Need .copy() here as nextafter needs mutabls copy.
+        theta_sd = np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1).T.copy()
+        theta_sd = np.nextafter(0, np.inf, out=theta_sd, where=theta_sd < np.nextafter(0, np.inf))
+        self._theta_sd = np.sqrt(theta_sd)
 
     def _correction(self, pvals, method="fdr_bh") -> np.ndarray:
         """
@@ -2349,7 +2353,6 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
 
     def _test_pairs(self, groups0, groups1):
         num_features = self.model_estim.x.shape[1]
-
         pvals = np.tile(np.NaN, [len(groups0), len(groups1), num_features])
 
         for i, g0 in enumerate(groups0):
