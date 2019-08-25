@@ -848,6 +848,8 @@ def two_sample(
             sample_description=sample_description,
             noise_model=noise_model,
             size_factors=size_factors,
+            init_a="closed_form",
+            init_b="closed_form",
             batch_size=batch_size,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
@@ -872,6 +874,8 @@ def two_sample(
             sample_description=sample_description,
             noise_model=noise_model,
             size_factors=size_factors,
+            init_a="closed_form",
+            init_b="closed_form",
             batch_size=batch_size,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
@@ -911,7 +915,7 @@ def pairwise(
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         is_sig_zerovar: bool = True,
-        quick_scale: bool = None,
+        quick_scale: bool = False,
         dtype="float64",
         pval_correction: str = "global",
         keep_full_test_objs: bool = False,
@@ -1082,7 +1086,7 @@ def pairwise(
                     grouping == g2
                 ))[0]
                 de_test_temp = two_sample(
-                    data=data[idx],
+                    data=data[idx, :],
                     grouping=grouping[idx],
                     as_numeric=as_numeric,
                     test=test,
@@ -1100,7 +1104,7 @@ def pairwise(
                 pvals[i, j] = de_test_temp.pval
                 pvals[j, i] = pvals[i, j]
                 logfc[i, j] = de_test_temp.log_fold_change()
-                logfc[j, i] = - logfc[i, j]
+                logfc[j, i] = -logfc[i, j]
                 if keep_full_test_objs:
                     tests[i, j] = de_test_temp
                     tests[j, i] = de_test_temp
