@@ -819,8 +819,8 @@ def two_sample(
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
     if test in ['t-test', 'rank'] and noise_model is not None:
-        raise ValueError('base.two_sample(): Do not specify `noise_model` if using test t-test or rank_test: ' +
-                         'The t-test is based on a gaussian noise model and wilcoxon is model free.')
+        raise Warning('two_sample(): Do not specify `noise_model` if using test t-test or rank_test: ' +
+                      'The t-test is based on a gaussian noise model and the rank sum test is model free.')
 
     gene_names = parse_gene_names(data, gene_names)
     grouping = parse_grouping(data, sample_description, grouping)
@@ -906,11 +906,11 @@ def pairwise(
         data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
-        test: str = 'z-test',
-        lazy: bool = False,
+        test: str = "z-test",
+        lazy: bool = True,
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
-        noise_model: str = None,
+        noise_model: str = "nb",
         size_factors: np.ndarray = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",

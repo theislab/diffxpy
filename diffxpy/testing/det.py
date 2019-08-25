@@ -2102,11 +2102,13 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         self.grouping = grouping
         self.groups = list(np.asarray(groups))
 
-        # values of parameter estimates: coefficients x genes array with one coefficient per group
+        # Values of parameter estimates: coefficients x genes array with one coefficient per group
         self._theta_mle = model_estim.a_var
-        # standard deviation of estimates: coefficients x genes array with one coefficient per group
-        # theta_sd = sqrt(diagonal(fisher_inv))
-        self._theta_sd = np.sqrt(np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1)).T
+        # Standard deviation of estimates: coefficients x genes array with one coefficient per group
+        # Need .copy() here as nextafter needs mutabls copy.
+        theta_sd = np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1).T.copy()
+        theta_sd = np.nextafter(0, np.inf, out=theta_sd, where=theta_sd < np.nextafter(0, np.inf))
+        self._theta_sd = np.sqrt(theta_sd)
         self._logfc = None
 
         # Call tests in constructor.
@@ -2307,11 +2309,13 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         else:
             self.groups = groups.tolist()
 
-        # values of parameter estimates: coefficients x genes array with one coefficient per group
+        # Values of parameter estimates: coefficients x genes array with one coefficient per group
         self._theta_mle = model_estim.a_var
-        # standard deviation of estimates: coefficients x genes array with one coefficient per group
-        # theta_sd = sqrt(diagonal(fisher_inv))
-        self._theta_sd = np.sqrt(np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1)).T
+        # Standard deviation of estimates: coefficients x genes array with one coefficient per group
+        # Need .copy() here as nextafter needs mutabls copy.
+        theta_sd = np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1).T.copy()
+        theta_sd = np.nextafter(0, np.inf, out=theta_sd, where=theta_sd < np.nextafter(0, np.inf))
+        self._theta_sd = np.sqrt(theta_sd)
 
     def _correction(self, pvals, method="fdr_bh") -> np.ndarray:
         """
