@@ -1555,13 +1555,13 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         mean_x0 = np.asarray(np.mean(x0, axis=0)).flatten().astype(dtype=np.float)
         mean_x1 = np.asarray(np.mean(x1, axis=0)).flatten().astype(dtype=np.float)
         # Avoid unnecessary mean computation:
-        self._mean = np.average(
+        self._mean = np.asarray(np.average(
             a=np.vstack([mean_x0, mean_x1]),
             weights=np.array([x0.shape[0] / (x0.shape[0] + x1.shape[0]),
                               x1.shape[0] / (x0.shape[0] + x1.shape[0])]),
             axis=0,
             returned=False
-        )
+        )).flatten()
         self._ave_nonzero = self._mean != 0  # omit all-zero features
         if isinstance(x0, scipy.sparse.csr_matrix):
             # Efficient analytic expression of variance without densification.
@@ -1603,6 +1603,8 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         if is_logged:
             self._logfc = mean_x1 - mean_x0
         else:
+            mean_x0 = np.nextafter(0, np.inf, out=mean_x0, where=mean_x0 < np.nextafter(0, np.inf))
+            mean_x1 = np.nextafter(0, np.inf, out=mean_x1, where=mean_x1 < np.nextafter(0, np.inf))
             self._logfc = np.log(mean_x1) - np.log(mean_x0)
 
     @property
@@ -1679,13 +1681,13 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
         mean_x0 = np.asarray(np.mean(x0, axis=0)).flatten().astype(dtype=np.float)
         mean_x1 = np.asarray(np.mean(x1, axis=0)).flatten().astype(dtype=np.float)
         # Avoid unnecessary mean computation:
-        self._mean = np.average(
+        self._mean = np.asarray(np.average(
             a=np.vstack([mean_x0, mean_x1]),
             weights=np.array([x0.shape[0] / (x0.shape[0] + x1.shape[0]),
                               x1.shape[0] / (x0.shape[0] + x1.shape[0])]),
             axis=0,
             returned=False
-        )
+        )).flatten()
         if isinstance(x0, scipy.sparse.csr_matrix):
             # Efficient analytic expression of variance without densification.
             var_x0 = np.asarray(np.mean(x0.power(2), axis=0)).flatten().astype(dtype=np.float) - np.square(mean_x0)
@@ -1724,6 +1726,8 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
         if is_logged:
             self._logfc = mean_x1 - mean_x0
         else:
+            mean_x0 = np.nextafter(0, np.inf, out=mean_x0, where=mean_x0 < np.nextafter(0, np.inf))
+            mean_x1 = np.nextafter(0, np.inf, out=mean_x1, where=mean_x1 < np.nextafter(0, np.inf))
             self._logfc = np.log(mean_x1) - np.log(mean_x0)
 
     @property
@@ -1881,7 +1885,7 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         self._gene_ids = np.asarray(gene_ids)
         self._logfc = logfc
         self._pval = pval
-        self._mean = ave
+        self._mean = np.asarray(ave).flatten()
         self.groups = list(np.asarray(groups))
         self._tests = tests
 
@@ -2673,7 +2677,7 @@ class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):
         self._gene_ids = np.asarray(gene_ids)
         self._pval = pval
         self._logfc = logfc
-        self._mean = ave
+        self._mean = np.asarray(ave).flatten()
         self.groups = list(np.asarray(groups))
         self._tests = tests
 
@@ -2794,7 +2798,7 @@ class DifferentialExpressionTestByPartition(_DifferentialExpressionTestMulti):
         self._gene_ids = tests[0].gene_ids
         self._pval = np.expand_dims(np.vstack([x.pval for x in tests]), axis=0)
         self._logfc = np.expand_dims(np.vstack([x.log_fold_change() for x in tests]), axis=0)
-        self._mean = ave
+        self._mean = np.asarray(ave).flatten()
 
         _ = self.qval
 
