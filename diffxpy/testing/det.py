@@ -1819,7 +1819,7 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
             - "global": correct all p-values in one operation
             - "by_test": correct the p-values of each test individually
         """
-        super().__init__()
+        _DifferentialExpressionTest.__init__(self=self)
         self._correction_type = correction_type
 
     def _correction(self, method):
@@ -1851,7 +1851,7 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
         assert self.gene_ids is not None
 
         # calculate maximum logFC of lower triangular fold change matrix
-        raw_logfc = self.log2_fold_change()
+        raw_logfc = self.log_fold_change(base=2.)
 
         # first flatten all dimensions up to the last 'gene' dimension
         flat_logfc = raw_logfc.reshape(-1, raw_logfc.shape[-1])
@@ -1875,137 +1875,139 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
         return res
 
 
-class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
+class _DifferentialExpressionTestPairwiseBase(_DifferentialExpressionTestMulti):
     """
-    Pairwise unit_test between more than 2 groups per gene.
+    Pairwise differential expression tests base class.
+
+    Defines API of accessing test results of pairs of groups. The underlaying accessors depend
+    on the type of test and are defined in the subclasses.
     """
 
-    def __init__(self, gene_ids, pval, logfc, ave, groups, tests, correction_type: str):
-        super().__init__(correction_type=correction_type)
-        self._gene_ids = np.asarray(gene_ids)
-        self._logfc = logfc
-        self._pval = pval
-        self._mean = np.asarray(ave).flatten()
-        self.groups = list(np.asarray(groups))
-        self._tests = tests
+    groups: List[str]
 
-        _ = self.qval
+    def _get_group_idx(self, groups0, groups1):
+        if np.any([x not in self.groups for x in groups0]):
+            raise ValueError('element of groups1 not recognized; not in groups %s' % self.groups)
+        if np.any([x not in self.groups for x in groups1]):
+            raise ValueError('element of groups2 not recognized; not in groups %s' % self.groups)
 
-    @property
-    def gene_ids(self) -> np.ndarray:
-        return self._gene_ids
+        return np.array([self.groups.index(x) for x in groups0]), \
+               np.array([self.groups.index(x) for x in groups1])
 
-    @property
-    def x(self):
-        return None
-
-    @property
-    def tests(self):
+    @abc.abstractmethod
+    def _pval_pairs(self, idx0, idx1):
         """
-        If `keep_full_test_objs` was set to `True`, this will return a matrix of differential expression tests.
-        """
-        if self._tests is None:
-            raise ValueError("Individual tests were not kept!")
+        Test-specific p-values accessor for the comparison of groups1 to groups2.
 
-        return self._tests
-
-    def log_fold_change(self, base=np.e, **kwargs):
-        """
-        Returns matrix of fold changes per gene
-        """
-        if base == np.e:
-            return self._logfc
-        else:
-            return self._logfc / np.log(base)
-
-    def _check_groups(self, group1, group2):
-        if group1 not in self.groups:
-            raise ValueError('group1 not recognized')
-        if group2 not in self.groups:
-            raise ValueError('group2 not recognized')
-
-    def pval_pair(self, group1, group2):
-        """
-        Get p-values of the comparison of group1 and group2.
-
-        :param group1: Identifier of first group of observations in pair-wise comparison.
-        :param group2: Identifier of second group of observations in pair-wise comparison.
+        :param idx0: List of indices of first set of group of observations in pair-wise comparison.
+        :param idx1: List of indices of second set of group of observations in pair-wise comparison.
         :return: p-values
         """
-        assert self._pval is not None
+        pass
 
-        self._check_groups(group1, group2)
-        return self._pval[self.groups.index(group1), self.groups.index(group2), :]
-
-    def qval_pair(self, group1, group2):
+    @abc.abstractmethod
+    def _qval_pairs(self, idx0, idx1, method):
         """
-        Get q-values of the comparison of group1 and group2.
+        Test-specific q-values accessor for the comparison of groups1 to groups2.
 
-        :param group1: Identifier of first group of observations in pair-wise comparison.
-        :param group2: Identifier of second group of observations in pair-wise comparison.
+        :param idx0: List of indices of first set of group of observations in pair-wise comparison.
+        :param idx1: List of indices of second set of group of observations in pair-wise comparison.
+        :param method: Multiple testing correction method.
+            Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
         :return: q-values
         """
-        assert self._qval is not None
+        pass
 
-        self._check_groups(group1, group2)
-        return self._qval[self.groups.index(group1), self.groups.index(group2), :]
+    @abc.abstractmethod
+    def _log_fold_change_pairs(self, idx0, idx1, base):
+        """
+        Test-specific log fold change-values accessor for the comparison of groups1 to groups2.
 
-    def log10_pval_pair_clean(self, group1, group2, log10_threshold=-30):
+        :param idx0: List of indices of first set of group of observations in pair-wise comparison.
+        :param idx1: List of indices of second set of group of observations in pair-wise comparison.
+        :param base: Base of logarithm.
+        :return: log fold change values
+        """
+        pass
+
+    def pval_pairs(self, groups0, groups1):
+        """
+        Get p-values of the comparison of groups1 to groups2.
+
+        :param groups0: List of identifier of first set of group of observations in pair-wise comparison.
+        :param groups1: List of identifier of second set of group of observations in pair-wise comparison.
+        :return: p-values
+        """
+        idx0, idx1 = self._get_group_idx(groups0=groups0, groups1=groups1)
+        return self._pval_pairs(idx0=idx0, idx1=idx1)
+
+    def qval_pairs(self, groups0, groups1, method="fdr_bh"):
+        """
+        Get q-values of the comparison of groups1 to groups2.
+
+        :param groups0: List of identifier of first set of group of observations in pair-wise comparison.
+        :param groups1: List of identifier of second set of group of observations in pair-wise comparison.
+        :param method: Multiple testing correction method.
+            Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
+        :return: q-values
+        """
+        idx0, idx1 = self._get_group_idx(groups0=groups0, groups1=groups1)
+        return self._qval_pairs(idx0=idx0, idx1=idx1, method=method)
+
+    def log10_pval_pairs_clean(self, groups0, groups1, log10_threshold=-30):
         """
         Return log10 transformed and cleaned p-values.
 
         NaN p-values are set to one and p-values below log10_threshold
         in log10 space are set to log10_threshold.
 
-        :param group1: Identifier of first group of observations in pair-wise comparison.
-        :param group2: Identifier of second group of observations in pair-wise comparison.
+        :param groups0: List of identifier of first set of group of observations in pair-wise comparison.
+        :param groups1: List of identifier of second set of group of observations in pair-wise comparison.
         :param log10_threshold: minimal log10 p-value to return.
         :return: Cleaned log10 transformed p-values.
         """
-        pvals = np.reshape(self.pval_pair(group1=group1, group2=group2), -1)
+        pvals = np.reshape(self.pval_pairs(groups0=groups0, groups1=groups1), -1)
         pvals = np.nextafter(0, 1, out=pvals, where=pvals == 0)
         log10_pval_clean = np.log(pvals) / np.log(10)
         log10_pval_clean[np.isnan(log10_pval_clean)] = 1
         log10_pval_clean = np.clip(log10_pval_clean, log10_threshold, 0, log10_pval_clean)
         return log10_pval_clean
 
-    def log10_qval_pair_clean(self, group1, group2, log10_threshold=-30):
+    def log10_qval_pairs_clean(self, groups0, groups1, log10_threshold=-30):
         """
         Return log10 transformed and cleaned q-values.
 
         NaN p-values are set to one and q-values below log10_threshold
         in log10 space are set to log10_threshold.
 
-        :param group1: Identifier of first group of observations in pair-wise comparison.
-        :param group2: Identifier of second group of observations in pair-wise comparison.
+        :param groups0: List of identifier of first set of group of observations in pair-wise comparison.
+        :param groups1: List of identifier of second set of group of observations in pair-wise comparison.
         :param log10_threshold: minimal log10 q-value to return.
         :return: Cleaned log10 transformed q-values.
         """
-        qvals = np.reshape(self.qval_pair(group1=group1, group2=group2), -1)
+        qvals = np.reshape(self.qval_pairs(groups0=groups0, groups1=groups1), -1)
         qvals = np.nextafter(0, 1, out=qvals, where=qvals == 0)
         log10_qval_clean = np.log(qvals) / np.log(10)
         log10_qval_clean[np.isnan(log10_qval_clean)] = 1
         log10_qval_clean = np.clip(log10_qval_clean, log10_threshold, 0, log10_qval_clean)
         return log10_qval_clean
 
-    def log_fold_change_pair(
+    def log_fold_change_pairs(
             self,
-            group1,
-            group2,
+            groups0,
+            groups1,
             base=np.e
     ):
         """
         Get log fold changes of the comparison of group1 and group2.
 
-        :param group1: Identifier of first group of observations in pair-wise comparison.
-        :param group2: Identifier of second group of observations in pair-wise comparison.
+        :param groups0: List of identifier of first set of group of observations in pair-wise comparison.
+        :param groups1: List of identifier of second set of group of observations in pair-wise comparison.
         :param base: Base of logarithm.
         :return: log fold changes
         """
-        assert self._logfc is not None
-
-        self._check_groups(group1, group2)
-        return self.log_fold_change(base=base)[self.groups.index(group1), self.groups.index(group2), :]
+        idx0, idx1 = self._get_group_idx(groups0=groups0, groups1=groups1)
+        return self._log_fold_change_pairs(idx0=idx0, idx1=idx1, base=base)
 
     def summary(
             self,
@@ -2036,39 +2038,54 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
 
         return res
 
-    def summary_pair(
+    def summary_pairs(
             self,
-            group1,
-            group2,
+            groups0,
+            groups1,
             qval_thres=None,
             fc_upper_thres=None,
             fc_lower_thres=None,
-            mean_thres=None
+            mean_thres=None,
+            method="fdr_bh"
     ) -> pd.DataFrame:
         """
         Summarize differential expression results into an output table.
 
-        :param group1: Identifier of first group of observations in pair-wise comparison.
-        :param group2: Identifier of second group of observations in pair-wise comparison.
+        :param groups0: List of identifier of first set of group of observations in pair-wise comparison.
+        :param groups1: List of identifier of second set of group of observations in pair-wise comparison.
         :param qval_thres: Upper bound of corrected p-values for gene to be included.
         :param fc_upper_thres: Upper bound of fold-change for gene to be included.
         :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
         :param mean_thres: Lower bound of average expression for gene to be included.
+        :param method: Multiple testing correction method.
+            Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
         :return: pandas.DataFrame with the following columns:
-
             - gene: the gene id's
-            - pval: the per-gene p-value of the selected test
-            - qval: the per-gene q-value of the selected test
-            - log2fc: the per-gene log2 fold change of the selected test
+            - pval: the minimum per-gene p-value of all tests
+            - qval: the minimum per-gene q-value of all tests
+            - log2fc: the maximal/minimal (depending on which one is higher) log2 fold change of the genes
             - mean: the mean expression of the gene across all groups
         """
         assert self.gene_ids is not None
 
+        pval = self.pval_pairs(groups0=groups0, groups1=groups1)
+        qval = self.qval_pairs(groups0=groups0, groups1=groups1, method=method)
+
+        # calculate maximum logFC of lower triangular fold change matrix
+        raw_logfc = self.log_fold_change_pairs(groups0=groups0, groups1=groups1, base=2)
+
+        # first flatten all dimensions up to the last 'gene' dimension
+        flat_logfc = raw_logfc.reshape(-1, raw_logfc.shape[-1])
+        # next, get argmax of flattened logfc and unravel the true indices from it
+        r, c = np.unravel_index(flat_logfc.argmax(0), raw_logfc.shape[:2])
+        # if logfc is maximal in the lower triangular matrix, multiply it with -1
+        logfc = raw_logfc[r, c, np.arange(raw_logfc.shape[-1])] * np.where(r <= c, 1, -1)
+
         res = pd.DataFrame({
             "gene": self.gene_ids,
-            "pval": self.pval_pair(group1=group1, group2=group2),
-            "qval": self.qval_pair(group1=group1, group2=group2),
-            "log2fc": self.log_fold_change_pair(group1=group1, group2=group2, base=2),
+            "pval": np.min(pval, axis=(0, 1)),
+            "qval": np.min(qval, axis=(0, 1)),
+            "log2fc": np.asarray(logfc),
             "mean": np.asarray(self.mean)
         })
 
@@ -2083,7 +2100,105 @@ class DifferentialExpressionTestPairwise(_DifferentialExpressionTestMulti):
         return res
 
 
-class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
+class DifferentialExpressionTestPairwiseStandard(_DifferentialExpressionTestPairwiseBase):
+    """
+    Pairwise differential expression tests class for tests other than z-tests.
+    """
+
+    def __init__(
+            self,
+            gene_ids,
+            pval,
+            logfc,
+            ave,
+            groups,
+            tests,
+            correction_type: str
+    ):
+        super().__init__(correction_type=correction_type)
+        self._gene_ids = np.asarray(gene_ids)
+        self._logfc = logfc
+        self._pval = pval
+        self._mean = np.asarray(ave).flatten()
+        self.groups = list(np.asarray(groups))
+        self._tests = tests
+
+        _ = self.qval
+
+    @property
+    def gene_ids(self) -> np.ndarray:
+        return self._gene_ids
+
+    @property
+    def x(self):
+        return None
+
+    @property
+    def tests(self):
+        """
+        If `keep_full_test_objs` was set to `True`, this will return a matrix of differential expression tests.
+        """
+        if self._tests is None:
+            raise ValueError("Individual tests were not kept!")
+
+        return self._tests
+
+    def _correction_pairs(self, idx0, idx1, method):
+        if self._correction_type.lower() == "global":
+            pvals = np.reshape(self._pval(idx0=idx0, idx1=idx1), -1)
+            qvals = correction.correct(pvals=pvals, method=method)
+            qvals = np.reshape(qvals, self._pval(idx0=idx0, idx1=idx1).shape)
+            return qvals
+        elif self._correction_type.lower() == "by_test":
+            qvals = np.apply_along_axis(
+                func1d=lambda pv: correction.correct(pvals=pv, method=method),
+                axis=-1,
+                arr=self.pval(idx0=idx0, idx1=idx1)
+            )
+            return qvals
+
+    def _pval_pairs(self, idx0, idx1):
+        """
+        Test-specific p-values accessor for the comparison of groups1 to groups2.
+
+        :param idx0: List of indices of first set of group of observations in pair-wise comparison.
+        :param idx1: List of indices of second set of group of observations in pair-wise comparison.
+        :return: p-values
+        """
+        assert np.all([x < self._pval.shape[1] for x in idx0])
+        assert np.all([x < self._pval.shape[1] for x in idx1])
+        return self._pval[idx0, idx1]
+
+    def _qval_pairs(self, idx0, idx1, method="fdr_bh"):
+        """
+        Test-specific q-values accessor for the comparison of groups1 to groups2.
+
+        :param idx0: List of indices of first set of group of observations in pair-wise comparison.
+        :param idx1: List of indices of second set of group of observations in pair-wise comparison.
+        :param method: Multiple testing correction method.
+            Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
+        :return: q-values
+        """
+        return self._correction_pairs(idx0=idx0, idx1=idx1, method=method)
+
+    def _log_fold_change_pairs(self, idx0, idx1, base):
+        """
+        Test-specific log fold change-values accessor for the comparison of groups1 to groups2.
+
+        :param idx0: List of indices of first set of group of observations in pair-wise comparison.
+        :param idx1: List of indices of second set of group of observations in pair-wise comparison.
+        :param base: Base of logarithm.
+        :return: log fold change values
+        """
+        assert np.all([x < self._pval.shape[1] for x in idx0])
+        assert np.all([x < self._pval.shape[1] for x in idx1])
+        if base == np.e:
+            return self._logfc[idx0, idx1]
+        else:
+            return self._logfc[idx0, idx1] / np.log(base)
+
+
+class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
     """
     Pairwise unit_test between more than 2 groups per gene.
     """
@@ -2160,11 +2275,43 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
         :return: np.ndarray
         """
 
-        return np.mean(self.model_estim.x, axis=0)
+        return np.asarray(np.mean(self.model_estim.x, axis=0)).flatten()
 
-    def log_fold_change(self, base=np.e, **kwargs):
+    def _pval_pairs(self, idx0, idx1):
         """
-        Returns matrix of fold changes per gene
+        Test-specific p-values accessor for the comparison of groups1 to groups2.
+
+        :param idx0: List of indices of first set of group of observations in pair-wise comparison.
+        :param idx1: List of indices of second set of group of observations in pair-wise comparison.
+        :return: p-values
+        """
+        assert np.all([x < self.pval.shape[1] for x in idx0])
+        assert np.all([x < self.pval.shape[1] for x in idx1])
+        return self.pval[idx0, idx1]
+
+    def _qval_pairs(self, idx0, idx1, method="fdr_bh"):
+        """
+        Test-specific q-values accessor for the comparison of groups1 to groups2.
+
+        :param idx0: List of indices of first set of group of observations in pair-wise comparison.
+        :param idx1: List of indices of second set of group of observations in pair-wise comparison.
+        :param method: Multiple testing correction method.
+            TODO not used yet.
+            Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
+        :return: q-values
+        """
+        assert np.all([x < self.qval.shape[1] for x in idx0])
+        assert np.all([x < self.qval.shape[1] for x in idx1])
+        return self.qval[idx0, idx1]
+
+    def _log_fold_change_pairs(self, idx0, idx1, base):
+        """
+        Test-specific log fold change-values accessor for the comparison of groups1 to groups2.
+
+        :param idx0: List of indices of first set of group of observations in pair-wise comparison.
+        :param idx1: List of indices of second set of group of observations in pair-wise comparison.
+        :param base: Base of logarithm.
+        :return: log fold change values
         """
         if self._logfc is None:
             groups = self.groups
@@ -2185,105 +2332,12 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestMulti):
             self._logfc = logfc
 
         if base == np.e:
-            return self._logfc
+            return self._logfc[idx0, idx1]
         else:
-            return self._logfc / np.log(base)
-
-    def _check_groups(self, group1, group2):
-        if group1 not in self.groups:
-            raise ValueError('group1 not recognized')
-        if group2 not in self.groups:
-            raise ValueError('group2 not recognized')
-
-    def pval_pair(self, group1, group2):
-        self._check_groups(group1, group2)
-        return self.pval[self.groups.index(group1), self.groups.index(group2), :]
-
-    def qval_pair(self, group1, group2):
-        self._check_groups(group1, group2)
-        return self.qval[self.groups.index(group1), self.groups.index(group2), :]
-
-    def log_fold_change_pair(self, group1, group2, base=np.e):
-        self._check_groups(group1, group2)
-        return self.log_fold_change(base=base)[self.groups.index(group1), self.groups.index(group2), :]
-
-    def summary(
-            self,
-            qval_thres=None,
-            fc_upper_thres=None,
-            fc_lower_thres=None,
-            mean_thres=None,
-            **kwargs
-    ) -> pd.DataFrame:
-        """
-        Summarize differential expression results into an output table.
-
-        :param qval_thres: Upper bound of corrected p-values for gene to be included.
-        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
-        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
-        :param mean_thres: Lower bound of average expression for gene to be included.
-        :return: Summary table of differential expression test.
-        """
-        res = super().summary(**kwargs)
-
-        res = self._threshold_summary(
-            res=res,
-            qval_thres=qval_thres,
-            fc_upper_thres=fc_upper_thres,
-            fc_lower_thres=fc_lower_thres,
-            mean_thres=mean_thres
-        )
-
-        return res
-
-    def summary_pair(
-            self,
-            group1,
-            group2,
-            qval_thres=None,
-            fc_upper_thres=None,
-            fc_lower_thres=None,
-            mean_thres=None
-    ) -> pd.DataFrame:
-        """
-        Summarize differential expression results into an output table.
-
-        :param group1: Identifier of first group of observations in pair-wise comparison.
-        :param group2: Identifier of second group of observations in pair-wise comparison.
-        :param qval_thres: Upper bound of corrected p-values for gene to be included.
-        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
-        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
-        :param mean_thres: Lower bound of average expression for gene to be included.
-        :return: pandas.DataFrame with the following columns:
-
-            - gene: the gene id's
-            - pval: the per-gene p-value of the selected test
-            - qval: the per-gene q-value of the selected test
-            - log2fc: the per-gene log2 fold change of the selected test
-            - mean: the mean expression of the gene across all groups
-        """
-        assert self.gene_ids is not None
-
-        res = pd.DataFrame({
-            "gene": self.gene_ids,
-            "pval": self.pval_pair(group1=group1, group2=group2),
-            "qval": self.qval_pair(group1=group1, group2=group2),
-            "log2fc": self.log_fold_change_pair(group1=group1, group2=group2, base=2),
-            "mean": np.asarray(self.mean)
-        })
-
-        res = self._threshold_summary(
-            res=res,
-            qval_thres=qval_thres,
-            fc_upper_thres=fc_upper_thres,
-            fc_lower_thres=fc_lower_thres,
-            mean_thres=mean_thres
-        )
-
-        return res
+            return self._logfc[idx0, idx1] / np.log(base)
 
 
-class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
+class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseBase):
     """
     Pairwise unit_test between more than 2 groups per gene with lazy evaluation.
 
@@ -2303,7 +2357,10 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
             grouping, groups,
             correction_type="global"
     ):
-        super().__init__(correction_type=correction_type)
+        _DifferentialExpressionTestMulti.__init__(
+            self=self,
+            correction_type=correction_type
+        )
         self.model_estim = model_estim
         self.grouping = grouping
         if isinstance(groups, list):
@@ -2319,7 +2376,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         theta_sd = np.nextafter(0, np.inf, out=theta_sd, where=theta_sd < np.nextafter(0, np.inf))
         self._theta_sd = np.sqrt(theta_sd)
 
-    def _correction(self, pvals, method="fdr_bh") -> np.ndarray:
+    def _correction_pairs(self, pvals, method="fdr_bh") -> np.ndarray:
         """
         Performs multiple testing corrections available in statsmodels.stats.multitest.multipletests().
 
@@ -2353,18 +2410,22 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         """
         pass
 
-    def _test_pairs(self, groups0, groups1):
-        num_features = self.model_estim.x.shape[1]
-        pvals = np.tile(np.NaN, [len(groups0), len(groups1), num_features])
+    def _test_pairs(self, idx0, idx1):
+        """
 
-        for i, g0 in enumerate(groups0):
-            for j, g1 in enumerate(groups1):
-                if g0 != g1:
+        :param idx0: List of indices of first set of group of observations in pair-wise comparison.
+        :param idx1: List of indices of second set of group of observations in pair-wise comparison.
+        :return: p-values
+        """
+        pvals = np.tile(np.NaN, [len(idx0), len(idx1), self.model_estim.x.shape[1]])
+        for i in idx0:
+            for j in idx1:
+                if i != j:
                     pvals[i, j] = stats.two_coef_z_test(
-                        theta_mle0=self._theta_mle[g0],
-                        theta_mle1=self._theta_mle[g1],
-                        theta_sd0=self._theta_sd[g0],
-                        theta_sd1=self._theta_sd[g1]
+                        theta_mle0=self._theta_mle[i],
+                        theta_mle1=self._theta_mle[j],
+                        theta_sd0=self._theta_sd[i],
+                        theta_sd1=self._theta_sd[j]
                     )
                 else:
                     pvals[i, j] = 1
@@ -2394,7 +2455,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         :return: np.ndarray
         """
 
-        return np.mean(self.model_estim.x, axis=0)
+        return np.asarray(np.mean(self.model_estim.x, axis=0)).flatten()
 
     @property
     def pval(self, **kwargs):
@@ -2419,243 +2480,58 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestMulti):
         This function is not available in lazy results evaluation as it would
         require all pairwise tests to be performed.
         """
-        pass
+        raise ValueError("This function is not available in lazy results evaluation as it would "
+                         "require all pairwise tests to be performed.")
 
-    def summary(
-            self,
-            qval_thres=None,
-            fc_upper_thres=None,
-            fc_lower_thres=None,
-            mean_thres=None,
-            **kwargs
-    ) -> pd.DataFrame:
+    @property
+    def summary(self, **kwargs):
         """
-        Summarize differential expression results into an output table.
-
         This function is not available in lazy results evaluation as it would
         require all pairwise tests to be performed.
-
-        :param qval_thres: Upper bound of corrected p-values for gene to be included.
-        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
-        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
-        :param mean_thres: Lower bound of average expression for gene to be included.
-        :return: Summary table of differential expression test.
         """
-        pass
+        raise ValueError("This function is not available in lazy results evaluation as it would "
+                         "require all pairwise tests to be performed.")
 
-    def _check_groups(self, groups0, groups1):
-        if not isinstance(groups0, list):
-            groups0 = [groups0]
-        if not isinstance(groups1, list):
-            groups1 = [groups1]
-        for g in groups0:
-            if g not in self.groups:
-                raise ValueError('groups0 element '+str(g)+' not recognized')
-        for g in groups1:
-            if g not in self.groups:
-                raise ValueError('groups1 element '+str(g)+' not recognized')
-
-    def _groups_idx(self, groups):
-        if not isinstance(groups, list):
-            groups = [groups]
-        return np.array([self.groups.index(x) for x in groups])
-
-    def pval_pairs(self, groups0=None, groups1=None):
+    def _pval_pairs(self, idx0, idx1):
         """
-        Return p-values for all pairwise comparisons of groups0 and groups1.
+        Test-specific p-values accessor for the comparison of groups0 to groups1.
 
-        If you want to test one group (such as a control) against all other groups
-        (one test for each other group), give the control group id in groups0
-        and leave groups1=None, groups1 is then set to the full set of all groups.
-
-        :param groups0: First set of groups in pair-wise comparison.
-        :param groups1: Second set of groups in pair-wise comparison.
-        :return: P-values of pair-wise comparison.
+        :param idx0: List of indices of first set of group of observations in pair-wise comparison.
+        :param idx1: List of indices of second set of group of observations in pair-wise comparison.
+        :return: p-values
         """
-        if groups0 is None:
-            groups0 = self.groups
-        if groups1 is None:
-            groups1 = self.groups
-        self._check_groups(groups0, groups1)
-        groups0 = self._groups_idx(groups0)
-        groups1 = self._groups_idx(groups1)
-        return self._test_pairs(groups0=groups0, groups1=groups1)
+        return self._test_pairs(idx0=idx0, idx1=idx1)
 
-    def qval_pairs(self, groups0=None, groups1=None, method="fdr_bh", **kwargs):
+    def _qval_pairs(self, idx0, idx1, method="fdr_bh"):
         """
-        Return multiple testing-corrected p-values for all
-        pairwise comparisons of groups0 and groups1.
+        Test-specific q-values accessor for the comparison of both sets of groups.
 
-        If you want to test one group (such as a control) against all other groups
-        (one test for each other group), give the control group id in groups0
-        and leave groups1=None, groups1 is then set to the full set of all groups.
-
-        :param groups0: First set of groups in pair-wise comparison.
-        :param groups1: Second set of groups in pair-wise comparison.
+        :param idx0: List of indices of first set of group of observations in pair-wise comparison.
+        :param idx1: List of indices of second set of group of observations in pair-wise comparison.
         :param method: Multiple testing correction method.
             Browse available methods in the annotation of statsmodels.stats.multitest.multipletests().
-        :return: Multiple testing-corrected p-values of pair-wise comparison.
+        :return: q-values
         """
-        if groups0 is None:
-            groups0 = self.groups
-        if groups1 is None:
-            groups1 = self.groups
-        self._check_groups(groups0, groups1)
-        groups0 = self._groups_idx(groups0)
-        groups1 = self._groups_idx(groups1)
-        pval = self.pval_pair(groups0=groups0, groups1=groups1)
-        return self._correction(pval=pval, method=method, **kwargs)
+        return self._correction_pairs(pvals=self._pval_pairs(idx0=idx0, idx1=idx1), method=method)
 
-    def log_fold_change_pairs(self, groups0=None, groups1=None, base=np.e):
+    def _log_fold_change_pairs(self, idx0, idx1, base):
         """
-        Return log-fold changes for all pairwise comparisons of groups0 and groups1.
+        Test-specific log fold change-values accessor for the comparison of both sets of groups.
 
-        If you want to test one group (such as a control) against all other groups
-        (one test for each other group), give the control group id in groups0
-        and leave groups1=None, groups1 is then set to the full set of all groups.
-
-        :param groups0: First set of groups in pair-wise comparison.
-        :param groups1: Second set of groups in pair-wise comparison.
-        :param base: Base of logarithm of log-fold change.
-        :return: P-values of pair-wise comparison.
+        :param idx0: List of indices of first set of group of observations in pair-wise comparison.
+        :param idx1: List of indices of second set of group of observations in pair-wise comparison.
+        :param base: Base of logarithm.
+        :return: log fold change values
         """
-        if groups0 is None:
-            groups0 = self.groups
-        if groups1 is None:
-            groups1 = self.groups
-        self._check_groups(groups0, groups1)
-        groups0 = self._groups_idx(groups0)
-        groups1 = self._groups_idx(groups1)
-
-        num_features = self._theta_mle.shape[1]
-
-        logfc = np.zeros(shape=(len(groups0), len(groups1), num_features))
-        for i, g0 in enumerate(groups0):
-            for j, g1 in enumerate(groups1):
-                logfc[i, j, :] = self._theta_mle[g0, :] - self._theta_mle[g1, :]
+        logfc = np.zeros(shape=(len(idx0), len(idx1), self._theta_mle.shape[1]))
+        for i in idx0:
+            for j in idx1:
+                logfc[i, j, :] = self._theta_mle[i, :] - self._theta_mle[j, :]
 
         if base == np.e:
             return logfc
         else:
             return logfc / np.log(base)
-
-    def summary_pair(
-            self,
-            group0,
-            group1,
-            qval_thres=None,
-            fc_upper_thres=None,
-            fc_lower_thres=None,
-            mean_thres=None,
-            **kwargs
-    ) -> pd.DataFrame:
-        """
-        Summarize differential expression results of single pairwose comparison
-        into an output table.
-
-        :param group0: First set of groups in pair-wise comparison.
-        :param group1: Second set of groups in pair-wise comparison.
-        :param qval_thres: Upper bound of corrected p-values for gene to be included.
-        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
-        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
-        :param mean_thres: Lower bound of average expression for gene to be included.
-        :return: pandas.DataFrame with the following columns:
-
-            - gene: the gene id's
-            - pval: the per-gene p-value of the selected test
-            - qval: the per-gene q-value of the selected test
-            - log2fc: the per-gene log2 fold change of the selected test
-            - mean: the mean expression of the gene across all groups
-        """
-        assert self.gene_ids is not None
-
-        if len(group0) != 1:
-            raise ValueError("group0 should only contain one entry in summary_pair()")
-        if len(group1) != 1:
-            raise ValueError("group1 should only contain one entry in summary_pair()")
-
-        pval = self.pval_pairs(groups0=group0, groups1=group1)
-        qval = self._correction(pvals=pval, **kwargs)
-        res = pd.DataFrame({
-            "gene": self.gene_ids,
-            "pval": pval.flatten(),
-            "qval": qval.flatten(),
-            "log2fc": self.log_fold_change_pairs(groups0=group0, groups1=group1, base=2).flatten(),
-            "mean": np.asarray(self.mean)
-        })
-
-        res = self._threshold_summary(
-            res=res,
-            qval_thres=qval_thres,
-            fc_upper_thres=fc_upper_thres,
-            fc_lower_thres=fc_lower_thres,
-            mean_thres=mean_thres
-        )
-
-        return res
-
-    def summary_pairs(
-            self,
-            groups0,
-            groups1=None,
-            qval_thres=None,
-            fc_upper_thres=None,
-            fc_lower_thres=None,
-            mean_thres=None,
-            **kwargs
-    ) -> pd.DataFrame:
-        """
-        Summarize differential expression results of a set of
-        pairwise comparisons into an output table.
-
-        :param groups0: First set of groups in pair-wise comparison.
-        :param groups1: Second set of groups in pair-wise comparison.
-        :param qval_thres: Upper bound of corrected p-values for gene to be included.
-        :param fc_upper_thres: Upper bound of fold-change for gene to be included.
-        :param fc_lower_thres: Lower bound of fold-change p-values for gene to be included.
-        :param mean_thres: Lower bound of average expression for gene to be included.
-        :return: pandas.DataFrame with the following columns:
-
-            - gene: the gene id's
-            - pval: the minimum per-gene p-value of all tests
-            - qval: the minimum per-gene q-value of all tests
-            - log2fc: the maximal/minimal (depending on which one is higher) log2 fold change of the genes
-            - mean: the mean expression of the gene across all groups
-        """
-        assert self.gene_ids is not None
-        if groups1 is None:
-            groups1 = self.groups
-
-        pval = self.pval_pairs(groups0=groups0, groups1=groups1)
-        qval = self._correction(pvals=pval, **kwargs)
-
-        # calculate maximum logFC of lower triangular fold change matrix
-        raw_logfc = self.log_fold_change_pairs(groups0=groups0, groups1=groups1, base=2)
-
-        # first flatten all dimensions up to the last 'gene' dimension
-        flat_logfc = raw_logfc.reshape(-1, raw_logfc.shape[-1])
-        # next, get argmax of flattened logfc and unravel the true indices from it
-        r, c = np.unravel_index(flat_logfc.argmax(0), raw_logfc.shape[:2])
-        # if logfc is maximal in the lower triangular matrix, multiply it with -1
-        logfc = raw_logfc[r, c, np.arange(raw_logfc.shape[-1])] * np.where(r <= c, 1, -1)
-
-        res = pd.DataFrame({
-            "gene": self.gene_ids,
-            "pval": np.min(pval, axis=(0, 1)),
-            "qval": np.min(qval, axis=(0, 1)),
-            "log2fc": np.asarray(logfc),
-            "mean": np.asarray(self.mean)
-        })
-
-        res = self._threshold_summary(
-            res=res,
-            qval_thres=qval_thres,
-            fc_upper_thres=fc_upper_thres,
-            fc_lower_thres=fc_lower_thres,
-            mean_thres=mean_thres
-        )
-
-        return res
 
 
 class DifferentialExpressionTestVsRest(_DifferentialExpressionTestMulti):

@@ -15,7 +15,7 @@ from diffxpy import pkg_constants
 from diffxpy.models.batch_bfgs.optim import Estim_BFGS
 from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, \
     DifferentialExpressionTestTT, DifferentialExpressionTestRank, _DifferentialExpressionTestSingle, \
-    DifferentialExpressionTestZTestLazy, DifferentialExpressionTestZTest, DifferentialExpressionTestPairwise, \
+    DifferentialExpressionTestZTestLazy, DifferentialExpressionTestZTest, DifferentialExpressionTestPairwiseStandard, \
     DifferentialExpressionTestVsRest, _DifferentialExpressionTestMulti, DifferentialExpressionTestByPartition, \
     DifferentialExpressionTestWaldCont, DifferentialExpressionTestLRTCont
 from .utils import parse_gene_names, parse_sample_description, parse_size_factors, parse_grouping, \
@@ -1109,7 +1109,7 @@ def pairwise(
                     tests[i, j] = de_test_temp
                     tests[j, i] = de_test_temp
 
-        de_test = DifferentialExpressionTestPairwise(
+        de_test = DifferentialExpressionTestPairwiseStandard(
             gene_ids=gene_names,
             pval=pvals,
             logfc=logfc,
