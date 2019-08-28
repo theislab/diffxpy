@@ -16,8 +16,8 @@ from diffxpy.models.batch_bfgs.optim import Estim_BFGS
 from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, \
     DifferentialExpressionTestTT, DifferentialExpressionTestRank, _DifferentialExpressionTestSingle, \
     DifferentialExpressionTestZTestLazy, DifferentialExpressionTestZTest, DifferentialExpressionTestPairwise, \
-    DifferentialExpressionTestVsRest, _DifferentialExpressionTestMulti, DifferentialExpressionTestByPartition, \
-    DifferentialExpressionTestWaldCont, DifferentialExpressionTestLRTCont
+    DifferentialExpressionTestVsRest, _DifferentialExpressionTestMulti, DifferentialExpressionTestByPartition
+from .det_cont import DifferentialExpressionTestWaldCont, DifferentialExpressionTestLRTCont
 from .utils import parse_gene_names, parse_sample_description, parse_size_factors, parse_grouping, \
     constraint_system_from_star
 
@@ -2028,7 +2028,8 @@ def continuous_1d(
             de_test=de_test,
             size_factors=size_factors,
             continuous_coords=sample_description[continuous].values,
-            spline_coefs=new_coefs
+            spline_coefs=new_coefs,
+            noise_model=noise_model
         )
     else:
         raise ValueError('continuous(): Parameter `test` not recognized.')

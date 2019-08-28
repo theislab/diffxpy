@@ -9,11 +9,89 @@ from batchglm.api.models.glm_nb import Simulator
 import diffxpy.api as de
 
 
-class TestContinuous(unittest.TestCase):
+class _TestContinuous:
 
-    def test_forfatal_functions(self):
+    noise_model: str
+
+    def _fit_continuous(
+        self,
+        sim,
+        sample_description,
+        test
+    ):
+        test = de.test.continuous_1d(
+            data=sim.input_data,
+            sample_description=sample_description,
+            gene_names=["gene" + str(i) for i in range(sim.input_data.num_features)],
+            continuous="pseudotime",
+            df=3,
+            formula_loc="~ 1 + pseudotime + batch",
+            formula_scale="~ 1",
+            factor_loc_totest="pseudotime",
+            test=test,
+            quick_scale=True,
+            noise_model=self.noise_model
+        )
+        return test
+
+    def _test_null_model(
+            self,
+            nobs: int,
+            ngenes: int,
+            test: str
+    ):
+        sim = Simulator(num_observations=nobs, num_features=ngenes)
+        sim.generate_sample_description(num_batches=0, num_conditions=0)
+        sim.generate()
+
+        random_sample_description = pd.DataFrame({
+            "pseudotime": np.random.random(size=sim.nobs),
+            "batch": np.random.randint(2, size=sim.nobs)
+        })
+        return self._fit_continuous(
+            sim=sim,
+            sample_description=random_sample_description,
+            test=test
+        )
+
+    def _test_forfatal(self, test: str):
         """
         Test if de.test.continuous() DifferentialExpressionTestSingle object functions work fine.
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        test = self._test_null_model(nobs=10, ngenes=2, test=test)
+        ids = test.gene_ids
+
+        # 1. Test all additional functions which depend on model computation:
+        # 1.1. Only continuous model:
+        _ = test.log_fold_change(genes=ids, non_numeric=False)
+        _ = test.max(genes=ids, non_numeric=False)
+        _ = test.min(genes=ids, non_numeric=False)
+        _ = test.argmax(genes=ids, non_numeric=False)
+        _ = test.argmin(genes=ids, non_numeric=False)
+        _ = test.summary(non_numeric=False)
+        # 1.2. Full model:
+        _ = test.log_fold_change(genes=ids, non_numeric=True)
+        _ = test.max(genes=ids, non_numeric=True)
+        _ = test.min(genes=ids, non_numeric=True)
+        _ = test.argmax(genes=ids, non_numeric=True)
+        _ = test.argmin(genes=ids, non_numeric=True)
+        _ = test.summary(non_numeric=True)
+
+        return True
+
+
+class TestContinuousNb(_TestContinuous, unittest.TestCase):
+
+    def test_forfatal_wald(self):
+        """
+        Test if de.test.continuous() generates a uniform p-value distribution in the wald test
+        if it is given data simulated based on the null model. Returns the p-value
+        of the two-side Kolmgorov-Smirnov test for equality of the observed
+        p-value distriubution and a uniform distribution.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
@@ -22,55 +100,31 @@ class TestContinuous(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        num_observations = 10
-        num_features = 2
-
-        sim = Simulator(num_observations=num_observations, num_features=num_features)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
-
-        random_sample_description = pd.DataFrame({
-            "pseudotime": np.random.random(size=sim.nobs),
-            "batch": np.random.randint(2, size=sim.nobs)
-        })
-
-        test = de.test.continuous_1d(
-            data=sim.X,
-            continuous="pseudotime",
-            df=3,
-            formula_loc="~ 1 + pseudotime + batch",
-            formula_scale="~ 1",
-            factor_loc_totest="pseudotime",
-            test="wald",
-            sample_description=random_sample_description,
-            quick_scale=True,
-            batch_size=None,
-            training_strategy="DEFAULT",
-            dtype="float64"
-        )
-
-        summary = test.summary()
-        ids = test.gene_ids
-
-        # 1. Test all additional functions which depend on model computation:
-        # 1.1. Only continuous model:
-        temp = test.log_fold_change(genes=ids, nonnumeric=False)
-        temp = test.max(genes=ids, nonnumeric=False)
-        temp = test.min(genes=ids, nonnumeric=False)
-        temp = test.argmax(genes=ids, nonnumeric=False)
-        temp = test.argmin(genes=ids, nonnumeric=False)
-        temp = test.summary(nonnumeric=False)
-        # 1.2. Full model:
-        temp = test.log_fold_change(genes=ids, nonnumeric=True)
-        temp = test.max(genes=ids, nonnumeric=True)
-        temp = test.min(genes=ids, nonnumeric=True)
-        temp = test.argmax(genes=ids, nonnumeric=True)
-        temp = test.argmin(genes=ids, nonnumeric=True)
-        temp = test.summary(nonnumeric=True)
-
+        self.noise_model = "nb"
+        np.random.seed(1)
+        _ = self._test_forfatal(test="wald")
         return True
 
-    def test_null_distribution_wald(self, n_cells: int = 2000, n_genes: int = 100):
+    def test_forfatal_lrt(self):
+        """
+        Test if de.test.continuous() generates a uniform p-value distribution in the wald test
+        if it is given data simulated based on the null model. Returns the p-value
+        of the two-side Kolmgorov-Smirnov test for equality of the observed
+        p-value distriubution and a uniform distribution.
+
+        :param n_cells: Number of cells to simulate (number of observations per test).
+        :param n_genes: Number of genes to simulate (number of tests).
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        self.noise_model = "nb"
+        np.random.seed(1)
+        _ = self._test_forfatal(test="lrt")
+        return True
+
+    def test_null_distribution_wald(self):
         """
         Test if de.test.continuous() generates a uniform p-value distribution in the wald test
         if it is given data simulated based on the null model. Returns the p-value
@@ -84,29 +138,9 @@ class TestContinuous(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
-
-        random_sample_description = pd.DataFrame({
-            "pseudotime": np.random.random(size=sim.nobs)
-        })
-
-        test = de.test.continuous_1d(
-            data=sim.X,
-            continuous="pseudotime",
-            df=3,
-            formula_loc="~ 1 + pseudotime",
-            formula_scale="~ 1",
-            factor_loc_totest="pseudotime",
-            test="wald",
-            sample_description=random_sample_description,
-            quick_scale=True,
-            batch_size=None,
-            training_strategy="DEFAULT",
-            dtype="float64"
-        )
-        summary = test.summary()
+        self.noise_model = "nb"
+        np.random.seed(1)
+        test = self._test_null_model(nobs=2000, ngenes=100, test="wald")
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
@@ -130,29 +164,9 @@ class TestContinuous(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.INFO)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
-
-        random_sample_description = pd.DataFrame({
-            "pseudotime": np.random.random(size=sim.nobs)
-        })
-
-        test = de.test.continuous_1d(
-            data=sim.X,
-            continuous="pseudotime",
-            df=3,
-            formula_loc="~ 1 + pseudotime",
-            formula_scale="~ 1",
-            factor_loc_totest="pseudotime",
-            test="lrt",
-            sample_description=random_sample_description,
-            quick_scale=False,
-            batch_size=None,
-            training_strategy="DEFAULT",
-            dtype="float64"
-        )
-        summary = test.summary()
+        self.noise_model = "nb"
+        np.random.seed(1)
+        test = self._test_null_model(nobs=2000, ngenes=100, test="lrt")
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
@@ -161,6 +175,7 @@ class TestContinuous(unittest.TestCase):
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0 is <= 0.05!"
 
         return True
+
 
 if __name__ == '__main__':
     unittest.main()
