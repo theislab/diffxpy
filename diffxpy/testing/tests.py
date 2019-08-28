@@ -15,9 +15,10 @@ from diffxpy import pkg_constants
 from diffxpy.models.batch_bfgs.optim import Estim_BFGS
 from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, \
     DifferentialExpressionTestTT, DifferentialExpressionTestRank, _DifferentialExpressionTestSingle, \
-    DifferentialExpressionTestZTestLazy, DifferentialExpressionTestZTest, DifferentialExpressionTestPairwiseStandard, \
     DifferentialExpressionTestVsRest, _DifferentialExpressionTestMulti, DifferentialExpressionTestByPartition, \
     DifferentialExpressionTestWaldCont, DifferentialExpressionTestLRTCont
+from .det_pair import DifferentialExpressionTestZTestLazy, DifferentialExpressionTestZTest, \
+    DifferentialExpressionTestPairwiseStandard
 from .utils import parse_gene_names, parse_sample_description, parse_size_factors, parse_grouping, \
     constraint_system_from_star
 

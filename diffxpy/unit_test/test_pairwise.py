@@ -75,11 +75,14 @@ class _TestPairwiseNull:
         )
         if not lazy:
             _ = det.summary()
+            _ = det.pval
+            _ = det.qval
+            _ = det.log_fold_change()
         # Single pair accessors:
         _ = det.pval_pairs(groups0="0", groups1="1")
         _ = det.qval_pairs(groups0="0", groups1="1")
-        _ = det.log10_pval_pair_cleans(groups0="0", groups1="1")
-        _ = det.log10_qval_pair_cleans(groups0="0", groups1="1")
+        _ = det.log10_pval_pairs_clean(groups0="0", groups1="1")
+        _ = det.log10_qval_pairs_clean(groups0="0", groups1="1")
         _ = det.log_fold_change_pairs(groups0="0", groups1="1")
         _ = det.summary_pairs(groups0="0", groups1="1")
 
