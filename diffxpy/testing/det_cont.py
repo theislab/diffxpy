@@ -7,6 +7,8 @@ import batchglm.api as glm
 import logging
 import numpy as np
 import pandas as pd
+import scipy
+import scipy.sparse
 from typing import Union
 
 from .det import _DifferentialExpressionTestSingle, DifferentialExpressionTestWald, DifferentialExpressionTestLRT
@@ -334,6 +336,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             axs.append(ax)
 
             y = self.x[:, g]
+            if isinstance(y, scipy.sparse.csr_matrix):
+                y = np.asarray(y.todense())
             yhat = self._continuous_model(idx=g, non_numeric=non_numeric)
             if log:
                 y = np.log(y + 1)
