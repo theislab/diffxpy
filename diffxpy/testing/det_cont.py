@@ -337,7 +337,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
 
             y = self.x[:, g]
             if isinstance(y, scipy.sparse.csr_matrix):
-                y = np.asarray(y.todense())
+                y = np.asarray(y.todense()).flatten()
             yhat = self._continuous_model(idx=g, non_numeric=non_numeric)
             if log:
                 y = np.log(y + 1)
