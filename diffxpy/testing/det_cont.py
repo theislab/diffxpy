@@ -30,6 +30,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             size_factors: np.ndarray,
             continuous_coords: np.ndarray,
             spline_coefs: list,
+            interpolated_spline_basis: np.ndarray,
             noise_model: str
     ):
         self._de_test = de_test
@@ -37,6 +38,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         self._size_factors = size_factors
         self._continuous_coords = continuous_coords
         self._spline_coefs = spline_coefs
+        self._interpolated_spline_basis = interpolated_spline_basis
         self.noise_model = noise_model
 
     @property
@@ -207,6 +209,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :return: Continuuos fit for each cell for given gene.
         """
         idx = np.asarray(idx)
+
         if non_numeric:
             mu = np.matmul(self._model_estim.input_data.design_loc,
                            self._model_estim.model.a[:, idx])
@@ -219,6 +222,20 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
 
         mu = np.exp(mu)
         return mu
+
+    def _continuous_interpolation(self, idx):
+        """
+        Recover continuous fit for a gene.
+
+        :param idx: Index of genes to recover fit for.
+        :return: Continuuos fit for each cell for given gene.
+        """
+        idx = np.asarray(idx)
+        idx_basis = self._spline_par_loc_idx(intercept=True)
+        eta_loc = np.matmul(self._interpolated_spline_basis[:, :-1], self._model_estim.model.a[idx_basis, :][:, idx])
+        mu = np.exp(eta_loc)
+        t_eval = self._interpolated_spline_basis[:, -1]
+        return t_eval, mu
 
     def max(self, genes, non_numeric=False):
         """
@@ -276,7 +293,6 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             hue=None,
             size=1,
             log=True,
-            non_numeric=False,
             save=None,
             show=True,
             ncols=2,
@@ -291,7 +307,6 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :param hue: Confounder to include in plot.
         :param size: Point size.
         :param log: Whether to log values.
-        :param non_numeric:
         :param save: Path+file name stem to save plots to.
             File will be save+"_genes.png". Does not save if save is None.
         :param show: Whether to display plot.
@@ -338,7 +353,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             y = self.x[:, g]
             if isinstance(y, scipy.sparse.csr_matrix):
                 y = np.asarray(y.todense()).flatten()
-            yhat = self._continuous_model(idx=g, non_numeric=non_numeric)
+            t_continuous, yhat = self._continuous_interpolation(idx=g)
             if log:
                 y = np.log(y + 1)
                 yhat = np.log(yhat + 1)
@@ -352,7 +367,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
                 legend=False
             )
             sns.lineplot(
-                x=self._continuous_coords,
+                x=t_continuous,
                 y=yhat,
                 hue=hue,
                 ax=ax
@@ -419,23 +434,17 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
 
         # Build heatmap matrix.
         # Add in data.
-        data = np.array([
-            self._continuous_model(idx=g, non_numeric=False)
-            for i, g in enumerate(gene_idx)
-        ])
-        # Order columns by continuous covariate.
-        idx_x_sorted = np.argsort(self._continuous_coords)
-        data = data[:, idx_x_sorted]
-        xcoord = self._continuous_coords[idx_x_sorted]
+        xcoord, data = self._continuous_interpolation(idx=gene_idx)
+        data = data.T
 
         if transform.lower() == "log10":
             data = np.nextafter(0, 1, out=data, where=data == 0)
             data = np.log(data) / np.log(10)
         elif transform.lower() == "zscore":
-            mu = np.mean(data, axis=0)
-            sd = np.std(data, axis=0)
+            mu = np.mean(data, axis=0, keepdims=True)
+            sd = np.std(data, axis=0, keepdims=True)
             sd = np.nextafter(0, 1, out=sd, where=sd == 0)
-            data = np.array([(x - mu[i]) / sd[i] for i, x in enumerate(data)])
+            data = (data - mu) / sd
         elif transform.lower() == "none":
             pass
         else:
@@ -483,7 +492,8 @@ class DifferentialExpressionTestWaldCont(_DifferentialExpressionTestCont):
             size_factors: np.ndarray,
             continuous_coords: np.ndarray,
             spline_coefs: list,
-            noise_model: str,
+            interpolated_spline_basis: np.ndarray,
+            noise_model: str
     ):
         super(DifferentialExpressionTestWaldCont, self).__init__(
             de_test=de_test,
@@ -491,6 +501,7 @@ class DifferentialExpressionTestWaldCont(_DifferentialExpressionTestCont):
             size_factors=size_factors,
             continuous_coords=continuous_coords,
             spline_coefs=spline_coefs,
+            interpolated_spline_basis=interpolated_spline_basis,
             noise_model=noise_model
         )
 
@@ -504,6 +515,7 @@ class DifferentialExpressionTestLRTCont(_DifferentialExpressionTestCont):
             size_factors: np.ndarray,
             continuous_coords: np.ndarray,
             spline_coefs: list,
+            interpolated_spline_basis: np.ndarray,
             noise_model: str
     ):
         super().__init__(
@@ -512,5 +524,6 @@ class DifferentialExpressionTestLRTCont(_DifferentialExpressionTestCont):
             size_factors=size_factors,
             continuous_coords=continuous_coords,
             spline_coefs=spline_coefs,
+            interpolated_spline_basis=interpolated_spline_basis,
             noise_model=noise_model
         )

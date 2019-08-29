@@ -1722,7 +1722,7 @@ def continuous_1d(
         noise_model: str = 'nb',
         size_factors: np.ndarray = None,
         batch_size: int = None,
-        training_strategy: Union[str, List[Dict[str, object]], Callable] = "DEFAULT",
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
         dtype="float64",
         **kwargs
@@ -1906,6 +1906,21 @@ def continuous_1d(
     new_coefs = [continuous + str(i) for i in range(spline_basis.shape[1])]
     spline_basis.columns = new_coefs
     formula_extension = '+'.join(new_coefs)
+    # Generated interpolated spline bases.
+    # Safe interpolated interval in last column, need to extract later.
+    interpolated_interval = np.linspace(
+        np.min(sample_description[continuous].values),
+        np.max(sample_description[continuous].values),
+        100
+    )
+    interpolated_spline_basis = np.hstack([
+        np.ones([100, 1]),
+        patsy.highlevel.dmatrix(
+            "0+bs(" + continuous + ", df=" + str(df) + ")",
+            pd.DataFrame({continuous: interpolated_interval})
+        ).base,
+        np.expand_dims(interpolated_interval, axis=1)
+    ])
 
     # Replace continuous factor in formulas by spline basis coefficients.
     # Note that the brackets around formula_term_continuous propagate the sum
@@ -1978,7 +1993,8 @@ def continuous_1d(
             noise_model=noise_model,
             size_factors=size_factors,
             continuous_coords=sample_description[continuous].values,
-            spline_coefs=new_coefs
+            spline_coefs=new_coefs,
+            interpolated_spline_basis=interpolated_spline_basis
         )
     elif test.lower() == 'lrt':
         if noise_model is None:
