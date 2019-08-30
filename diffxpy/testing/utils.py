@@ -52,19 +52,20 @@ def parse_sample_description(
                 "with corresponding sample annotations"
             )
 
-    if anndata is not None and isinstance(data, Raw):
-        # Raw does not have attribute shape.
-        assert data.X.shape[0] == sample_description.shape[0], \
-            "data matrix and sample description must contain same number of cells: %i, %i" % \
-            (data.X.shape[0], sample_description.shape[0])
-    elif isinstance(data, glm.typing.InputDataBase):
-        assert data.x.shape[0] == sample_description.shape[0], \
-            "data matrix and sample description must contain same number of cells: %i, %i" % \
-            (data.x.shape[0], sample_description.shape[0])
-    else:
-        assert data.shape[0] == sample_description.shape[0], \
-            "data matrix and sample description must contain same number of cells: %i, %i" % \
-            (data.shape[0], sample_description.shape[0])
+    if sample_description is not None:
+        if anndata is not None and isinstance(data, Raw):
+            # Raw does not have attribute shape.
+            assert data.X.shape[0] == sample_description.shape[0], \
+                "data matrix and sample description must contain same number of cells: %i, %i" % \
+                (data.X.shape[0], sample_description.shape[0])
+        elif isinstance(data, glm.typing.InputDataBase):
+            assert data.x.shape[0] == sample_description.shape[0], \
+                "data matrix and sample description must contain same number of cells: %i, %i" % \
+                (data.x.shape[0], sample_description.shape[0])
+        else:
+            assert data.shape[0] == sample_description.shape[0], \
+                "data matrix and sample description must contain same number of cells: %i, %i" % \
+                (data.shape[0], sample_description.shape[0])
     return sample_description
 
 
@@ -117,8 +118,7 @@ def dmat_unique(dmat, sample_description):
 
 
 def design_matrix(
-        data: Union[anndata.AnnData, Raw, np.ndarray,
-                    scipy.sparse.csr_matrix] = None,
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix] = None,
         sample_description: Union[None, pd.DataFrame] = None,
         formula: Union[None, str] = None,
         as_numeric: Union[List[str], Tuple[str], str] = (),

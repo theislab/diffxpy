@@ -19,7 +19,7 @@ from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, 
     DifferentialExpressionTestVsRest, _DifferentialExpressionTestMulti, DifferentialExpressionTestByPartition
 from .det_cont import DifferentialExpressionTestWaldCont, DifferentialExpressionTestLRTCont
 from .utils import parse_gene_names, parse_sample_description, parse_size_factors, parse_grouping, \
-    constraint_system_from_star
+    constraint_system_from_star, design_matrix, preview_coef_names
 
 
 def _fit(
@@ -580,8 +580,17 @@ def wald(
     constraints_loc_temp = constraints_loc if constraints_loc is not None else np.eye(design_loc.shape[-1])
     if factor_loc_totest is not None:
         # Select coefficients to test via formula model:
+        # Create temporary patsy design matrix to catch events in which design matrix is not patsy anymore here:
+        design_loc_temp = design_matrix(
+            data=data,
+            sample_description=sample_description,
+            formula=formula_loc,
+            as_numeric=as_numeric,
+            dmat=dmat_loc,
+            return_type="patsy"
+        )
         col_indices = np.concatenate([
-            np.arange(design_loc.shape[-1])[design_loc.design_info.slice(x)]
+            np.arange(design_loc_temp.shape[-1])[design_loc_temp.design_info.slice(x)]
             for x in factor_loc_totest
         ])
         assert col_indices.size > 0, "Could not find any matching columns!"
@@ -595,8 +604,14 @@ def wald(
                 design_loc[:, col_indices] = np.where(samples, 1, 0)
     elif coef_to_test is not None:
         # Directly select coefficients to test from design matrix:
-        # Check that coefficients to test are not dependent parameters if constraints are given:
-        coef_loc_names = glm.data.view_coef_names(design_loc).tolist()
+        if sample_description is not None:
+            coef_loc_names = preview_coef_names(
+                sample_description=sample_description,
+                formula=formula_loc,
+                as_numeric=as_numeric
+            ).tolist()
+        else:
+            coef_loc_names = dmat_loc.columns.tolist()
         if not np.all([x in coef_loc_names for x in coef_to_test]):
             raise ValueError(
                 "the requested test coefficients %s were found in model coefficients %s" %

@@ -17,17 +17,19 @@ class _TestContinuous:
         self,
         sim,
         sample_description,
+        constrained,
         test
     ):
         test = de.test.continuous_1d(
             data=sim.input_data,
             sample_description=sample_description,
             gene_names=["gene" + str(i) for i in range(sim.input_data.num_features)],
-            continuous="pseudotime",
-            df=3,
-            formula_loc="~ 1 + pseudotime + batch",
+            formula_loc="~ 1 + continuous_covariate + batch",
             formula_scale="~ 1",
-            factor_loc_totest="pseudotime",
+            factor_loc_totest="continuous_covariate",
+            continuous="continuous_covariate",
+            constraints_loc={"batch": "continuous_covariate"} if constrained else None,
+            df=3,
             test=test,
             quick_scale=True,
             noise_model=self.noise_model
@@ -38,23 +40,30 @@ class _TestContinuous:
             self,
             nobs: int,
             ngenes: int,
-            test: str
+            test: str,
+            constrained: bool
     ):
         sim = Simulator(num_observations=nobs, num_features=ngenes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "pseudotime": np.random.random(size=sim.nobs),
-            "batch": np.random.randint(2, size=sim.nobs)
+            "continuous_covariate": np.asarray(np.random.randint(0, 5, size=sim.nobs), dtype=float)
         })
+        random_sample_description["batch"] = [str(int(x)) + str(np.random.randint(0, 3))
+                                              for x in random_sample_description["continuous_covariate"]]
         return self._fit_continuous(
             sim=sim,
             sample_description=random_sample_description,
-            test=test
+            test=test,
+            constrained=constrained
         )
 
-    def _test_forfatal(self, test: str):
+    def _test_forfatal(
+            self,
+            test: str,
+            constrained: bool
+    ):
         """
         Test if de.test.continuous() DifferentialExpressionTestSingle object functions work fine.
         """
@@ -62,7 +71,12 @@ class _TestContinuous:
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        test = self._test_null_model(nobs=10, ngenes=2, test=test)
+        test = self._test_null_model(
+            nobs=10,
+            ngenes=2,
+            test=test,
+            constrained=constrained
+        )
         ids = test.gene_ids
 
         # 1. Test all additional functions which depend on model computation:
@@ -102,7 +116,8 @@ class TestContinuousNb(_TestContinuous, unittest.TestCase):
 
         self.noise_model = "nb"
         np.random.seed(1)
-        _ = self._test_forfatal(test="wald")
+        _ = self._test_forfatal(test="wald", constrained=False)
+        _ = self._test_forfatal(test="wald", constrained=True)
         return True
 
     def test_forfatal_lrt(self):
@@ -121,7 +136,7 @@ class TestContinuousNb(_TestContinuous, unittest.TestCase):
 
         self.noise_model = "nb"
         np.random.seed(1)
-        _ = self._test_forfatal(test="lrt")
+        _ = self._test_forfatal(test="lrt", constrained=False)
         return True
 
     def test_null_distribution_wald(self):
@@ -140,7 +155,7 @@ class TestContinuousNb(_TestContinuous, unittest.TestCase):
 
         self.noise_model = "nb"
         np.random.seed(1)
-        test = self._test_null_model(nobs=2000, ngenes=100, test="wald")
+        test = self._test_null_model(nobs=2000, ngenes=100, test="wald", constrained=False)
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
@@ -150,7 +165,7 @@ class TestContinuousNb(_TestContinuous, unittest.TestCase):
 
         return True
 
-    def test_null_distribution_lrt(self, n_cells: int = 2000, n_genes: int = 100):
+    def test_null_distribution_lrt(self):
         """
         Test if de.test.continuous() generates a uniform p-value distribution in lrt
         if it is given data simulated based on the null model. Returns the p-value
@@ -166,7 +181,7 @@ class TestContinuousNb(_TestContinuous, unittest.TestCase):
 
         self.noise_model = "nb"
         np.random.seed(1)
-        test = self._test_null_model(nobs=2000, ngenes=100, test="lrt")
+        test = self._test_null_model(nobs=2000, ngenes=100, test="lrt", constrained=False)
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval, 'uniform').pvalue
