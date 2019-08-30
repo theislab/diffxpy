@@ -24,11 +24,12 @@ class _TestContinuous:
             data=sim.input_data,
             sample_description=sample_description,
             gene_names=["gene" + str(i) for i in range(sim.input_data.num_features)],
-            formula_loc="~ 1 + continuous_covariate + batch",
+            formula_loc="~ 1 + continuous + batch",
             formula_scale="~ 1",
-            factor_loc_totest="continuous_covariate",
-            continuous="continuous_covariate",
-            constraints_loc={"batch": "continuous_covariate"} if constrained else None,
+            factor_loc_totest="continuous",
+            continuous="continuous",
+            constraints_loc={"batch": "continuous"} if constrained else None,
+            size_factors=np.random.uniform(0.5, 1.5, sim.nobs),
             df=3,
             test=test,
             quick_scale=True,
@@ -48,10 +49,10 @@ class _TestContinuous:
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "continuous_covariate": np.asarray(np.random.randint(0, 5, size=sim.nobs), dtype=float)
+            "continuous": np.asarray(np.random.randint(0, 5, size=sim.nobs), dtype=float)
         })
         random_sample_description["batch"] = [str(int(x)) + str(np.random.randint(0, 3))
-                                              for x in random_sample_description["continuous_covariate"]]
+                                              for x in random_sample_description["continuous"]]
         return self._fit_continuous(
             sim=sim,
             sample_description=random_sample_description,
@@ -72,7 +73,7 @@ class _TestContinuous:
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         test = self._test_null_model(
-            nobs=10,
+            nobs=500,
             ngenes=2,
             test=test,
             constrained=constrained
@@ -117,7 +118,7 @@ class TestContinuousNb(_TestContinuous, unittest.TestCase):
         self.noise_model = "nb"
         np.random.seed(1)
         _ = self._test_forfatal(test="wald", constrained=False)
-        _ = self._test_forfatal(test="wald", constrained=True)
+        #_ = self._test_forfatal(test="wald", constrained=True)
         return True
 
     def test_forfatal_lrt(self):
