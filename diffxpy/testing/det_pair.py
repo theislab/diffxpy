@@ -420,7 +420,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
         """
         assert np.all([x < self.pval.shape[1] for x in idx0])
         assert np.all([x < self.pval.shape[1] for x in idx1])
-        return self.pval[idx0, idx1]
+        return self.pval[idx0, :, :][:, idx1, :]
 
     def _log_fold_change_pairs(self, idx0, idx1, base):
         """
@@ -431,18 +431,16 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
         :param base: Base of logarithm.
         :return: log fold change values
         """
-        if self._logfc is None:
-            logfc = np.tile(np.NaN, [len(idx0), len(idx1), self.model_estim.x.shape[1]])
-            for i, xi in enumerate(idx0):
-                for j, xj in enumerate(idx1):
-                    logfc[i, j, :] = self._theta_mle[xj, :] - self._theta_mle[xi, :]
-                    logfc[j, i, :] = -logfc[i, j, :]
-            self._logfc = logfc
+        logfc = np.tile(np.NaN, [len(idx0), len(idx1), self.model_estim.x.shape[1]])
+        for i, xi in enumerate(idx0):
+            for j, xj in enumerate(idx1):
+                logfc[i, j, :] = self._theta_mle[xj, :] - self._theta_mle[xi, :]
+                logfc[j, i, :] = -logfc[i, j, :]
 
         if base == np.e:
-            return self._logfc[idx0, :, :][:, idx1, :]
+            return logfc
         else:
-            return self._logfc[idx0, :, :][:, idx1, :] / np.log(base)
+            return logfc / np.log(base)
 
 
 class _DifferentialExpressionTestPairwiseLazyBase(_DifferentialExpressionTestPairwiseBase):
