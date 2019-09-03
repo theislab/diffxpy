@@ -43,7 +43,7 @@ class _TestFit:
             "batch": np.random.randint(2, size=sim.nobs)
         })
 
-        estim = de.fit.model(
+        _ = de.fit.model(
             data=sim.input_data,
             sample_description=random_sample_description,
             formula_loc="~ 1 + condition + batch",

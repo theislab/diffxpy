@@ -213,7 +213,7 @@ def preview_coef_names(
 
 
 def constraint_system_from_star(
-        dmat: Union[None, np.ndarray] = None,
+        dmat: Union[None, patsy.design_info.DesignMatrix] = None,
         sample_description: Union[None, pd.DataFrame] = None,
         formula: Union[None, str] = None,
         as_numeric: Union[List[str], Tuple[str], str] = (),

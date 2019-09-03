@@ -28,6 +28,8 @@ def _fit(
         data,
         design_loc,
         design_scale,
+        design_loc_names: list = None,
+        design_scale_names: list = None,
         constraints_loc: np.ndarray = None,
         constraints_scale: np.ndarray = None,
         init_model=None,
@@ -148,6 +150,8 @@ def _fit(
             data=data,
             design_loc=design_loc,
             design_scale=design_scale,
+            design_loc_names=design_loc_names,
+            design_scale_names=design_scale_names,
             constraints_loc=constraints_loc,
             constraints_scale=constraints_scale,
             size_factors=size_factors,
@@ -558,8 +562,8 @@ def wald(
         sample_description=sample_description
     )
 
-    logging.getLogger("diffxpy").debug("building location model")
-    design_loc, constraints_loc = constraint_system_from_star(
+    # Build design matrices and constraints.
+    design_loc, design_loc_names, constraints_loc, term_names_loc = constraint_system_from_star(
         dmat=dmat_loc,
         sample_description=sample_description,
         formula=formula_loc,
@@ -567,8 +571,7 @@ def wald(
         constraints=constraints_loc,
         return_type="patsy"
     )
-    logging.getLogger("diffxpy").debug("building scale model")
-    design_scale, constraints_scale = constraint_system_from_star(
+    design_scale, design_scale_names, constraints_scale, term_names_scale = constraint_system_from_star(
         dmat=dmat_scale,
         sample_description=sample_description,
         formula=formula_scale,
@@ -579,22 +582,20 @@ def wald(
 
     # Define indices of coefficients to test:
     constraints_loc_temp = constraints_loc if constraints_loc is not None else np.eye(design_loc.shape[-1])
+    # Check that design_loc is patsy, otherwise  use term_names for slicing.
     if factor_loc_totest is not None:
-        # Select coefficients to test via formula model:
-        # Create temporary patsy design matrix to catch events in which design matrix is not patsy anymore here:
-        design_loc_temp = design_matrix(
-            data=data,
-            sample_description=sample_description,
-            formula=formula_loc,
-            as_numeric=as_numeric,
-            dmat=dmat_loc,
-            return_type="patsy"
-        )
-        col_indices = np.concatenate([
-            np.arange(design_loc_temp.shape[-1])[design_loc_temp.design_info.slice(x)]
-            for x in factor_loc_totest
-        ])
-        assert col_indices.size > 0, "Could not find any matching columns!"
+        if not isinstance(design_loc, patsy.design_info.DesignMatrix):
+            col_indices = np.where([
+                x in factor_loc_totest
+                for x in term_names_loc
+            ])[0]
+        else:
+            # Select coefficients to test via formula model:
+            col_indices = np.concatenate([
+                np.arange(design_loc.shape[-1])[design_loc.design_info.slice(x)]
+                for x in factor_loc_totest
+            ])
+        assert len(col_indices) > 0, "Could not find any matching columns!"
         if coef_to_test is not None:
             if len(factor_loc_totest) > 1:
                 raise ValueError("do not set coef_to_test if more than one factor_loc_totest is given")
@@ -626,16 +627,19 @@ def wald(
         raise ValueError("either set factor_loc_totest or coef_to_test")
     # Check that all tested coefficients are independent:
     for x in col_indices:
-        if np.sum(constraints_loc_temp[x,:]) != 1:
+        if np.sum(constraints_loc_temp[x, :]) != 1:
             raise ValueError("Constraints input is wrong: not all tested coefficients are unconstrained.")
     # Adjust tested coefficients from dependent to independent (fitted) parameters:
-    col_indices = np.array([np.where(constraints_loc_temp[x,:] == 1)[0][0] for x in col_indices])
+    col_indices = np.array([np.where(constraints_loc_temp[x, :] == 1)[0][0] for x in col_indices])
 
+    # Fit model.
     model = _fit(
         noise_model=noise_model,
         data=data,
         design_loc=design_loc,
         design_scale=design_scale,
+        design_loc_names=design_loc_names,
+        design_scale_names=design_scale_names,
         constraints_loc=constraints_loc,
         constraints_scale=constraints_scale,
         init_a=init_a,
@@ -649,13 +653,13 @@ def wald(
         **kwargs,
     )
 
+    # Prepare differential expression test.
     de_test = DifferentialExpressionTestWald(
         model_estim=model,
         col_indices=col_indices,
         noise_model=noise_model,
         sample_description=sample_description
     )
-
     return de_test
 
 
@@ -1721,22 +1725,22 @@ class _Partition:
 
 
 def continuous_1d(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         continuous: str,
-        df: int = 5,
-        factor_loc_totest: Union[str, List[str]] = None,
-        formula_loc: str = None,
+        factor_loc_totest: Union[str, List[str]],
+        formula_loc: str,
         formula_scale: str = "~1",
+        df: int = 5,
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
         init_a: Union[np.ndarray, str] = "standard",
         init_b: Union[np.ndarray, str] = "standard",
         gene_names: Union[np.ndarray, list] = None,
-        sample_description=None,
+        sample_description: Union[None, pd.DataFrame] = None,
         constraints_loc: Union[dict, None] = None,
         constraints_scale: Union[dict, None] = None,
         noise_model: str = 'nb',
-        size_factors: np.ndarray = None,
+        size_factors: Union[np.ndarray, pd.core.series.Series, str] = None,
         batch_size: int = None,
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
@@ -1896,10 +1900,7 @@ def continuous_1d(
     """
     if formula_loc is None:
         raise ValueError("supply fomula_loc")
-    # Set testing default to continuous covariate if not supplied:
-    if factor_loc_totest is None:
-        factor_loc_totest = [continuous]
-    elif isinstance(factor_loc_totest, str):
+    if isinstance(factor_loc_totest, str):
         factor_loc_totest = [factor_loc_totest]
     elif isinstance(factor_loc_totest, tuple):
         factor_loc_totest = list(factor_loc_totest)
@@ -1917,6 +1918,11 @@ def continuous_1d(
         raise ValueError('parameter continuous not found in sample_description')
 
     # Perform spline basis transform.
+    if not np.issubdtype(sample_description[continuous].dtype, np.number):
+        raise ValueError(
+            "The column corresponding to the continuous covariate ('%s') in " % continuous +
+            "sample description should be numeric but is '%s'" % sample_description[continuous].dtype
+        )
     spline_basis = patsy.highlevel.dmatrix("0+bs(" + continuous + ", df=" + str(df) + ")", sample_description)
     spline_basis = pd.DataFrame(spline_basis)
     new_coefs = [continuous + str(i) for i in range(spline_basis.shape[1])]
@@ -1943,17 +1949,11 @@ def continuous_1d(
     # across interaction terms.
     formula_term_continuous = '(' + formula_extension + ')'
 
-    if formula_loc is not None:
-        formula_loc_new = formula_loc.split(continuous)
-        formula_loc_new = formula_term_continuous.join(formula_loc_new)
-    else:
-        formula_loc_new = None
+    formula_loc_new = formula_loc.split(continuous)
+    formula_loc_new = formula_term_continuous.join(formula_loc_new)
 
-    if formula_scale is not None:
-        formula_scale_new = formula_scale.split(continuous)
-        formula_scale_new = formula_term_continuous.join(formula_scale_new)
-    else:
-        formula_scale_new = None
+    formula_scale_new = formula_scale.split(continuous)
+    formula_scale_new = formula_term_continuous.join(formula_scale_new)
 
     # Add spline basis into sample description
     for x in spline_basis.columns:
