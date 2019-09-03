@@ -595,6 +595,7 @@ def wald(
                 np.arange(design_loc.shape[-1])[design_loc.design_info.slice(x)]
                 for x in factor_loc_totest
             ])
+        print(col_indices)
         assert len(col_indices) > 0, "Could not find any matching columns!"
         if coef_to_test is not None:
             if len(factor_loc_totest) > 1:
@@ -1989,7 +1990,7 @@ def continuous_1d(
     for x in spline_basis.columns:
         sample_description[x] = spline_basis[x].values
 
-    # Add spline basis to continuous covariate list
+    # Add spline basis to continuous covariates list
     as_numeric.extend(new_coefs)
 
     if test.lower() == 'wald':
@@ -1999,23 +2000,34 @@ def continuous_1d(
         # Adjust factors / coefficients to test:
         # Note that the continuous covariate does not necessarily have to be tested,
         # it could also be a condition effect or similar.
-        # TODO handle interactions
         if continuous in factor_loc_totest:
             # Create reduced set of factors to test which does not contain continuous:
-            factor_loc_totest_new = [x for x in factor_loc_totest if x != continuous]
+            factor_loc_totest_intermediate = [x for x in factor_loc_totest if x != continuous]
             # Add spline basis terms in instead of continuous term:
-            factor_loc_totest_new.extend(new_coefs)
+            factor_loc_totest_intermediate.extend(new_coefs)
         else:
-            factor_loc_totest_new = factor_loc_totest
+            factor_loc_totest_intermediate = factor_loc_totest
+        # Replace continuous factor in interaction terms with new spline factors.
+        factor_loc_totest_final = []
+        for i, x in enumerate(factor_loc_totest_intermediate):
+            if len(x.split(":")) > 1:
+                if np.any([x == continuous for x in x.split(":")]):
+                    interaction_partner = [y for y in x.split(":") if y != continuous][0]
+                    for y in new_coefs:
+                        factor_loc_totest_final.append(y+":"+interaction_partner)
+                else:
+                    factor_loc_totest_final.append(x)
+            else:
+                factor_loc_totest_final.append(x)
 
         logging.getLogger("diffxpy").debug("model formulas assembled in de.test.continuos():")
-        logging.getLogger("diffxpy").debug("factor_loc_totest_new: " + ",".join(factor_loc_totest_new))
+        logging.getLogger("diffxpy").debug("factor_loc_totest_final: " + ",".join(factor_loc_totest_final))
         logging.getLogger("diffxpy").debug("formula_loc_new: " + formula_loc_new)
         logging.getLogger("diffxpy").debug("formula_scale_new: " + formula_scale_new)
 
         de_test = wald(
             data=data,
-            factor_loc_totest=factor_loc_totest_new,
+            factor_loc_totest=factor_loc_totest_final,
             coef_to_test=None,
             formula_loc=formula_loc_new,
             formula_scale=formula_scale_new,
@@ -2034,6 +2046,7 @@ def continuous_1d(
             dtype=dtype,
             **kwargs
         )
+        print(de_test.model_estim.input_data.loc_names)
         de_test = DifferentialExpressionTestWaldCont(
             de_test=de_test,
             noise_model=noise_model,

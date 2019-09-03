@@ -39,6 +39,31 @@ class _TestContinuous:
         )
         return test
 
+    def _fit_continuous_interaction(
+        self,
+        sim,
+        sample_description,
+        constrained,
+        test,
+        spline_basis
+    ):
+        test = de.test.continuous_1d(
+            data=sim.input_data,
+            sample_description=sample_description,
+            gene_names=["gene" + str(i) for i in range(sim.input_data.num_features)],
+            formula_loc="~ 1 + continuous + batch + continuous:batch",
+            formula_scale="~ 1",
+            factor_loc_totest=["continuous", "continuous:batch"],
+            continuous="continuous",
+            size_factors="size_factors",
+            df=3,
+            spline_basis=spline_basis,
+            test=test,
+            quick_scale=True,
+            noise_model=self.noise_model
+        )
+        return test
+
     def _test_basic(
             self,
             ngenes: int,
@@ -67,6 +92,34 @@ class _TestContinuous:
         )
         return det
 
+    def _test_interaction(
+            self,
+            ngenes: int,
+            test: str,
+            constrained: bool,
+            spline_basis: str
+    ):
+        n_timepoints = 5
+        sim = Simulator(num_observations=n_timepoints*200, num_features=ngenes)
+        sim.generate_sample_description(num_batches=0, num_conditions=0)
+        sim.generate_params()
+        sim.generate_data()
+
+        random_sample_description = pd.DataFrame({
+            "continuous": np.asarray(np.random.randint(0, n_timepoints, size=sim.nobs), dtype=float)
+        })
+        random_sample_description["batch"] = [str(np.random.randint(0, 3))
+                                              for x in random_sample_description["continuous"]]
+        random_sample_description["size_factors"] = np.random.uniform(0.9, 1.1, sim.nobs)  # TODO put into simulation.
+        det = self._fit_continuous_interaction(
+            sim=sim,
+            sample_description=random_sample_description,
+            test=test,
+            constrained=constrained,
+            spline_basis=spline_basis,
+        )
+        return det
+
     def _test_null_model(
             self,
             ngenes: int,
@@ -75,6 +128,21 @@ class _TestContinuous:
             spline_basis: str
     ):
         det = self._test_basic(
+            ngenes=ngenes,
+            test=test,
+            constrained=constrained,
+            spline_basis=spline_basis
+        )
+        return self._eval(det=det)
+
+    def _test_null_model_interaction(
+            self,
+            ngenes: int,
+            test: str,
+            constrained: bool,
+            spline_basis: str
+    ):
+        det = self._test_interaction(
             ngenes=ngenes,
             test=test,
             constrained=constrained,
@@ -145,6 +213,15 @@ class _TestContinuous:
         for x in ["bs", "cr", "cc"]:
             self._test_null_model(ngenes=ngenes, test=test, constrained=constrained, spline_basis=x)
 
+    def _test_null_model_all_splines_interaction(
+            self,
+            ngenes: int,
+            test: str,
+            constrained: bool
+    ):
+        for x in ["bs", "cr", "cc"]:
+            self._test_null_model_interaction(ngenes=ngenes, test=test, constrained=constrained, spline_basis=x)
+
 
 class TestContinuousNb(_TestContinuous, unittest.TestCase):
 
@@ -203,7 +280,8 @@ class TestContinuousNb(_TestContinuous, unittest.TestCase):
 
         self.noise_model = "nb"
         np.random.seed(1)
-        self._test_null_model_all_splines(ngenes=100, test="wald", constrained=False)
+        #self._test_null_model_all_splines(ngenes=100, test="wald", constrained=False)
+        self._test_null_model_all_splines_interaction(ngenes=100, test="wald", constrained=False)
         return True
 
     def test_null_distribution_wald_constrained(self):
@@ -223,6 +301,7 @@ class TestContinuousNb(_TestContinuous, unittest.TestCase):
         self.noise_model = "nb"
         np.random.seed(1)
         self._test_null_model_all_splines(ngenes=100, test="wald", constrained=True)
+        # Interaction not supported yet.
         return True
 
     def _test_null_distribution_lrt(self):
