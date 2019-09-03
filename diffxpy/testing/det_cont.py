@@ -214,7 +214,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             mu = np.matmul(self._model_estim.input_data.design_loc,
                            self._model_estim.model.a[:, idx])
             if self._size_factors is not None:
-                mu = mu + self._size_factors
+                mu = mu + self._model_estim.input_data.size_factors
         else:
             idx_basis = self._spline_par_loc_idx(intercept=True)
             mu = np.matmul(self._model_estim.input_data.design_loc[:, idx_basis],

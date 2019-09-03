@@ -49,10 +49,7 @@ class _TestSingleNull:
             sample_description=random_sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition + batch",
-            batch_size=500,
-            noise_model=noise_model,
-            training_strategy="DEFAULT",
-            dtype="float64"
+            noise_model=noise_model
         )
         _ = test.summary()
 
@@ -100,9 +97,7 @@ class _TestSingleNull:
             sample_description=random_sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition",
-            noise_model=noise_model,
-            training_strategy="DEFAULT",
-            dtype="float64"
+            noise_model=noise_model
         )
         _ = test.summary()
 
@@ -152,9 +147,7 @@ class _TestSingleNull:
             full_formula_scale="~ 1",
             reduced_formula_loc="~ 1",
             reduced_formula_scale="~ 1",
-            noise_model=noise_model,
-            training_strategy="DEFAULT",
-            dtype="float64"
+            noise_model=noise_model
         )
         _ = test.summary()
 

@@ -40,8 +40,8 @@ class TestConstrained(unittest.TestCase):
         coefficient_names = ['intercept', 'bio1', 'bio2', 'bio3', 'bio4', 'treatment1']
         dmat_est = pd.DataFrame(data=dmat, columns=coefficient_names)
 
-        dmat_est_loc = de.utils.design_matrix(dmat=dmat_est, return_type="dataframe")
-        dmat_est_scale = de.utils.design_matrix(dmat=dmat_est, return_type="dataframe")
+        dmat_est_loc, _ = de.utils.design_matrix(dmat=dmat_est, return_type="dataframe")
+        dmat_est_scale, _ = de.utils.design_matrix(dmat=dmat_est, return_type="dataframe")
 
         # Build constraints:
         constraints_loc = de.utils.constraint_matrix_from_string(
@@ -144,7 +144,7 @@ class TestConstrained(unittest.TestCase):
 
         return True
 
-    def test_null_distribution_wald_constrained_2layer(self, n_genes: int = 100):
+    def _test_null_distribution_wald_constrained_2layer(self, n_genes: int = 100):
         """
         Test if de.wald() with constraints generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value

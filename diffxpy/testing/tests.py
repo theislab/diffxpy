@@ -611,7 +611,7 @@ def wald(
                 sample_description=sample_description,
                 formula=formula_loc,
                 as_numeric=as_numeric
-            ).tolist()
+            )
         else:
             coef_loc_names = dmat_loc.columns.tolist()
         if not np.all([x in coef_loc_names for x in coef_to_test]):
@@ -1731,6 +1731,7 @@ def continuous_1d(
         formula_loc: str,
         formula_scale: str = "~1",
         df: int = 5,
+        spline_basis: str = "bs",
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
         init_a: Union[np.ndarray, str] = "standard",
@@ -1774,7 +1775,14 @@ def continuous_1d(
     :param df: int
         Degrees of freedom of the spline model, i.e. the number of spline basis vectors.
         df is equal to the number of coefficients in the GLM which are used to describe the
-        continuous depedency-
+        continuous depedency.
+    :param spline_basis: str
+        The type of sline basis to use, refer also to:
+            https://patsy.readthedocs.io/en/latest/spline-regression.html
+
+            - "bs": B-splines
+            - "cr": natural cubic splines
+            - "cc": natural cyclic splines
     :param factor_loc_totest:
         List of factors of formula to test with Wald test.
         E.g. "condition" or ["batch", "condition"] if formula_loc would be "~ 1 + batch + condition"
@@ -1913,17 +1921,39 @@ def continuous_1d(
     gene_names = parse_gene_names(data, gene_names)
     sample_description = parse_sample_description(data, sample_description)
 
-    # Check that continuous factor is contained in sample description
+    # Check that continuous factor is contained in sample description and is numeric.
     if continuous not in sample_description.columns:
         raise ValueError('parameter continuous not found in sample_description')
-
-    # Perform spline basis transform.
     if not np.issubdtype(sample_description[continuous].dtype, np.number):
         raise ValueError(
             "The column corresponding to the continuous covariate ('%s') in " % continuous +
             "sample description should be numeric but is '%s'" % sample_description[continuous].dtype
         )
-    spline_basis = patsy.highlevel.dmatrix("0+bs(" + continuous + ", df=" + str(df) + ")", sample_description)
+    # Check that not too many degrees of freedom given the sampled points were chosen:
+    if len(np.unique(sample_description[continuous].values)) <= df - 1:
+        raise ValueError(
+            "Use at most (number of observed points in continuous covariate) - 1 degrees of freedom " +
+            " for spline basis. You chose df=%i for n=%i points." %
+            (df, len(np.unique(sample_description[continuous].values)))
+        )
+    # Perform spline basis transform.
+    if spline_basis.lower() == "bs":
+        spline_basis = patsy.highlevel.dmatrix(
+            "bs(" + continuous + ", df=" + str(df) + ", degree=3, include_intercept=False) - 1",
+            sample_description
+        )
+    elif spline_basis.lower() == "cr":
+        spline_basis = patsy.highlevel.dmatrix(
+            "cr(" + continuous + ", df=" + str(df) + ", constraints='center') - 1",
+            sample_description
+        )
+    elif spline_basis.lower() == "cc":
+        spline_basis = patsy.highlevel.dmatrix(
+            "cc(" + continuous + ", df=" + str(df) + ", constraints='center') - 1",
+            sample_description
+        )
+    else:
+        raise ValueError("spline basis %s not recognized" % spline_basis)
     spline_basis = pd.DataFrame(spline_basis)
     new_coefs = [continuous + str(i) for i in range(spline_basis.shape[1])]
     spline_basis.columns = new_coefs
