@@ -595,7 +595,6 @@ def wald(
                 np.arange(design_loc.shape[-1])[design_loc.design_info.slice(x)]
                 for x in factor_loc_totest
             ])
-        print(col_indices)
         assert len(col_indices) > 0, "Could not find any matching columns!"
         if coef_to_test is not None:
             if len(factor_loc_totest) > 1:
@@ -2046,7 +2045,6 @@ def continuous_1d(
             dtype=dtype,
             **kwargs
         )
-        print(de_test.model_estim.input_data.loc_names)
         de_test = DifferentialExpressionTestWaldCont(
             de_test=de_test,
             noise_model=noise_model,

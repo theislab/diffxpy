@@ -51,10 +51,12 @@ class _TestContinuous:
             data=sim.input_data,
             sample_description=sample_description,
             gene_names=["gene" + str(i) for i in range(sim.input_data.num_features)],
-            formula_loc="~ 1 + continuous + batch + continuous:batch",
+            formula_loc="~ 1 + continuous + condition + continuous:condition" if not constrained else \
+                "~ 1 + continuous + condition + continuous:condition + batch",
             formula_scale="~ 1",
-            factor_loc_totest=["continuous", "continuous:batch"],
+            factor_loc_totest=["continuous", "continuous:condition"],
             continuous="continuous",
+            constraints_loc={"batch": "condition"} if constrained else None,
             size_factors="size_factors",
             df=3,
             spline_basis=spline_basis,
@@ -108,8 +110,10 @@ class _TestContinuous:
         random_sample_description = pd.DataFrame({
             "continuous": np.asarray(np.random.randint(0, n_timepoints, size=sim.nobs), dtype=float)
         })
-        random_sample_description["batch"] = [str(np.random.randint(0, 3))
-                                              for x in random_sample_description["continuous"]]
+        random_sample_description["condition"] = [str(np.random.randint(0, 2))
+                                                  for x in random_sample_description["continuous"]]
+        random_sample_description["batch"] = [x + str(np.random.randint(0, 3))
+                                              for x in random_sample_description["condition"]]
         random_sample_description["size_factors"] = np.random.uniform(0.9, 1.1, sim.nobs)  # TODO put into simulation.
         det = self._fit_continuous_interaction(
             sim=sim,
@@ -280,7 +284,7 @@ class TestContinuousNb(_TestContinuous, unittest.TestCase):
 
         self.noise_model = "nb"
         np.random.seed(1)
-        #self._test_null_model_all_splines(ngenes=100, test="wald", constrained=False)
+        self._test_null_model_all_splines(ngenes=100, test="wald", constrained=False)
         self._test_null_model_all_splines_interaction(ngenes=100, test="wald", constrained=False)
         return True
 
@@ -301,7 +305,7 @@ class TestContinuousNb(_TestContinuous, unittest.TestCase):
         self.noise_model = "nb"
         np.random.seed(1)
         self._test_null_model_all_splines(ngenes=100, test="wald", constrained=True)
-        # Interaction not supported yet.
+        self._test_null_model_all_splines_interaction(ngenes=100, test="wald", constrained=True)
         return True
 
     def _test_null_distribution_lrt(self):
