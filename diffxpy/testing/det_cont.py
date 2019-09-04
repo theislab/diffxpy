@@ -110,12 +110,12 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :return: Log-fold change of fitted expression value by gene.
         """
         if genes is None:
-            genes = np.asarray(range(self.x.shape[1]))
+            idx = np.arange(0, self.x.shape[1])
         else:
-            genes = self._idx_genes(genes)
+            idx, genes = self._idx_genes(genes)
 
-        max_val = self.max(genes=genes, non_numeric=non_numeric)
-        min_val = self.min(genes=genes, non_numeric=non_numeric)
+        max_val = self.max(genes=idx, non_numeric=non_numeric)
+        min_val = self.min(genes=idx, non_numeric=non_numeric)
         max_val = np.nextafter(0, 1, out=max_val, where=max_val == 0)
         min_val = np.nextafter(0, 1, out=min_val, where=min_val == 0)
         return (np.log(max_val) - np.log(min_val)) / np.log(base)
@@ -179,12 +179,14 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
 
         if isinstance(genes[0], str):
             genes = self._filter_genes_str(genes)
-            genes = np.array([self.gene_ids.tolist().index(x) for x in genes])
-        elif isinstance(genes[0], int) or isinstance(genes[0], np.int64):
+            idx = np.array([self.gene_ids.tolist().index(x) for x in genes])
+        elif isinstance(genes[0], int) or isinstance(genes[0], np.number):
             genes = self._filter_genes_int(genes)
+            idx = genes
+            genes = [self.gene_ids.tolist()[x] for x in idx]
         else:
             raise ValueError("only string and integer elements allowed in genes")
-        return genes
+        return idx, genes
 
     def _spline_par_loc_idx(self, intercept=True):
         """
@@ -245,9 +247,9 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :param non_numeric: Whether to include non-numeric covariates in fit.
         :return: Maximum fitted expression value by gene.
         """
-        genes = self._idx_genes(genes)
+        idx, genes = self._idx_genes(genes)
         return np.array([np.max(self._continuous_model(idx=i, non_numeric=non_numeric))
-                         for i in genes])
+                         for i in idx])
 
     def min(self, genes, non_numeric=False):
         """
@@ -257,9 +259,9 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :param non_numeric: Whether to include non-numeric covariates in fit.
         :return: Maximum fitted expression value by gene.
         """
-        genes = self._idx_genes(genes)
+        idx, genes = self._idx_genes(genes)
         return np.array([np.min(self._continuous_model(idx=i, non_numeric=non_numeric))
-                         for i in genes])
+                         for i in idx])
 
     def argmax(self, genes, non_numeric=False):
         """
@@ -269,9 +271,9 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :param non_numeric: Whether to include non-numeric covariates in fit.
         :return: Maximum fitted expression value by gene.
         """
-        genes = self._idx_genes(genes)
+        idx, genes = self._idx_genes(genes)
         idx = np.array([np.argmax(self._continuous_model(idx=i, non_numeric=non_numeric))
-                        for i in genes])
+                        for i in idx])
         return self._continuous_coords[idx]
 
     def argmin(self, genes, non_numeric=False):
@@ -282,15 +284,16 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :param non_numeric: Whether to include non-numeric covariates in fit.
         :return: Maximum fitted expression value by gene.
         """
-        genes = self._idx_genes(genes)
+        idx, genes = self._idx_genes(genes)
         idx = np.array([np.argmin(self._continuous_model(idx=i, non_numeric=non_numeric))
-                        for i in genes])
+                        for i in idx])
         return self._continuous_coords[idx]
 
     def plot_genes(
             self,
             genes,
             hue=None,
+            scalings=None,
             size=1,
             log=True,
             save=None,
@@ -304,7 +307,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         Plot observed data and spline fits of selected genes.
 
         :param genes: Gene IDs to plot.
-        :param hue: Confounder to include in plot.
+        :param hue: Confounder to include in plot. Must be length number of observations.
+        :param scalings: Names of scaling coefficients to plot separate model curves for.
         :param size: Point size.
         :param log: Whether to log values.
         :param save: Path+file name stem to save plots to.
@@ -324,7 +328,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
 
         plt.ioff()
 
-        gene_idx = self._idx_genes(genes)
+        gene_idx, gene_ids = self._idx_genes(genes)
 
         # Set up gridspec.
         ncols = ncols if len(gene_idx) > ncols else len(gene_idx)
@@ -354,6 +358,19 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             if isinstance(y, scipy.sparse.csr_matrix):
                 y = np.asarray(y.todense()).flatten()
             t_continuous, yhat = self._continuous_interpolation(idx=g)
+            if scalings is not None:
+                yhat = np.vstack([
+                    [yhat],
+                    [
+                        yhat * np.expand_dims(
+                            np.exp(self._model_estim.a_var[self._model_estim.input_data.loc_names.index(x), g]),
+                            axis=0
+                        )
+                        for i, x in enumerate(scalings)
+                    ]
+                ])
+            else:
+                yhat = np.expand_dims(yhat, axis=0)
             if log:
                 y = np.log(y + 1)
                 yhat = np.log(yhat + 1)
@@ -366,14 +383,15 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
                 ax=ax,
                 legend=False
             )
-            sns.lineplot(
-                x=t_continuous,
-                y=yhat,
-                hue=hue,
-                ax=ax
-            )
+            for j in range(yhat.shape[0]):
+                sns.lineplot(
+                    x=t_continuous,
+                    y=yhat[j, :],
+                    hue=None,
+                    ax=ax
+                )
 
-            ax.set_title(genes[i])
+            ax.set_title(gene_ids[i])
             ax.set_xlabel("continuous")
             if log:
                 ax.set_ylabel("log expression")
@@ -426,7 +444,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
 
         plt.ioff()
 
-        gene_idx = self._idx_genes(genes)
+        gene_idx, gene_ids = self._idx_genes(genes)
 
         # Define figure.
         fig = plt.figure(figsize=(width, height_per_gene * len(gene_idx)))
@@ -465,7 +483,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         ax.set_xticks(xtick_pos)
         ax.set_xticklabels(xtick_lab)
         ax.set_xlabel("continuous")
-        plt.yticks(np.arange(len(genes)), genes, rotation='horizontal')
+        plt.yticks(np.arange(len(genes)), gene_ids, rotation='horizontal')
         ax.set_ylabel("genes")
 
         # Save, show and return figure.
