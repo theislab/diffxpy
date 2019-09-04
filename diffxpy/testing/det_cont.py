@@ -357,6 +357,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             y = self.x[:, g]
             if isinstance(y, scipy.sparse.csr_matrix):
                 y = np.asarray(y.todense()).flatten()
+                if self._model_estim.input_data.size_factors is not None:
+                    y = y / self._model_estim.input_data.size_factors
             t_continuous, yhat = self._continuous_interpolation(idx=g)
             if scalings is not None:
                 yhat = np.vstack([
@@ -406,6 +408,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             plt.show()
 
         plt.close(fig)
+        plt.ion()
 
         if return_axs:
             return axs
@@ -494,6 +497,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             plt.show()
 
         plt.close(fig)
+        plt.ion()
 
         if return_axs:
             return ax
