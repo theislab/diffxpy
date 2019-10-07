@@ -32,7 +32,8 @@ Multiple tests per gene
 
 How to perform pairwise tests `pairwise <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/multi/pairwise.ipynb>`__.
 
-How to perform group versus rest tests `versus_rest <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/multiversus_rest.ipynb>`__.
+How to perform group versus rest tests `versus_rest 
+<https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/multi/versus_rest.ipynb>`__.
 
 
 Gene set enrichment: enrich
