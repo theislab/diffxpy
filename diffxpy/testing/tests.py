@@ -12,7 +12,6 @@ import scipy.sparse
 from typing import Union, List, Dict, Callable, Tuple
 
 from diffxpy import pkg_constants
-from diffxpy.models.batch_bfgs.optim import Estim_BFGS
 from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, \
     DifferentialExpressionTestTT, DifferentialExpressionTestRank, _DifferentialExpressionTestSingle, \
     DifferentialExpressionTestVsRest, _DifferentialExpressionTestMulti, DifferentialExpressionTestByPartition
@@ -20,7 +19,7 @@ from .det_cont import DifferentialExpressionTestWaldCont, DifferentialExpression
 from .det_pair import DifferentialExpressionTestZTestLazy, DifferentialExpressionTestZTest, \
     DifferentialExpressionTestPairwiseStandard
 from .utils import parse_gene_names, parse_sample_description, parse_size_factors, parse_grouping, \
-    constraint_system_from_star, design_matrix, preview_coef_names
+    constraint_system_from_star, preview_coef_names
 
 
 def _fit(
@@ -38,6 +37,7 @@ def _fit(
         gene_names=None,
         size_factors=None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
         close_session=True,
@@ -89,24 +89,9 @@ def _fit(
     :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data
     :param batch_size: the batch size to use for the estimator
-    :param training_strategy: {str, function, list} training strategy to use. Can be:
+    :param training_strategy: {str} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
-        - function: Can be used to implement custom training function will be called as
-          `training_strategy(estimator)`.
-        - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
-          method arguments.
-
-          Example:
-
-          .. code-block:: python
-
-              [
-                {"learning_rate": 0.5, },
-                {"learning_rate": 0.05, },
-              ]
-
-          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
@@ -128,64 +113,57 @@ def _fit(
         "irls_gd_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_GD_TR
     }
 
-    if isinstance(training_strategy, str) and training_strategy.lower() == 'bfgs':
-        assert False, "depreceated"
-        lib_size = np.zeros(data.shape[0])
+    if backend.lower() in ["tf1"]:
         if noise_model == "nb" or noise_model == "negative_binomial":
-            estim = Estim_BFGS(X=data, design_loc=design_loc, design_scale=design_scale,
-                               lib_size=lib_size, batch_size=batch_size, feature_names=gene_names)
-            estim.run(nproc=3, maxiter=10000, debug=False)
-            model = estim.return_batchglm_formated_model()
-        else:
-            raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
-    else:
-        if noise_model == "nb" or noise_model == "negative_binomial":
-            from batchglm.api.models.glm_nb import Estimator, InputDataGLM
+            from batchglm.api.models.tf1.glm_nb import Estimator, InputDataGLM
         elif noise_model == "norm" or noise_model == "normal":
-            from batchglm.api.models.glm_norm import Estimator, InputDataGLM
+            from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
         else:
-            raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
-
-        input_data = InputDataGLM(
-            data=data,
-            design_loc=design_loc,
-            design_scale=design_scale,
-            design_loc_names=design_loc_names,
-            design_scale_names=design_scale_names,
-            constraints_loc=constraints_loc,
-            constraints_scale=constraints_scale,
-            size_factors=size_factors,
-            feature_names=gene_names,
-        )
-
-        constructor_args = {}
-        if batch_size is not None:
-            constructor_args["batch_size"] = batch_size
-        if quick_scale is not None:
-            constructor_args["quick_scale"] = quick_scale
-        estim = Estimator(
-            input_data=input_data,
-            init_model=init_model,
-            init_a=init_a,
-            init_b=init_b,
-            provide_optimizers=provide_optimizers,
-            provide_batched=pkg_constants.BATCHGLM_PROVIDE_BATCHED,
-            provide_fim=pkg_constants.BATCHGLM_PROVIDE_FIM,
-            provide_hessian=pkg_constants.BATCHGLM_PROVIDE_HESSIAN,
-            dtype=dtype,
-            **constructor_args
-        )
-        estim.initialize()
-
-        # Training:
-        if callable(training_strategy):
-            # call training_strategy if it is a function
-            training_strategy(estim)
+            raise ValueError('noise_model="%s" not recognized.' % noise_model)
+    elif backend.lower() in ["numpy"]:
+        if isinstance(training_strategy, str):
+            if training_strategy.lower() == "auto":
+                training_strategy = "DEFAULT"
+        if noise_model == "nb" or noise_model == "negative_binomial":
+            from batchglm.api.models.numpy.glm_nb import Estimator, InputDataGLM
         else:
-            estim.train_sequence(training_strategy=training_strategy)
+            raise ValueError('noise_model="%s" not recognized.' % noise_model)
+    else:
+        raise ValueError('models="%s" not recognized.' % backend)
 
-        if close_session:
-            estim.finalize()
+    input_data = InputDataGLM(
+        data=data,
+        design_loc=design_loc,
+        design_scale=design_scale,
+        design_loc_names=design_loc_names,
+        design_scale_names=design_scale_names,
+        constraints_loc=constraints_loc,
+        constraints_scale=constraints_scale,
+        size_factors=size_factors,
+        feature_names=gene_names,
+    )
+
+    constructor_args = {}
+    if batch_size is not None:
+        constructor_args["batch_size"] = batch_size
+    if quick_scale is not None:
+        constructor_args["quick_scale"] = quick_scale
+    estim = Estimator(
+        input_data=input_data,
+        init_a=init_a,
+        init_b=init_b,
+        provide_optimizers=provide_optimizers,
+        provide_batched=pkg_constants.BATCHGLM_PROVIDE_BATCHED,
+        provide_fim=pkg_constants.BATCHGLM_PROVIDE_FIM,
+        provide_hessian=pkg_constants.BATCHGLM_PROVIDE_HESSIAN,
+        dtype=dtype,
+        **constructor_args
+    )
+    estim.initialize()
+    estim.train_sequence(training_strategy=training_strategy)
+
+    if close_session:
+        estim.finalize()
 
     return estim
 
