@@ -25,10 +25,10 @@ class _TestFit:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.glm_nb import Simulator
+            from batchglm.api.models.tf1.glm_nb import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         elif noise_model == "norm":
-            from batchglm.api.models.glm_norm import Simulator
+            from batchglm.api.models.tf1.glm_norm import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
@@ -43,7 +43,7 @@ class _TestFit:
             "batch": np.random.randint(2, size=sim.nobs)
         })
 
-        estim = de.fit.model(
+        _ = de.fit.model(
             data=sim.input_data,
             sample_description=random_sample_description,
             formula_loc="~ 1 + condition + batch",
@@ -68,10 +68,10 @@ class _TestFit:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.glm_nb import Simulator
+            from batchglm.api.models.tf1.glm_nb import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         elif noise_model == "norm":
-            from batchglm.api.models.glm_norm import Simulator
+            from batchglm.api.models.tf1.glm_norm import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
@@ -114,9 +114,9 @@ class _TestFit:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.glm_nb import Simulator
+            from batchglm.api.models.tf1.glm_nb import Simulator
         elif noise_model == "norm":
-            from batchglm.api.models.glm_norm import Simulator
+            from batchglm.api.models.tf1.glm_norm import Simulator
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 

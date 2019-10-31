@@ -26,10 +26,10 @@ class _TestSingleNull:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.glm_nb import Simulator
+            from batchglm.api.models.tf1.glm_nb import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         elif noise_model == "norm":
-            from batchglm.api.models.glm_norm import Simulator
+            from batchglm.api.models.tf1.glm_norm import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
@@ -49,10 +49,7 @@ class _TestSingleNull:
             sample_description=random_sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition + batch",
-            batch_size=500,
-            noise_model=noise_model,
-            training_strategy="DEFAULT",
-            dtype="float64"
+            noise_model=noise_model
         )
         _ = test.summary()
 
@@ -81,9 +78,9 @@ class _TestSingleNull:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.glm_nb import Simulator
+            from batchglm.api.models.tf1.glm_nb import Simulator
         elif noise_model == "norm":
-            from batchglm.api.models.glm_norm import Simulator
+            from batchglm.api.models.tf1.glm_norm import Simulator
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
@@ -100,9 +97,7 @@ class _TestSingleNull:
             sample_description=random_sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition",
-            noise_model=noise_model,
-            training_strategy="DEFAULT",
-            dtype="float64"
+            noise_model=noise_model
         )
         _ = test.summary()
 
@@ -131,9 +126,9 @@ class _TestSingleNull:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.glm_nb import Simulator
+            from batchglm.api.models.tf1.glm_nb import Simulator
         elif noise_model == "norm":
-            from batchglm.api.models.glm_norm import Simulator
+            from batchglm.api.models.tf1.glm_norm import Simulator
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
@@ -152,9 +147,7 @@ class _TestSingleNull:
             full_formula_scale="~ 1",
             reduced_formula_loc="~ 1",
             reduced_formula_scale="~ 1",
-            noise_model=noise_model,
-            training_strategy="DEFAULT",
-            dtype="float64"
+            noise_model=noise_model
         )
         _ = test.summary()
 
@@ -180,7 +173,7 @@ class _TestSingleNull:
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
-        from batchglm.api.models.glm_norm import Simulator
+        from batchglm.api.models.tf1.glm_norm import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -220,7 +213,7 @@ class _TestSingleNull:
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
-        from batchglm.api.models.glm_norm import Simulator
+        from batchglm.api.models.tf1.glm_norm import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)

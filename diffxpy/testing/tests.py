@@ -12,14 +12,14 @@ import scipy.sparse
 from typing import Union, List, Dict, Callable, Tuple
 
 from diffxpy import pkg_constants
-from diffxpy.models.batch_bfgs.optim import Estim_BFGS
 from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, \
     DifferentialExpressionTestTT, DifferentialExpressionTestRank, _DifferentialExpressionTestSingle, \
-    DifferentialExpressionTestZTestLazy, DifferentialExpressionTestZTest, DifferentialExpressionTestPairwise, \
-    DifferentialExpressionTestVsRest, _DifferentialExpressionTestMulti, DifferentialExpressionTestByPartition, \
-    DifferentialExpressionTestWaldCont, DifferentialExpressionTestLRTCont
+    DifferentialExpressionTestVsRest, _DifferentialExpressionTestMulti, DifferentialExpressionTestByPartition
+from .det_cont import DifferentialExpressionTestWaldCont, DifferentialExpressionTestLRTCont
+from .det_pair import DifferentialExpressionTestZTestLazy, DifferentialExpressionTestZTest, \
+    DifferentialExpressionTestPairwiseStandard
 from .utils import parse_gene_names, parse_sample_description, parse_size_factors, parse_grouping, \
-    constraint_system_from_star
+    constraint_system_from_star, preview_coef_names
 
 
 def _fit(
@@ -27,6 +27,8 @@ def _fit(
         data,
         design_loc,
         design_scale,
+        design_loc_names: list = None,
+        design_scale_names: list = None,
         constraints_loc: np.ndarray = None,
         constraints_scale: np.ndarray = None,
         init_model=None,
@@ -35,11 +37,12 @@ def _fit(
         gene_names=None,
         size_factors=None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
         close_session=True,
         dtype="float64"
-) -> glm.typing.InputDataBase:
+):
     """
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
@@ -86,24 +89,15 @@ def _fit(
     :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data
     :param batch_size: the batch size to use for the estimator
-    :param training_strategy: {str, function, list} training strategy to use. Can be:
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
+    :param training_strategy: {str} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
-        - function: Can be used to implement custom training function will be called as
-          `training_strategy(estimator)`.
-        - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
-          method arguments.
-
-          Example:
-
-          .. code-block:: python
-
-              [
-                {"learning_rate": 0.5, },
-                {"learning_rate": 0.05, },
-              ]
-
-          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
@@ -125,62 +119,57 @@ def _fit(
         "irls_gd_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_GD_TR
     }
 
-    if isinstance(training_strategy, str) and training_strategy.lower() == 'bfgs':
-        assert False, "depreceated"
-        lib_size = np.zeros(data.shape[0])
+    if backend.lower() in ["tf1"]:
         if noise_model == "nb" or noise_model == "negative_binomial":
-            estim = Estim_BFGS(X=data, design_loc=design_loc, design_scale=design_scale,
-                               lib_size=lib_size, batch_size=batch_size, feature_names=gene_names)
-            estim.run(nproc=3, maxiter=10000, debug=False)
-            model = estim.return_batchglm_formated_model()
-        else:
-            raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
-    else:
-        if noise_model == "nb" or noise_model == "negative_binomial":
-            from batchglm.api.models.glm_nb import Estimator, InputDataGLM
+            from batchglm.api.models.tf1.glm_nb import Estimator, InputDataGLM
         elif noise_model == "norm" or noise_model == "normal":
-            from batchglm.api.models.glm_norm import Estimator, InputDataGLM
+            from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
         else:
-            raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
-
-        input_data = InputDataGLM(
-            data=data,
-            design_loc=design_loc,
-            design_scale=design_scale,
-            constraints_loc=constraints_loc,
-            constraints_scale=constraints_scale,
-            size_factors=size_factors,
-            feature_names=gene_names,
-        )
-
-        constructor_args = {}
-        if batch_size is not None:
-            constructor_args["batch_size"] = batch_size
-        if quick_scale is not None:
-            constructor_args["quick_scale"] = quick_scale
-        estim = Estimator(
-            input_data=input_data,
-            init_model=init_model,
-            init_a=init_a,
-            init_b=init_b,
-            provide_optimizers=provide_optimizers,
-            provide_batched=pkg_constants.BATCHGLM_PROVIDE_BATCHED,
-            provide_fim=pkg_constants.BATCHGLM_PROVIDE_FIM,
-            provide_hessian=pkg_constants.BATCHGLM_PROVIDE_HESSIAN,
-            dtype=dtype,
-            **constructor_args
-        )
-        estim.initialize()
-
-        # Training:
-        if callable(training_strategy):
-            # call training_strategy if it is a function
-            training_strategy(estim)
+            raise ValueError('noise_model="%s" not recognized.' % noise_model)
+    elif backend.lower() in ["numpy"]:
+        if isinstance(training_strategy, str):
+            if training_strategy.lower() == "auto":
+                training_strategy = "DEFAULT"
+        if noise_model == "nb" or noise_model == "negative_binomial":
+            from batchglm.api.models.numpy.glm_nb import Estimator, InputDataGLM
         else:
-            estim.train_sequence(training_strategy=training_strategy)
+            raise ValueError('noise_model="%s" not recognized.' % noise_model)
+    else:
+        raise ValueError('models="%s" not recognized.' % backend)
 
-        if close_session:
-            estim.finalize()
+    input_data = InputDataGLM(
+        data=data,
+        design_loc=design_loc,
+        design_scale=design_scale,
+        design_loc_names=design_loc_names,
+        design_scale_names=design_scale_names,
+        constraints_loc=constraints_loc,
+        constraints_scale=constraints_scale,
+        size_factors=size_factors,
+        feature_names=gene_names,
+    )
+
+    constructor_args = {}
+    if batch_size is not None:
+        constructor_args["batch_size"] = batch_size
+    if quick_scale is not None:
+        constructor_args["quick_scale"] = quick_scale
+    estim = Estimator(
+        input_data=input_data,
+        init_a=init_a,
+        init_b=init_b,
+        provide_optimizers=provide_optimizers,
+        provide_batched=pkg_constants.BATCHGLM_PROVIDE_BATCHED,
+        provide_fim=pkg_constants.BATCHGLM_PROVIDE_FIM,
+        provide_hessian=pkg_constants.BATCHGLM_PROVIDE_HESSIAN,
+        dtype=dtype,
+        **constructor_args
+    )
+    estim.initialize()
+    estim.train_sequence(training_strategy=training_strategy)
+
+    if close_session:
+        estim.finalize()
 
     return estim
 
@@ -199,6 +188,7 @@ def lrt(
         noise_model="nb",
         size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray] = None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = False,
         dtype="float64",
@@ -213,16 +203,12 @@ def lrt(
     :param data: Input data matrix (observations x features) or (cells x genes).
     :param full_formula_loc: formula
         Full model formula for location parameter model.
-        If not specified, `full_formula` will be used instead.
     :param reduced_formula_loc: formula
         Reduced model formula for location and scale parameter models.
-        If not specified, `reduced_formula` will be used instead.
     :param full_formula_scale: formula
         Full model formula for scale parameter model.
-        If not specified, `reduced_formula_scale` will be used instead.
     :param reduced_formula_scale: formula
         Reduced model formula for scale parameter model.
-        If not specified, `reduced_formula` will be used instead.
     :param as_numeric:
         Which columns of sample_description to treat as numeric and
         not as categorical. This yields columns in the design matrix
@@ -256,6 +242,12 @@ def lrt(
         same order as in data or string-type column identifier of size-factor containing
         column in sample description.
     :param batch_size: the batch size to use for the estimator
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -334,6 +326,7 @@ def lrt(
         gene_names=gene_names,
         size_factors=size_factors,
         batch_size=batch_size,
+        backend=backend,
         training_strategy=training_strategy,
         quick_scale=quick_scale,
         dtype=dtype,
@@ -352,6 +345,7 @@ def lrt(
         init_model=reduced_model,
         size_factors=size_factors,
         batch_size=batch_size,
+        backend=backend,
         training_strategy=training_strategy,
         quick_scale=quick_scale,
         dtype=dtype,
@@ -387,6 +381,7 @@ def wald(
         noise_model: str = "nb",
         size_factors: Union[np.ndarray, pd.core.series.Series, str] = None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = False,
         dtype="float64",
@@ -406,10 +401,8 @@ def wald(
         the exact coefficients which are to be tested.
     :param formula_loc: formula
         model formula for location and scale parameter models.
-        If not specified, `formula` will be used instead.
     :param formula_scale: formula
         model formula for scale parameter model.
-        If not specified, `formula` will be used instead.
     :param as_numeric:
         Which columns of sample_description to treat as numeric and
         not as categorical. This yields columns in the design matrix
@@ -513,6 +506,12 @@ def wald(
 
         - 'nb': default
     :param batch_size: The batch size to use for the estimator.
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -557,8 +556,8 @@ def wald(
         sample_description=sample_description
     )
 
-    logging.getLogger("diffxpy").debug("building location model")
-    design_loc, constraints_loc = constraint_system_from_star(
+    # Build design matrices and constraints.
+    design_loc, design_loc_names, constraints_loc, term_names_loc = constraint_system_from_star(
         dmat=dmat_loc,
         sample_description=sample_description,
         formula=formula_loc,
@@ -566,8 +565,7 @@ def wald(
         constraints=constraints_loc,
         return_type="patsy"
     )
-    logging.getLogger("diffxpy").debug("building scale model")
-    design_scale, constraints_scale = constraint_system_from_star(
+    design_scale, design_scale_names, constraints_scale, term_names_scale = constraint_system_from_star(
         dmat=dmat_scale,
         sample_description=sample_description,
         formula=formula_scale,
@@ -578,13 +576,20 @@ def wald(
 
     # Define indices of coefficients to test:
     constraints_loc_temp = constraints_loc if constraints_loc is not None else np.eye(design_loc.shape[-1])
+    # Check that design_loc is patsy, otherwise  use term_names for slicing.
     if factor_loc_totest is not None:
-        # Select coefficients to test via formula model:
-        col_indices = np.concatenate([
-            np.arange(design_loc.shape[-1])[design_loc.design_info.slice(x)]
-            for x in factor_loc_totest
-        ])
-        assert col_indices.size > 0, "Could not find any matching columns!"
+        if not isinstance(design_loc, patsy.design_info.DesignMatrix):
+            col_indices = np.where([
+                x in factor_loc_totest
+                for x in term_names_loc
+            ])[0]
+        else:
+            # Select coefficients to test via formula model:
+            col_indices = np.concatenate([
+                np.arange(design_loc.shape[-1])[design_loc.design_info.slice(x)]
+                for x in factor_loc_totest
+            ])
+        assert len(col_indices) > 0, "Could not find any matching columns!"
         if coef_to_test is not None:
             if len(factor_loc_totest) > 1:
                 raise ValueError("do not set coef_to_test if more than one factor_loc_totest is given")
@@ -595,8 +600,14 @@ def wald(
                 design_loc[:, col_indices] = np.where(samples, 1, 0)
     elif coef_to_test is not None:
         # Directly select coefficients to test from design matrix:
-        # Check that coefficients to test are not dependent parameters if constraints are given:
-        coef_loc_names = glm.data.view_coef_names(design_loc).tolist()
+        if sample_description is not None:
+            coef_loc_names = preview_coef_names(
+                sample_description=sample_description,
+                formula=formula_loc,
+                as_numeric=as_numeric
+            )
+        else:
+            coef_loc_names = dmat_loc.columns.tolist()
         if not np.all([x in coef_loc_names for x in coef_to_test]):
             raise ValueError(
                 "the requested test coefficients %s were found in model coefficients %s" %
@@ -610,16 +621,19 @@ def wald(
         raise ValueError("either set factor_loc_totest or coef_to_test")
     # Check that all tested coefficients are independent:
     for x in col_indices:
-        if np.sum(constraints_loc_temp[x,:]) != 1:
+        if np.sum(constraints_loc_temp[x, :]) != 1:
             raise ValueError("Constraints input is wrong: not all tested coefficients are unconstrained.")
     # Adjust tested coefficients from dependent to independent (fitted) parameters:
-    col_indices = np.array([np.where(constraints_loc_temp[x,:] == 1)[0][0] for x in col_indices])
+    col_indices = np.array([np.where(constraints_loc_temp[x, :] == 1)[0][0] for x in col_indices])
 
+    # Fit model.
     model = _fit(
         noise_model=noise_model,
         data=data,
         design_loc=design_loc,
         design_scale=design_scale,
+        design_loc_names=design_loc_names,
+        design_scale_names=design_scale_names,
         constraints_loc=constraints_loc,
         constraints_scale=constraints_scale,
         init_a=init_a,
@@ -627,19 +641,20 @@ def wald(
         gene_names=gene_names,
         size_factors=size_factors,
         batch_size=batch_size,
+        backend=backend,
         training_strategy=training_strategy,
         quick_scale=quick_scale,
         dtype=dtype,
         **kwargs,
     )
 
+    # Prepare differential expression test.
     de_test = DifferentialExpressionTestWald(
         model_estim=model,
         col_indices=col_indices,
         noise_model=noise_model,
         sample_description=sample_description
     )
-
     return de_test
 
 
@@ -737,6 +752,7 @@ def two_sample(
         noise_model: str = None,
         size_factors: np.ndarray = None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         is_sig_zerovar: bool = True,
         quick_scale: bool = None,
@@ -800,6 +816,12 @@ def two_sample(
 
         - 'nb': default
     :param batch_size: The batch size to use for the estimator.
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -851,6 +873,7 @@ def two_sample(
             init_a="closed_form",
             init_b="closed_form",
             batch_size=batch_size,
+            backend=backend,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
@@ -877,6 +900,7 @@ def two_sample(
             init_a="closed_form",
             init_b="closed_form",
             batch_size=batch_size,
+            backend=backend,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
@@ -913,6 +937,7 @@ def pairwise(
         noise_model: str = "nb",
         size_factors: np.ndarray = None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         is_sig_zerovar: bool = True,
         quick_scale: bool = False,
@@ -988,6 +1013,12 @@ def pairwise(
 
         - 'nb': default
     :param batch_size: The batch size to use for the estimator.
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1041,6 +1072,7 @@ def pairwise(
             init_a="closed_form",
             init_b="closed_form",
             batch_size=batch_size,
+            backend=backend,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
@@ -1095,6 +1127,7 @@ def pairwise(
                     noise_model=noise_model,
                     size_factors=size_factors[idx] if size_factors is not None else None,
                     batch_size=batch_size,
+                    backend=backend,
                     training_strategy=training_strategy,
                     quick_scale=quick_scale,
                     is_sig_zerovar=is_sig_zerovar,
@@ -1109,7 +1142,7 @@ def pairwise(
                     tests[i, j] = de_test_temp
                     tests[j, i] = de_test_temp
 
-        de_test = DifferentialExpressionTestPairwise(
+        de_test = DifferentialExpressionTestPairwiseStandard(
             gene_ids=gene_names,
             pval=pvals,
             logfc=logfc,
@@ -1132,6 +1165,7 @@ def versus_rest(
         noise_model: str = None,
         size_factors: np.ndarray = None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         is_sig_zerovar: bool = True,
         quick_scale: bool = None,
@@ -1206,6 +1240,12 @@ def versus_rest(
 
         - 'nb': default
     :param batch_size: The batch size to use for the estimator.
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1259,6 +1299,7 @@ def versus_rest(
             sample_description=sample_description,
             noise_model=noise_model,
             batch_size=batch_size,
+            backend=backend,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             size_factors=size_factors,
@@ -1365,6 +1406,7 @@ class _Partition:
             size_factors: np.ndarray = None,
             noise_model: str = None,
             batch_size: int = None,
+            backend: str = "numpy",
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             is_sig_zerovar: bool = True,
             **kwargs
@@ -1395,6 +1437,12 @@ class _Partition:
 
             - 'nb': default
         :param batch_size: The batch size to use for the estimator.
+        :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+            training strategies. Available are:
+
+            - "numpy" numpy
+            - "tf1" tensorflow1.* >= 1.13
+            - "tf2" tensorflow2.*
         :param training_strategy: {str, function, list} training strategy to use. Can be:
 
             - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1419,6 +1467,7 @@ class _Partition:
                 noise_model=noise_model,
                 size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
+                backend=backend,
                 training_strategy=training_strategy,
                 is_sig_zerovar=is_sig_zerovar,
                 **kwargs
@@ -1517,6 +1566,7 @@ class _Partition:
             size_factors: np.ndarray = None,
             noise_model="nb",
             batch_size: int = None,
+            backend: str = "numpy",
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             **kwargs
     ):
@@ -1569,6 +1619,12 @@ class _Partition:
 
             - 'nb': default
         :param batch_size: The batch size to use for the estimator.
+        :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+            training strategies. Available are:
+
+            - "numpy" numpy
+            - "tf1" tensorflow1.* >= 1.13
+            - "tf2" tensorflow2.*
         :param training_strategy: {str, function, list} training strategy to use. Can be:
 
             - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1594,6 +1650,7 @@ class _Partition:
                 noise_model=noise_model,
                 size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
+                backend=backend,
                 training_strategy=training_strategy,
                 **kwargs
             ))
@@ -1615,6 +1672,7 @@ class _Partition:
             noise_model: str = "nb",
             size_factors: np.ndarray = None,
             batch_size: int = None,
+            backend: str = "numpy",
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             **kwargs
     ):
@@ -1669,6 +1727,12 @@ class _Partition:
 
             - 'nb': default
         :param batch_size: The batch size to use for the estimator.
+            :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+            training strategies. Available are:
+
+            - "numpy" numpy
+            - "tf1" tensorflow1.* >= 1.13
+            - "tf2" tensorflow2.*
         :param training_strategy: {str, function, list} training strategy to use. Can be:
 
             - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1694,6 +1758,7 @@ class _Partition:
                 noise_model=noise_model,
                 size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
+                backend=backend,
                 training_strategy=training_strategy,
                 **kwargs
             ))
@@ -1705,24 +1770,26 @@ class _Partition:
 
 
 def continuous_1d(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
         continuous: str,
-        df: int = 5,
-        factor_loc_totest: Union[str, List[str]] = None,
-        formula_loc: str = None,
+        factor_loc_totest: Union[str, List[str]],
+        formula_loc: str,
         formula_scale: str = "~1",
+        df: int = 5,
+        spline_basis: str = "bs",
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
         init_a: Union[np.ndarray, str] = "standard",
         init_b: Union[np.ndarray, str] = "standard",
         gene_names: Union[np.ndarray, list] = None,
-        sample_description=None,
+        sample_description: Union[None, pd.DataFrame] = None,
         constraints_loc: Union[dict, None] = None,
         constraints_scale: Union[dict, None] = None,
         noise_model: str = 'nb',
-        size_factors: np.ndarray = None,
+        size_factors: Union[np.ndarray, pd.core.series.Series, str] = None,
         batch_size: int = None,
-        training_strategy: Union[str, List[Dict[str, object]], Callable] = "DEFAULT",
+        backend: str = "numpy",
+        training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
         dtype="float64",
         **kwargs
@@ -1754,7 +1821,14 @@ def continuous_1d(
     :param df: int
         Degrees of freedom of the spline model, i.e. the number of spline basis vectors.
         df is equal to the number of coefficients in the GLM which are used to describe the
-        continuous depedency-
+        continuous depedency.
+    :param spline_basis: str
+        The type of sline basis to use, refer also to:
+            https://patsy.readthedocs.io/en/latest/spline-regression.html
+
+            - "bs": B-splines
+            - "cr": natural cubic splines
+            - "cc": natural cyclic splines
     :param factor_loc_totest:
         List of factors of formula to test with Wald test.
         E.g. "condition" or ["batch", "condition"] if formula_loc would be "~ 1 + batch + condition"
@@ -1852,6 +1926,12 @@ def continuous_1d(
     :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data
     :param batch_size: the batch size to use for the estimator
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1880,10 +1960,7 @@ def continuous_1d(
     """
     if formula_loc is None:
         raise ValueError("supply fomula_loc")
-    # Set testing default to continuous covariate if not supplied:
-    if factor_loc_totest is None:
-        factor_loc_totest = [continuous]
-    elif isinstance(factor_loc_totest, str):
+    if isinstance(factor_loc_totest, str):
         factor_loc_totest = [factor_loc_totest]
     elif isinstance(factor_loc_totest, tuple):
         factor_loc_totest = list(factor_loc_totest)
@@ -1896,39 +1973,75 @@ def continuous_1d(
     gene_names = parse_gene_names(data, gene_names)
     sample_description = parse_sample_description(data, sample_description)
 
-    # Check that continuous factor is contained in sample description
+    # Check that continuous factor is contained in sample description and is numeric.
     if continuous not in sample_description.columns:
         raise ValueError('parameter continuous not found in sample_description')
-
+    if not np.issubdtype(sample_description[continuous].dtype, np.number):
+        raise ValueError(
+            "The column corresponding to the continuous covariate ('%s') in " % continuous +
+            "sample description should be numeric but is '%s'" % sample_description[continuous].dtype
+        )
+    # Check that not too many degrees of freedom given the sampled points were chosen:
+    if len(np.unique(sample_description[continuous].values)) <= df - 1:
+        raise ValueError(
+            "Use at most (number of observed points in continuous covariate) - 1 degrees of freedom " +
+            " for spline basis. You chose df=%i for n=%i points." %
+            (df, len(np.unique(sample_description[continuous].values)))
+        )
     # Perform spline basis transform.
-    spline_basis = patsy.highlevel.dmatrix("0+bs(" + continuous + ", df=" + str(df) + ")", sample_description)
+    if spline_basis.lower() == "bs":
+        spline_basis = patsy.highlevel.dmatrix(
+            "bs(" + continuous + ", df=" + str(df) + ", degree=3, include_intercept=False) - 1",
+            sample_description
+        )
+    elif spline_basis.lower() == "cr":
+        spline_basis = patsy.highlevel.dmatrix(
+            "cr(" + continuous + ", df=" + str(df) + ", constraints='center') - 1",
+            sample_description
+        )
+    elif spline_basis.lower() == "cc":
+        spline_basis = patsy.highlevel.dmatrix(
+            "cc(" + continuous + ", df=" + str(df) + ", constraints='center') - 1",
+            sample_description
+        )
+    else:
+        raise ValueError("spline basis %s not recognized" % spline_basis)
     spline_basis = pd.DataFrame(spline_basis)
     new_coefs = [continuous + str(i) for i in range(spline_basis.shape[1])]
     spline_basis.columns = new_coefs
     formula_extension = '+'.join(new_coefs)
+    # Generated interpolated spline bases.
+    # Safe interpolated interval in last column, need to extract later.
+    interpolated_interval = np.linspace(
+        np.min(sample_description[continuous].values),
+        np.max(sample_description[continuous].values),
+        100
+    )
+    interpolated_spline_basis = np.hstack([
+        np.ones([100, 1]),
+        patsy.highlevel.dmatrix(
+            "0+bs(" + continuous + ", df=" + str(df) + ")",
+            pd.DataFrame({continuous: interpolated_interval})
+        ).base,
+        np.expand_dims(interpolated_interval, axis=1)
+    ])
 
     # Replace continuous factor in formulas by spline basis coefficients.
     # Note that the brackets around formula_term_continuous propagate the sum
     # across interaction terms.
     formula_term_continuous = '(' + formula_extension + ')'
 
-    if formula_loc is not None:
-        formula_loc_new = formula_loc.split(continuous)
-        formula_loc_new = formula_term_continuous.join(formula_loc_new)
-    else:
-        formula_loc_new = None
+    formula_loc_new = formula_loc.split(continuous)
+    formula_loc_new = formula_term_continuous.join(formula_loc_new)
 
-    if formula_scale is not None:
-        formula_scale_new = formula_scale.split(continuous)
-        formula_scale_new = formula_term_continuous.join(formula_scale_new)
-    else:
-        formula_scale_new = None
+    formula_scale_new = formula_scale.split(continuous)
+    formula_scale_new = formula_term_continuous.join(formula_scale_new)
 
     # Add spline basis into sample description
     for x in spline_basis.columns:
         sample_description[x] = spline_basis[x].values
 
-    # Add spline basis to continuous covariate list
+    # Add spline basis to continuous covariates list
     as_numeric.extend(new_coefs)
 
     if test.lower() == 'wald':
@@ -1938,23 +2051,34 @@ def continuous_1d(
         # Adjust factors / coefficients to test:
         # Note that the continuous covariate does not necessarily have to be tested,
         # it could also be a condition effect or similar.
-        # TODO handle interactions
         if continuous in factor_loc_totest:
             # Create reduced set of factors to test which does not contain continuous:
-            factor_loc_totest_new = [x for x in factor_loc_totest if x != continuous]
+            factor_loc_totest_intermediate = [x for x in factor_loc_totest if x != continuous]
             # Add spline basis terms in instead of continuous term:
-            factor_loc_totest_new.extend(new_coefs)
+            factor_loc_totest_intermediate.extend(new_coefs)
         else:
-            factor_loc_totest_new = factor_loc_totest
+            factor_loc_totest_intermediate = factor_loc_totest
+        # Replace continuous factor in interaction terms with new spline factors.
+        factor_loc_totest_final = []
+        for i, x in enumerate(factor_loc_totest_intermediate):
+            if len(x.split(":")) > 1:
+                if np.any([x == continuous for x in x.split(":")]):
+                    interaction_partner = [y for y in x.split(":") if y != continuous][0]
+                    for y in new_coefs:
+                        factor_loc_totest_final.append(y+":"+interaction_partner)
+                else:
+                    factor_loc_totest_final.append(x)
+            else:
+                factor_loc_totest_final.append(x)
 
         logging.getLogger("diffxpy").debug("model formulas assembled in de.test.continuos():")
-        logging.getLogger("diffxpy").debug("factor_loc_totest_new: " + ",".join(factor_loc_totest_new))
+        logging.getLogger("diffxpy").debug("factor_loc_totest_final: " + ",".join(factor_loc_totest_final))
         logging.getLogger("diffxpy").debug("formula_loc_new: " + formula_loc_new)
         logging.getLogger("diffxpy").debug("formula_scale_new: " + formula_scale_new)
 
         de_test = wald(
             data=data,
-            factor_loc_totest=factor_loc_totest_new,
+            factor_loc_totest=factor_loc_totest_final,
             coef_to_test=None,
             formula_loc=formula_loc_new,
             formula_scale=formula_scale_new,
@@ -1968,6 +2092,7 @@ def continuous_1d(
             noise_model=noise_model,
             size_factors=size_factors,
             batch_size=batch_size,
+            backend=backend,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
@@ -1978,7 +2103,8 @@ def continuous_1d(
             noise_model=noise_model,
             size_factors=size_factors,
             continuous_coords=sample_description[continuous].values,
-            spline_coefs=new_coefs
+            spline_coefs=new_coefs,
+            interpolated_spline_basis=interpolated_spline_basis
         )
     elif test.lower() == 'lrt':
         if noise_model is None:
@@ -2019,6 +2145,7 @@ def continuous_1d(
             noise_model=noise_model,
             size_factors=size_factors,
             batch_size=batch_size,
+            backend=backend,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
@@ -2028,7 +2155,8 @@ def continuous_1d(
             de_test=de_test,
             size_factors=size_factors,
             continuous_coords=sample_description[continuous].values,
-            spline_coefs=new_coefs
+            spline_coefs=new_coefs,
+            noise_model=noise_model
         )
     else:
         raise ValueError('continuous(): Parameter `test` not recognized.')

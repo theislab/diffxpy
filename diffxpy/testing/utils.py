@@ -52,19 +52,20 @@ def parse_sample_description(
                 "with corresponding sample annotations"
             )
 
-    if anndata is not None and isinstance(data, Raw):
-        # Raw does not have attribute shape.
-        assert data.X.shape[0] == sample_description.shape[0], \
-            "data matrix and sample description must contain same number of cells: %i, %i" % \
-            (data.X.shape[0], sample_description.shape[0])
-    elif isinstance(data, glm.typing.InputDataBase):
-        assert data.x.shape[0] == sample_description.shape[0], \
-            "data matrix and sample description must contain same number of cells: %i, %i" % \
-            (data.x.shape[0], sample_description.shape[0])
-    else:
-        assert data.shape[0] == sample_description.shape[0], \
-            "data matrix and sample description must contain same number of cells: %i, %i" % \
-            (data.shape[0], sample_description.shape[0])
+    if sample_description is not None:
+        if anndata is not None and isinstance(data, Raw):
+            # Raw does not have attribute shape.
+            assert data.X.shape[0] == sample_description.shape[0], \
+                "data matrix and sample description must contain same number of cells: %i, %i" % \
+                (data.X.shape[0], sample_description.shape[0])
+        elif isinstance(data, glm.typing.InputDataBase):
+            assert data.x.shape[0] == sample_description.shape[0], \
+                "data matrix and sample description must contain same number of cells: %i, %i" % \
+                (data.x.shape[0], sample_description.shape[0])
+        else:
+            assert data.shape[0] == sample_description.shape[0], \
+                "data matrix and sample description must contain same number of cells: %i, %i" % \
+                (data.shape[0], sample_description.shape[0])
     return sample_description
 
 
@@ -89,7 +90,14 @@ def parse_size_factors(
         elif isinstance(size_factors, str):
             assert size_factors in sample_description.columns, ""
             size_factors = sample_description[size_factors].values
-        assert size_factors.shape[0] == data.shape[0], "data matrix and size factors must contain same number of cells"
+
+        if anndata is not None and isinstance(data, Raw):
+            data_shape = data.X.shape
+        elif isinstance(data, glm.typing.InputDataBase):
+            data_shape = data.x.shape
+        else:
+            data_shape = data.shape
+        assert size_factors.shape[0] == data_shape[0], "data matrix and size factors must contain same number of cells"
         assert np.all(size_factors > 0), "size_factors <= 0 found, please remove these cells"
     return size_factors
 
@@ -117,8 +125,7 @@ def dmat_unique(dmat, sample_description):
 
 
 def design_matrix(
-        data: Union[anndata.AnnData, Raw, np.ndarray,
-                    scipy.sparse.csr_matrix] = None,
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix] = None,
         sample_description: Union[None, pd.DataFrame] = None,
         formula: Union[None, str] = None,
         as_numeric: Union[List[str], Tuple[str], str] = (),
@@ -206,7 +213,7 @@ def preview_coef_names(
 
 
 def constraint_system_from_star(
-        dmat: Union[None, np.ndarray] = None,
+        dmat: Union[None, patsy.design_info.DesignMatrix] = None,
         sample_description: Union[None, pd.DataFrame] = None,
         formula: Union[None, str] = None,
         as_numeric: Union[List[str], Tuple[str], str] = (),

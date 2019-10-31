@@ -263,7 +263,6 @@ def wald_test_chisq(
             raise ValueError('stats.wald_test(): theta_mle and theta0 have to contain the same number of entries')
 
     theta_diff = theta_mle - theta0
-    # Convert to nd.array to avoid gufunc error.
     wald_statistic = np.array([
         np.matmul(
             np.matmul(

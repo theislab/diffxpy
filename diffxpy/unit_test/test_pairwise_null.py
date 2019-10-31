@@ -18,11 +18,11 @@ class _TestPairwiseNull:
             n_groups: int
     ):
         if self.noise_model == "nb":
-            from batchglm.api.models.glm_nb import Simulator
+            from batchglm.api.models.tf1.glm_nb import Simulator
             rand_fn_loc = lambda shape: np.random.uniform(0.1, 1, shape)
             rand_fn_scale = lambda shape: np.random.uniform(0.5, 1, shape)
         elif self.noise_model == "norm" or self.noise_model is None:
-            from batchglm.api.models.glm_norm import Simulator
+            from batchglm.api.models import Simulator
             rand_fn_loc = lambda shape: np.random.uniform(500, 1000, shape)
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
@@ -37,7 +37,7 @@ class _TestPairwiseNull:
         sim.generate_data()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.nobs)
+            "condition": [str(x) for x in np.random.randint(n_groups, size=sim.nobs)]
         })
         return sim, random_sample_description
 
@@ -64,7 +64,7 @@ class _TestPairwiseNull:
             n_genes=n_genes,
             n_groups=n_groups
         )
-        test = de.test.pairwise(
+        det = de.test.pairwise(
             data=sim.input_data,
             sample_description=sample_description,
             grouping="condition",
@@ -73,13 +73,21 @@ class _TestPairwiseNull:
             quick_scale=quick_scale,
             noise_model=self.noise_model
         )
-        _ = test.summary()
+        if not lazy:
+            _ = det.summary()
+            _ = det.pval
+            _ = det.qval
+            _ = det.log_fold_change()
+        # Single pair accessors:
+        _ = det.pval_pairs(groups0="0", groups1="1")
+        _ = det.qval_pairs(groups0="0", groups1="1")
+        _ = det.log10_pval_pairs_clean(groups0="0", groups1="1")
+        _ = det.log10_qval_pairs_clean(groups0="0", groups1="1")
+        _ = det.log_fold_change_pairs(groups0="0", groups1="1")
+        _ = det.summary_pairs(groups0="0", groups1="1")
 
         # Compare p-value distribution under null model against uniform distribution.
-        if lazy:
-            pval_h0 = stats.kstest(test.pval_pairs(groups0=0, groups1=1).flatten(), 'uniform').pvalue
-        else:
-            pval_h0 = stats.kstest(test.pval[0, 1, :].flatten(), 'uniform').pvalue
+        pval_h0 = stats.kstest(det.pval_pairs(groups0="0", groups1="1").flatten(), 'uniform').pvalue
 
         logging.getLogger("diffxpy").info('KS-test pvalue for null model match of wald(): %f' % pval_h0)
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
