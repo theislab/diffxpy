@@ -401,10 +401,8 @@ def wald(
         the exact coefficients which are to be tested.
     :param formula_loc: formula
         model formula for location and scale parameter models.
-        If not specified, `formula` will be used instead.
     :param formula_scale: formula
         model formula for scale parameter model.
-        If not specified, `formula` will be used instead.
     :param as_numeric:
         Which columns of sample_description to treat as numeric and
         not as categorical. This yields columns in the design matrix
