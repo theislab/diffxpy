@@ -12,7 +12,6 @@ import scipy.sparse
 from typing import Union, List, Dict, Callable, Tuple
 
 from diffxpy import pkg_constants
-from diffxpy.models.batch_bfgs.optim import Estim_BFGS
 from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, \
     DifferentialExpressionTestTT, DifferentialExpressionTestRank, _DifferentialExpressionTestSingle, \
     DifferentialExpressionTestVsRest, _DifferentialExpressionTestMulti, DifferentialExpressionTestByPartition
@@ -20,7 +19,7 @@ from .det_cont import DifferentialExpressionTestWaldCont, DifferentialExpression
 from .det_pair import DifferentialExpressionTestZTestLazy, DifferentialExpressionTestZTest, \
     DifferentialExpressionTestPairwiseStandard
 from .utils import parse_gene_names, parse_sample_description, parse_size_factors, parse_grouping, \
-    constraint_system_from_star, design_matrix, preview_coef_names
+    constraint_system_from_star, preview_coef_names
 
 
 def _fit(
@@ -38,11 +37,12 @@ def _fit(
         gene_names=None,
         size_factors=None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
         close_session=True,
         dtype="float64"
-) -> glm.typing.InputDataBase:
+):
     """
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
@@ -89,24 +89,15 @@ def _fit(
     :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data
     :param batch_size: the batch size to use for the estimator
-    :param training_strategy: {str, function, list} training strategy to use. Can be:
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
+    :param training_strategy: {str} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
-        - function: Can be used to implement custom training function will be called as
-          `training_strategy(estimator)`.
-        - list of keyword dicts containing method arguments: Will call Estimator.train() once with each dict of
-          method arguments.
-
-          Example:
-
-          .. code-block:: python
-
-              [
-                {"learning_rate": 0.5, },
-                {"learning_rate": 0.05, },
-              ]
-
-          This will run training first with learning rate = 0.5 and then with learning rate = 0.05.
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
@@ -128,64 +119,57 @@ def _fit(
         "irls_gd_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_GD_TR
     }
 
-    if isinstance(training_strategy, str) and training_strategy.lower() == 'bfgs':
-        assert False, "depreceated"
-        lib_size = np.zeros(data.shape[0])
+    if backend.lower() in ["tf1"]:
         if noise_model == "nb" or noise_model == "negative_binomial":
-            estim = Estim_BFGS(X=data, design_loc=design_loc, design_scale=design_scale,
-                               lib_size=lib_size, batch_size=batch_size, feature_names=gene_names)
-            estim.run(nproc=3, maxiter=10000, debug=False)
-            model = estim.return_batchglm_formated_model()
-        else:
-            raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
-    else:
-        if noise_model == "nb" or noise_model == "negative_binomial":
-            from batchglm.api.models.glm_nb import Estimator, InputDataGLM
+            from batchglm.api.models.tf1.glm_nb import Estimator, InputDataGLM
         elif noise_model == "norm" or noise_model == "normal":
-            from batchglm.api.models.glm_norm import Estimator, InputDataGLM
+            from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
         else:
-            raise ValueError('base.test(): `noise_model="%s"` not recognized.' % noise_model)
-
-        input_data = InputDataGLM(
-            data=data,
-            design_loc=design_loc,
-            design_scale=design_scale,
-            design_loc_names=design_loc_names,
-            design_scale_names=design_scale_names,
-            constraints_loc=constraints_loc,
-            constraints_scale=constraints_scale,
-            size_factors=size_factors,
-            feature_names=gene_names,
-        )
-
-        constructor_args = {}
-        if batch_size is not None:
-            constructor_args["batch_size"] = batch_size
-        if quick_scale is not None:
-            constructor_args["quick_scale"] = quick_scale
-        estim = Estimator(
-            input_data=input_data,
-            init_model=init_model,
-            init_a=init_a,
-            init_b=init_b,
-            provide_optimizers=provide_optimizers,
-            provide_batched=pkg_constants.BATCHGLM_PROVIDE_BATCHED,
-            provide_fim=pkg_constants.BATCHGLM_PROVIDE_FIM,
-            provide_hessian=pkg_constants.BATCHGLM_PROVIDE_HESSIAN,
-            dtype=dtype,
-            **constructor_args
-        )
-        estim.initialize()
-
-        # Training:
-        if callable(training_strategy):
-            # call training_strategy if it is a function
-            training_strategy(estim)
+            raise ValueError('noise_model="%s" not recognized.' % noise_model)
+    elif backend.lower() in ["numpy"]:
+        if isinstance(training_strategy, str):
+            if training_strategy.lower() == "auto":
+                training_strategy = "DEFAULT"
+        if noise_model == "nb" or noise_model == "negative_binomial":
+            from batchglm.api.models.numpy.glm_nb import Estimator, InputDataGLM
         else:
-            estim.train_sequence(training_strategy=training_strategy)
+            raise ValueError('noise_model="%s" not recognized.' % noise_model)
+    else:
+        raise ValueError('models="%s" not recognized.' % backend)
 
-        if close_session:
-            estim.finalize()
+    input_data = InputDataGLM(
+        data=data,
+        design_loc=design_loc,
+        design_scale=design_scale,
+        design_loc_names=design_loc_names,
+        design_scale_names=design_scale_names,
+        constraints_loc=constraints_loc,
+        constraints_scale=constraints_scale,
+        size_factors=size_factors,
+        feature_names=gene_names,
+    )
+
+    constructor_args = {}
+    if batch_size is not None:
+        constructor_args["batch_size"] = batch_size
+    if quick_scale is not None:
+        constructor_args["quick_scale"] = quick_scale
+    estim = Estimator(
+        input_data=input_data,
+        init_a=init_a,
+        init_b=init_b,
+        provide_optimizers=provide_optimizers,
+        provide_batched=pkg_constants.BATCHGLM_PROVIDE_BATCHED,
+        provide_fim=pkg_constants.BATCHGLM_PROVIDE_FIM,
+        provide_hessian=pkg_constants.BATCHGLM_PROVIDE_HESSIAN,
+        dtype=dtype,
+        **constructor_args
+    )
+    estim.initialize()
+    estim.train_sequence(training_strategy=training_strategy)
+
+    if close_session:
+        estim.finalize()
 
     return estim
 
@@ -204,6 +188,7 @@ def lrt(
         noise_model="nb",
         size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray] = None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = False,
         dtype="float64",
@@ -218,16 +203,12 @@ def lrt(
     :param data: Input data matrix (observations x features) or (cells x genes).
     :param full_formula_loc: formula
         Full model formula for location parameter model.
-        If not specified, `full_formula` will be used instead.
     :param reduced_formula_loc: formula
         Reduced model formula for location and scale parameter models.
-        If not specified, `reduced_formula` will be used instead.
     :param full_formula_scale: formula
         Full model formula for scale parameter model.
-        If not specified, `reduced_formula_scale` will be used instead.
     :param reduced_formula_scale: formula
         Reduced model formula for scale parameter model.
-        If not specified, `reduced_formula` will be used instead.
     :param as_numeric:
         Which columns of sample_description to treat as numeric and
         not as categorical. This yields columns in the design matrix
@@ -261,6 +242,12 @@ def lrt(
         same order as in data or string-type column identifier of size-factor containing
         column in sample description.
     :param batch_size: the batch size to use for the estimator
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -339,6 +326,7 @@ def lrt(
         gene_names=gene_names,
         size_factors=size_factors,
         batch_size=batch_size,
+        backend=backend,
         training_strategy=training_strategy,
         quick_scale=quick_scale,
         dtype=dtype,
@@ -357,6 +345,7 @@ def lrt(
         init_model=reduced_model,
         size_factors=size_factors,
         batch_size=batch_size,
+        backend=backend,
         training_strategy=training_strategy,
         quick_scale=quick_scale,
         dtype=dtype,
@@ -392,6 +381,7 @@ def wald(
         noise_model: str = "nb",
         size_factors: Union[np.ndarray, pd.core.series.Series, str] = None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = False,
         dtype="float64",
@@ -411,10 +401,8 @@ def wald(
         the exact coefficients which are to be tested.
     :param formula_loc: formula
         model formula for location and scale parameter models.
-        If not specified, `formula` will be used instead.
     :param formula_scale: formula
         model formula for scale parameter model.
-        If not specified, `formula` will be used instead.
     :param as_numeric:
         Which columns of sample_description to treat as numeric and
         not as categorical. This yields columns in the design matrix
@@ -518,6 +506,12 @@ def wald(
 
         - 'nb': default
     :param batch_size: The batch size to use for the estimator.
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -647,6 +641,7 @@ def wald(
         gene_names=gene_names,
         size_factors=size_factors,
         batch_size=batch_size,
+        backend=backend,
         training_strategy=training_strategy,
         quick_scale=quick_scale,
         dtype=dtype,
@@ -757,6 +752,7 @@ def two_sample(
         noise_model: str = None,
         size_factors: np.ndarray = None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         is_sig_zerovar: bool = True,
         quick_scale: bool = None,
@@ -820,6 +816,12 @@ def two_sample(
 
         - 'nb': default
     :param batch_size: The batch size to use for the estimator.
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -871,6 +873,7 @@ def two_sample(
             init_a="closed_form",
             init_b="closed_form",
             batch_size=batch_size,
+            backend=backend,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
@@ -897,6 +900,7 @@ def two_sample(
             init_a="closed_form",
             init_b="closed_form",
             batch_size=batch_size,
+            backend=backend,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
@@ -933,6 +937,7 @@ def pairwise(
         noise_model: str = "nb",
         size_factors: np.ndarray = None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         is_sig_zerovar: bool = True,
         quick_scale: bool = False,
@@ -1008,6 +1013,12 @@ def pairwise(
 
         - 'nb': default
     :param batch_size: The batch size to use for the estimator.
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1061,6 +1072,7 @@ def pairwise(
             init_a="closed_form",
             init_b="closed_form",
             batch_size=batch_size,
+            backend=backend,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
@@ -1115,6 +1127,7 @@ def pairwise(
                     noise_model=noise_model,
                     size_factors=size_factors[idx] if size_factors is not None else None,
                     batch_size=batch_size,
+                    backend=backend,
                     training_strategy=training_strategy,
                     quick_scale=quick_scale,
                     is_sig_zerovar=is_sig_zerovar,
@@ -1152,6 +1165,7 @@ def versus_rest(
         noise_model: str = None,
         size_factors: np.ndarray = None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         is_sig_zerovar: bool = True,
         quick_scale: bool = None,
@@ -1226,6 +1240,12 @@ def versus_rest(
 
         - 'nb': default
     :param batch_size: The batch size to use for the estimator.
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1279,6 +1299,7 @@ def versus_rest(
             sample_description=sample_description,
             noise_model=noise_model,
             batch_size=batch_size,
+            backend=backend,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             size_factors=size_factors,
@@ -1385,6 +1406,7 @@ class _Partition:
             size_factors: np.ndarray = None,
             noise_model: str = None,
             batch_size: int = None,
+            backend: str = "numpy",
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             is_sig_zerovar: bool = True,
             **kwargs
@@ -1415,6 +1437,12 @@ class _Partition:
 
             - 'nb': default
         :param batch_size: The batch size to use for the estimator.
+        :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+            training strategies. Available are:
+
+            - "numpy" numpy
+            - "tf1" tensorflow1.* >= 1.13
+            - "tf2" tensorflow2.*
         :param training_strategy: {str, function, list} training strategy to use. Can be:
 
             - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1439,6 +1467,7 @@ class _Partition:
                 noise_model=noise_model,
                 size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
+                backend=backend,
                 training_strategy=training_strategy,
                 is_sig_zerovar=is_sig_zerovar,
                 **kwargs
@@ -1537,6 +1566,7 @@ class _Partition:
             size_factors: np.ndarray = None,
             noise_model="nb",
             batch_size: int = None,
+            backend: str = "numpy",
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             **kwargs
     ):
@@ -1589,6 +1619,12 @@ class _Partition:
 
             - 'nb': default
         :param batch_size: The batch size to use for the estimator.
+        :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+            training strategies. Available are:
+
+            - "numpy" numpy
+            - "tf1" tensorflow1.* >= 1.13
+            - "tf2" tensorflow2.*
         :param training_strategy: {str, function, list} training strategy to use. Can be:
 
             - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1614,6 +1650,7 @@ class _Partition:
                 noise_model=noise_model,
                 size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
+                backend=backend,
                 training_strategy=training_strategy,
                 **kwargs
             ))
@@ -1635,6 +1672,7 @@ class _Partition:
             noise_model: str = "nb",
             size_factors: np.ndarray = None,
             batch_size: int = None,
+            backend: str = "numpy",
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             **kwargs
     ):
@@ -1689,6 +1727,12 @@ class _Partition:
 
             - 'nb': default
         :param batch_size: The batch size to use for the estimator.
+            :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+            training strategies. Available are:
+
+            - "numpy" numpy
+            - "tf1" tensorflow1.* >= 1.13
+            - "tf2" tensorflow2.*
         :param training_strategy: {str, function, list} training strategy to use. Can be:
 
             - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -1714,6 +1758,7 @@ class _Partition:
                 noise_model=noise_model,
                 size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
+                backend=backend,
                 training_strategy=training_strategy,
                 **kwargs
             ))
@@ -1743,6 +1788,7 @@ def continuous_1d(
         noise_model: str = 'nb',
         size_factors: Union[np.ndarray, pd.core.series.Series, str] = None,
         batch_size: int = None,
+        backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
         dtype="float64",
@@ -1880,6 +1926,12 @@ def continuous_1d(
     :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data
     :param batch_size: the batch size to use for the estimator
+    :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        training strategies. Available are:
+
+        - "numpy" numpy
+        - "tf1" tensorflow1.* >= 1.13
+        - "tf2" tensorflow2.*
     :param training_strategy: {str, function, list} training strategy to use. Can be:
 
         - str: will use Estimator.TrainingStrategy[training_strategy] to train
@@ -2040,6 +2092,7 @@ def continuous_1d(
             noise_model=noise_model,
             size_factors=size_factors,
             batch_size=batch_size,
+            backend=backend,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
@@ -2092,6 +2145,7 @@ def continuous_1d(
             noise_model=noise_model,
             size_factors=size_factors,
             batch_size=batch_size,
+            backend=backend,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
