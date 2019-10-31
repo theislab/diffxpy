@@ -203,16 +203,12 @@ def lrt(
     :param data: Input data matrix (observations x features) or (cells x genes).
     :param full_formula_loc: formula
         Full model formula for location parameter model.
-        If not specified, `full_formula` will be used instead.
     :param reduced_formula_loc: formula
         Reduced model formula for location and scale parameter models.
-        If not specified, `reduced_formula` will be used instead.
     :param full_formula_scale: formula
         Full model formula for scale parameter model.
-        If not specified, `reduced_formula_scale` will be used instead.
     :param reduced_formula_scale: formula
         Reduced model formula for scale parameter model.
-        If not specified, `reduced_formula` will be used instead.
     :param as_numeric:
         Which columns of sample_description to treat as numeric and
         not as categorical. This yields columns in the design matrix
