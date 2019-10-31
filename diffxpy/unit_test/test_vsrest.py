@@ -22,7 +22,7 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-        from batchglm.api.models.glm_nb import Simulator
+        from batchglm.api.models.tf1.glm_nb import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -65,7 +65,7 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.ERROR)
-        from batchglm.api.models.glm_nb import Simulator
+        from batchglm.api.models.tf1.glm_nb import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -108,7 +108,7 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-        from batchglm.api.models.glm_nb import Simulator
+        from batchglm.api.models.tf1.glm_nb import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -148,7 +148,7 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-        from batchglm.api.models.glm_norm import Simulator
+        from batchglm.api.models import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)

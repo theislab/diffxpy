@@ -15,7 +15,6 @@ from typing import Union, Dict, Tuple, List, Set
 from .utils import split_x, dmat_unique
 from ..stats import stats
 from . import correction
-from diffxpy import pkg_constants
 
 logger = logging.getLogger("diffxpy")
 
@@ -822,7 +821,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         :return: Summary table of differential expression test.
         """
         res = super().summary(**kwargs)
-        res["grad"] = self.model_gradient.data
+        res["grad"] = self.model_gradient
         if len(self.theta_mle.shape) == 1:
             res["coef_mle"] = self.theta_mle
         if len(self.theta_sd.shape) == 1:
@@ -945,7 +944,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         import matplotlib.pyplot as plt
         from matplotlib import gridspec
         from matplotlib import rcParams
-        from batchglm.api.models.glm_norm import Estimator, InputDataGLM
+        from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
 
         plt.ioff()
 
@@ -1084,7 +1083,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         import matplotlib.pyplot as plt
         from matplotlib import gridspec
         from matplotlib import rcParams
-        from batchglm.api.models.glm_norm import Estimator, InputDataGLM
+        from batchglm.api.models import Estimator, InputDataGLM
 
         plt.ioff()
 
