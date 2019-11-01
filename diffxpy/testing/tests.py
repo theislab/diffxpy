@@ -41,7 +41,8 @@ def _fit(
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
         close_session=True,
-        dtype="float64"
+        dtype="float64",
+        optimizer="adam"
 ):
     """
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
@@ -106,24 +107,31 @@ def _fit(
         Should be "float32" for single precision or "float64" for double precision.
     :param close_session: If True, will finalize the estimator. Otherwise, return the estimator itself.
     """
-    provide_optimizers = {
-        "gd": pkg_constants.BATCHGLM_OPTIM_GD,
-        "adam": pkg_constants.BATCHGLM_OPTIM_ADAM,
-        "adagrad": pkg_constants.BATCHGLM_OPTIM_ADAGRAD,
-        "rmsprop": pkg_constants.BATCHGLM_OPTIM_RMSPROP,
-        "nr": pkg_constants.BATCHGLM_OPTIM_NEWTON,
-        "nr_tr": pkg_constants.BATCHGLM_OPTIM_NEWTON_TR,
-        "irls": pkg_constants.BATCHGLM_OPTIM_IRLS,
-        "irls_gd": pkg_constants.BATCHGLM_OPTIM_IRLS_GD,
-        "irls_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_TR,
-        "irls_gd_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_GD_TR
-    }
 
+    constructor_args = {}
     if backend.lower() in ["tf1"]:
+        constructor_args['provide_optimizers'] = {
+            "gd": pkg_constants.BATCHGLM_OPTIM_GD,
+            "adam": pkg_constants.BATCHGLM_OPTIM_ADAM,
+            "adagrad": pkg_constants.BATCHGLM_OPTIM_ADAGRAD,
+            "rmsprop": pkg_constants.BATCHGLM_OPTIM_RMSPROP,
+            "nr": pkg_constants.BATCHGLM_OPTIM_NEWTON,
+            "nr_tr": pkg_constants.BATCHGLM_OPTIM_NEWTON_TR,
+            "irls": pkg_constants.BATCHGLM_OPTIM_IRLS,
+            "irls_gd": pkg_constants.BATCHGLM_OPTIM_IRLS_GD,
+            "irls_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_TR,
+            "irls_gd_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_GD_TR
+        }
         if noise_model == "nb" or noise_model == "negative_binomial":
             from batchglm.api.models.tf1.glm_nb import Estimator, InputDataGLM
         elif noise_model == "norm" or noise_model == "normal":
             from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
+        else:
+            raise ValueError('noise_model="%s" not recognized.' % noise_model)
+
+    elif backend.lower() in ["tf2"]:
+        if noise_model == "nb" or noise_model == "negative_binomial":
+            from batchglm.api.models.tf2.glm_nb import Estimator, InputDataGLM
         else:
             raise ValueError('noise_model="%s" not recognized.' % noise_model)
     elif backend.lower() in ["numpy"]:
@@ -148,29 +156,44 @@ def _fit(
         size_factors=size_factors,
         feature_names=gene_names,
     )
-
-    constructor_args = {}
-    if batch_size is not None:
-        constructor_args["batch_size"] = batch_size
     if quick_scale is not None:
         constructor_args["quick_scale"] = quick_scale
+
+    if backend.lower() not in ["tf2"]:
+        if batch_size is not None:
+            constructor_args["batch_size"] = batch_size
+        #constructor_args['provide_optimizers'] = provide_optimizers
+        constructor_args['provide_batched'] = pkg_constants.BATCHGLM_PROVIDE_BATCHED
+        constructor_args['provide_fim'] = pkg_constants.BATCHGLM_PROVIDE_FIM
+        constructor_args['provide_hessian'] = pkg_constants.BATCHGLM_PROVIDE_HESSIAN
+
     estim = Estimator(
         input_data=input_data,
         init_a=init_a,
         init_b=init_b,
-        provide_optimizers=provide_optimizers,
-        provide_batched=pkg_constants.BATCHGLM_PROVIDE_BATCHED,
-        provide_fim=pkg_constants.BATCHGLM_PROVIDE_FIM,
-        provide_hessian=pkg_constants.BATCHGLM_PROVIDE_HESSIAN,
         dtype=dtype,
         **constructor_args
     )
     estim.initialize()
-    estim.train_sequence(training_strategy=training_strategy)
 
+    if backend.lower() not in ["tf2"]:
+        estim.train_sequence(training_strategy=training_strategy)
+
+    elif backend.lower() in ["tf2"]:
+
+        estim.train(
+            #batched_model: bool = True,
+            batch_size=batch_size,
+            optimizer=optimizer,
+            learning_rate=training_strategy['learning_rate'],
+            convergence_criteria=training_strategy['convergence_criteria'],
+            stopping_criteria=training_strategy['stopping_criteria'],
+            #autograd: bool = False,
+            featurewise=pkg_constants.BATCHGLM_FEATUREWISE
+            #benchmark: bool = False
+        )
     if close_session:
         estim.finalize()
-
     return estim
 
 
