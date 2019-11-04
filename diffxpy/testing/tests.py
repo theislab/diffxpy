@@ -147,6 +147,7 @@ def _fit(
         constraints_scale=constraints_scale,
         size_factors=size_factors,
         feature_names=gene_names,
+        cast_dtype=dtype
     )
 
     constructor_args = {}
