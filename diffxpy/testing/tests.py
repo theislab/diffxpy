@@ -36,7 +36,7 @@ def _fit(
         init_b: Union[np.ndarray, str] = "AUTO",
         gene_names=None,
         size_factors=None,
-        batch_size: int = None,
+        batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
@@ -88,7 +88,11 @@ def _fit(
         - np.ndarray: direct initialization of 'b'
     :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data
-    :param batch_size: the batch size to use for the estimator
+    :param batch_size: Argument controlling the memory load of the fitting procedure. For backends that allow
+        chunking of operations, this parameter controls the size of the batch / chunk.
+
+            - If backend is "tf1" or "tf2": number of observations per batch
+            - If backend is "numpy": Tuple of (number of observations per chunk, number of genes per chunk)
     :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
         training strategies. Available are:
 
@@ -126,6 +130,9 @@ def _fit(
             from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
         else:
             raise ValueError('noise_model="%s" not recognized.' % noise_model)
+        # Set default chunk size:
+        if isinstance(batch_size, int):
+            batch_size = (batch_size, 1000)
     elif backend.lower() in ["numpy"]:
         if isinstance(training_strategy, str):
             if training_strategy.lower() == "auto":
@@ -134,6 +141,11 @@ def _fit(
             from batchglm.api.models.numpy.glm_nb import Estimator, InputDataGLM
         else:
             raise ValueError('noise_model="%s" not recognized.' % noise_model)
+        # Set default chunk size:
+        if isinstance(batch_size, int):
+            raise ValueError("batch_size has to be a tuple if backend is numpy")
+        if batch_size is None:
+            batch_size = (1e6, 100)
     else:
         raise ValueError('models="%s" not recognized.' % backend)
 
@@ -147,12 +159,14 @@ def _fit(
         constraints_scale=constraints_scale,
         size_factors=size_factors,
         feature_names=gene_names,
+        chunk_size_cells=batch_size[0],
+        chunk_size_genes=batch_size[1],
         cast_dtype=dtype
     )
 
     constructor_args = {}
     if batch_size is not None:
-        constructor_args["batch_size"] = batch_size
+        constructor_args["batch_size"] = batch_size[0]
     if quick_scale is not None:
         constructor_args["quick_scale"] = quick_scale
     estim = Estimator(
@@ -188,7 +202,7 @@ def lrt(
         sample_description: pd.DataFrame = None,
         noise_model="nb",
         size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray] = None,
-        batch_size: int = None,
+        batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = False,
@@ -242,7 +256,11 @@ def lrt(
     :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data or string-type column identifier of size-factor containing
         column in sample description.
-    :param batch_size: the batch size to use for the estimator
+    :param batch_size: Argument controlling the memory load of the fitting procedure. For backends that allow
+        chunking of operations, this parameter controls the size of the batch / chunk.
+
+            - If backend is "tf1" or "tf2": number of observations per batch
+            - If backend is "numpy": Tuple of (number of observations per chunk, number of genes per chunk)
     :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
         training strategies. Available are:
 
@@ -381,7 +399,7 @@ def wald(
         constraints_scale: Union[None, List[str], Tuple[str, str], dict, np.ndarray] = None,
         noise_model: str = "nb",
         size_factors: Union[np.ndarray, pd.core.series.Series, str] = None,
-        batch_size: int = None,
+        batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = False,
@@ -506,7 +524,11 @@ def wald(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
-    :param batch_size: The batch size to use for the estimator.
+    :param batch_size: Argument controlling the memory load of the fitting procedure. For backends that allow
+        chunking of operations, this parameter controls the size of the batch / chunk.
+
+            - If backend is "tf1" or "tf2": number of observations per batch
+            - If backend is "numpy": Tuple of (number of observations per chunk, number of genes per chunk)
     :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
         training strategies. Available are:
 
@@ -752,7 +774,7 @@ def two_sample(
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
         size_factors: np.ndarray = None,
-        batch_size: int = None,
+        batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         is_sig_zerovar: bool = True,
@@ -816,7 +838,11 @@ def two_sample(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
-    :param batch_size: The batch size to use for the estimator.
+    :param batch_size: Argument controlling the memory load of the fitting procedure. For backends that allow
+        chunking of operations, this parameter controls the size of the batch / chunk.
+
+            - If backend is "tf1" or "tf2": number of observations per batch
+            - If backend is "numpy": Tuple of (number of observations per chunk, number of genes per chunk)
     :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
         training strategies. Available are:
 
@@ -937,7 +963,7 @@ def pairwise(
         sample_description: pd.DataFrame = None,
         noise_model: str = "nb",
         size_factors: np.ndarray = None,
-        batch_size: int = None,
+        batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         is_sig_zerovar: bool = True,
@@ -1013,7 +1039,11 @@ def pairwise(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
-    :param batch_size: The batch size to use for the estimator.
+    :param batch_size: Argument controlling the memory load of the fitting procedure. For backends that allow
+        chunking of operations, this parameter controls the size of the batch / chunk.
+
+            - If backend is "tf1" or "tf2": number of observations per batch
+            - If backend is "numpy": Tuple of (number of observations per chunk, number of genes per chunk)
     :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
         training strategies. Available are:
 
@@ -1165,7 +1195,7 @@ def versus_rest(
         sample_description: pd.DataFrame = None,
         noise_model: str = None,
         size_factors: np.ndarray = None,
-        batch_size: int = None,
+        batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         is_sig_zerovar: bool = True,
@@ -1240,7 +1270,11 @@ def versus_rest(
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
         - 'nb': default
-    :param batch_size: The batch size to use for the estimator.
+    :param batch_size: Argument controlling the memory load of the fitting procedure. For backends that allow
+        chunking of operations, this parameter controls the size of the batch / chunk.
+
+            - If backend is "tf1" or "tf2": number of observations per batch
+            - If backend is "numpy": Tuple of (number of observations per chunk, number of genes per chunk)
     :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
         training strategies. Available are:
 
@@ -1406,7 +1440,7 @@ class _Partition:
             test=None,
             size_factors: np.ndarray = None,
             noise_model: str = None,
-            batch_size: int = None,
+            batch_size: Union[None, int, Tuple[int, int]] = None,
             backend: str = "numpy",
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             is_sig_zerovar: bool = True,
@@ -1437,7 +1471,11 @@ class _Partition:
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
-        :param batch_size: The batch size to use for the estimator.
+        :param batch_size: Argument controlling the memory load of the fitting procedure. For backends that allow
+            chunking of operations, this parameter controls the size of the batch / chunk.
+
+                - If backend is "tf1" or "tf2": number of observations per batch
+                - If backend is "numpy": Tuple of (number of observations per chunk, number of genes per chunk)
         :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
             training strategies. Available are:
 
@@ -1566,7 +1604,7 @@ class _Partition:
             init_b: Union[str] = "AUTO",
             size_factors: np.ndarray = None,
             noise_model="nb",
-            batch_size: int = None,
+            batch_size: Union[None, int, Tuple[int, int]] = None,
             backend: str = "numpy",
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             **kwargs
@@ -1619,7 +1657,11 @@ class _Partition:
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
-        :param batch_size: The batch size to use for the estimator.
+        :param batch_size: Argument controlling the memory load of the fitting procedure. For backends that allow
+            chunking of operations, this parameter controls the size of the batch / chunk.
+
+                - If backend is "tf1" or "tf2": number of observations per batch
+                - If backend is "numpy": Tuple of (number of observations per chunk, number of genes per chunk)
         :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
             training strategies. Available are:
 
@@ -1672,7 +1714,7 @@ class _Partition:
             constraints_scale: np.ndarray = None,
             noise_model: str = "nb",
             size_factors: np.ndarray = None,
-            batch_size: int = None,
+            batch_size: Union[None, int, Tuple[int, int]] = None,
             backend: str = "numpy",
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             **kwargs
@@ -1727,8 +1769,12 @@ class _Partition:
         :param noise_model: str, noise model to use in model-based unit_test. Possible options:
 
             - 'nb': default
-        :param batch_size: The batch size to use for the estimator.
-            :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
+        :param batch_size: Argument controlling the memory load of the fitting procedure. For backends that allow
+            chunking of operations, this parameter controls the size of the batch / chunk.
+
+                - If backend is "tf1" or "tf2": number of observations per batch
+                - If backend is "numpy": Tuple of (number of observations per chunk, number of genes per chunk)
+        :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
             training strategies. Available are:
 
             - "numpy" numpy
@@ -1788,7 +1834,7 @@ def continuous_1d(
         constraints_scale: Union[dict, None] = None,
         noise_model: str = 'nb',
         size_factors: Union[np.ndarray, pd.core.series.Series, str] = None,
-        batch_size: int = None,
+        batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
@@ -1926,7 +1972,11 @@ def continuous_1d(
         - 'nb': default
     :param size_factors: 1D array of transformed library size factors for each cell in the
         same order as in data
-    :param batch_size: the batch size to use for the estimator
+    :param batch_size: Argument controlling the memory load of the fitting procedure. For backends that allow
+        chunking of operations, this parameter controls the size of the batch / chunk.
+
+            - If backend is "tf1" or "tf2": number of observations per batch
+            - If backend is "numpy": Tuple of (number of observations per chunk, number of genes per chunk)
     :param backend: Which linear algebra library to chose. This impact the available noise models and optimizers /
         training strategies. Available are:
 
