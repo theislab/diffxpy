@@ -42,7 +42,12 @@ def _fit(
         quick_scale: bool = None,
         close_session=True,
         dtype="float64",
-        optimizer="adam"
+        optimizer="adam",
+        convergence_criteria = None,
+        stopping_criteria = None,
+        learning_rate = None,
+        batched_model = None
+
 ):
     """
     :param noise_model: str, noise model to use in model-based unit_test. Possible options:
@@ -180,17 +185,24 @@ def _fit(
         estim.train_sequence(training_strategy=training_strategy)
 
     elif backend.lower() in ["tf2"]:
+        train_args = {}
+        train_args['featurewise'] = pkg_constants.BATCHGLM_FEATUREWISE
+        if batch_size is not None:
+            train_args["batch_size"] = batch_size
+        if optimizer is not None:
+            train_args["optimizer"] = optimizer
+        if convergence_criteria is not None:
+            train_args['convergence_criteria'] = convergence_criteria
+        if convergence_criteria is not None:
+            train_args['stopping_criteria'] = stopping_criteria
+        if learning_rate is not None:
+            train_args['learning_rate'] = learning_rate
+        if batched_model is not None:
+            train_args['batched_model'] = batched_model
 
         estim.train(
-            #batched_model: bool = True,
-            batch_size=batch_size,
-            optimizer=optimizer,
-            learning_rate=training_strategy['learning_rate'],
-            convergence_criteria=training_strategy['convergence_criteria'],
-            stopping_criteria=training_strategy['stopping_criteria'],
-            #autograd: bool = False,
-            featurewise=pkg_constants.BATCHGLM_FEATUREWISE
-            #benchmark: bool = False
+            autograd=pkg_constants.BATCHGLM_AUTOGRAD,
+            **train_args
         )
     if close_session:
         estim.finalize()
