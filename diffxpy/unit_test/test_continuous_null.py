@@ -5,7 +5,7 @@ import pandas as pd
 import scipy.stats as stats
 import logging
 
-from batchglm.api.models.tf1.glm_nb import Simulator
+from batchglm.api.models.numpy.glm_nb import Simulator
 import diffxpy.api as de
 
 
