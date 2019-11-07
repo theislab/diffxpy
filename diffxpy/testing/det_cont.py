@@ -211,6 +211,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :return: Continuuos fit for each cell for given gene.
         """
         idx = np.asarray(idx)
+        if len(idx.shape) == 0:
+            idx = np.array([idx])
 
         if non_numeric:
             mu = np.matmul(self._model_estim.input_data.design_loc,
@@ -220,7 +222,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         else:
             idx_basis = self._spline_par_loc_idx(intercept=True)
             mu = np.matmul(self._model_estim.input_data.design_loc[:, idx_basis],
-                           self._model_estim.model.a[idx_basis, idx])
+                           self._model_estim.model.a[idx_basis, :][:, idx])
 
         mu = np.exp(mu)
         return mu
@@ -272,9 +274,9 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :return: Maximum fitted expression value by gene.
         """
         idx, genes = self._idx_genes(genes)
-        idx = np.array([np.argmax(self._continuous_model(idx=i, non_numeric=non_numeric))
-                        for i in idx])
-        return self._continuous_coords[idx]
+        idx_cont = np.array([np.argmax(self._continuous_model(idx=i, non_numeric=non_numeric))
+                             for i in idx])
+        return self._continuous_coords[idx_cont]
 
     def argmin(self, genes, non_numeric=False):
         """
@@ -285,9 +287,9 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :return: Maximum fitted expression value by gene.
         """
         idx, genes = self._idx_genes(genes)
-        idx = np.array([np.argmin(self._continuous_model(idx=i, non_numeric=non_numeric))
-                        for i in idx])
-        return self._continuous_coords[idx]
+        idx_cont = np.array([np.argmin(self._continuous_model(idx=i, non_numeric=non_numeric))
+                             for i in idx])
+        return self._continuous_coords[idx_cont]
 
     def plot_genes(
             self,

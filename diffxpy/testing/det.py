@@ -754,8 +754,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             return self.model_estim.a_var[self.coef_loc_totest][0]
         else:
             idx_max = np.argmax(np.abs(self.model_estim.a_var[self.coef_loc_totest]), axis=0)
-            return self.model_estim.a_var[self.coef_loc_totest][
-                idx_max, np.arange(self.model_estim.a_var.shape[1])]
+            return self.model_estim.a_var[self.coef_loc_totest, :][idx_max, :]
 
     def _ll(self):
         """
