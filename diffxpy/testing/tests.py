@@ -154,7 +154,8 @@ def _fit(
         constraints_loc=constraints_loc,
         constraints_scale=constraints_scale,
         size_factors=size_factors,
-        feature_names=gene_names
+        feature_names=gene_names,
+        as_dask=backend.lower() in ["numpy"]
     )
 
     # Assemble variable key word arguments to constructor of Estimator.
