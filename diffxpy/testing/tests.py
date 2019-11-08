@@ -40,6 +40,7 @@ def _fit(
         backend: str = "numpy",
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
+        train_args: dict = {},
         close_session=True,
         dtype="float64"
 ):
@@ -105,24 +106,26 @@ def _fit(
     :param quick_scale: Depending on the optimizer, `scale` will be fitted faster and maybe less accurate.
 
         Useful in scenarios where fitting the exact `scale` is not absolutely necessary.
+    :param train_args: Backend-specific parameter estimation (optimizer) settings. This is a dictionary, its
+        entries depend on the backend. These optimizer settings are set to defaults if not passed in this
+        dictionary.
+
+        - backend=="tf1":
+        - backend=="tf2":
+            - optimizer: str
+            - convergence_criteria: str
+            - stopping_criteria: str
+            - learning_rate: float
+            - batched_model: True
+        - backend=="numpy":
+            - nproc: int = 3: number of processes to use in steps of multiprocessing that require scipy.minimize.
+                Note that the number of processes in the steps only based on linear algebra functions may deviate.
     :param dtype: Allows specifying the precision which should be used to fit data.
 
         Should be "float32" for single precision or "float64" for double precision.
     :param close_session: If True, will finalize the estimator. Otherwise, return the estimator itself.
     """
-    provide_optimizers = {
-        "gd": pkg_constants.BATCHGLM_OPTIM_GD,
-        "adam": pkg_constants.BATCHGLM_OPTIM_ADAM,
-        "adagrad": pkg_constants.BATCHGLM_OPTIM_ADAGRAD,
-        "rmsprop": pkg_constants.BATCHGLM_OPTIM_RMSPROP,
-        "nr": pkg_constants.BATCHGLM_OPTIM_NEWTON,
-        "nr_tr": pkg_constants.BATCHGLM_OPTIM_NEWTON_TR,
-        "irls": pkg_constants.BATCHGLM_OPTIM_IRLS,
-        "irls_gd": pkg_constants.BATCHGLM_OPTIM_IRLS_GD,
-        "irls_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_TR,
-        "irls_gd_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_GD_TR
-    }
-
+    # Load estimator for required noise model and backend:
     if backend.lower() in ["tf1"]:
         if noise_model == "nb" or noise_model == "negative_binomial":
             from batchglm.api.models.tf1.glm_nb import Estimator, InputDataGLM
@@ -130,9 +133,11 @@ def _fit(
             from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
         else:
             raise ValueError('noise_model="%s" not recognized.' % noise_model)
-        # Set default chunk size:
-        if isinstance(batch_size, int):
-            batch_size = (batch_size, 1000)
+    elif backend.lower() in ["tf2"]:
+        if noise_model == "nb" or noise_model == "negative_binomial":
+            from batchglm.api.models.tf2.glm_nb import Estimator, InputDataGLM
+        else:
+            raise ValueError('noise_model="%s" not recognized.' % noise_model)
     elif backend.lower() in ["numpy"]:
         if isinstance(training_strategy, str):
             if training_strategy.lower() == "auto":
@@ -147,7 +152,7 @@ def _fit(
         if batch_size is None:
             batch_size = (1e6, 100)
     else:
-        raise ValueError('models="%s" not recognized.' % backend)
+        raise ValueError('backend="%s" not recognized.' % backend)
 
     input_data = InputDataGLM(
         data=data,
@@ -161,31 +166,66 @@ def _fit(
         feature_names=gene_names,
         chunk_size_cells=batch_size[0],
         chunk_size_genes=batch_size[1],
+        as_dask=backend.lower() in ["numpy"],
         cast_dtype=dtype
     )
 
+    # Assemble variable key word arguments to constructor of Estimator.
     constructor_args = {}
-    if batch_size is not None:
-        constructor_args["batch_size"] = batch_size[0]
     if quick_scale is not None:
         constructor_args["quick_scale"] = quick_scale
+    if batch_size is not None:
+        constructor_args["batch_size"] = batch_size
+    # Backend-specific constructor arguments:
+    if backend.lower() in ["tf1"]:
+        constructor_args['provide_optimizers'] = {
+            "gd": pkg_constants.BATCHGLM_OPTIM_GD,
+            "adam": pkg_constants.BATCHGLM_OPTIM_ADAM,
+            "adagrad": pkg_constants.BATCHGLM_OPTIM_ADAGRAD,
+            "rmsprop": pkg_constants.BATCHGLM_OPTIM_RMSPROP,
+            "nr": pkg_constants.BATCHGLM_OPTIM_NEWTON,
+            "nr_tr": pkg_constants.BATCHGLM_OPTIM_NEWTON_TR,
+            "irls": pkg_constants.BATCHGLM_OPTIM_IRLS,
+            "irls_gd": pkg_constants.BATCHGLM_OPTIM_IRLS_GD,
+            "irls_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_TR,
+            "irls_gd_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_GD_TR
+        }
+        #constructor_args['provide_optimizers'] = provide_optimizers
+        constructor_args['provide_batched'] = pkg_constants.BATCHGLM_PROVIDE_BATCHED
+        constructor_args['provide_fim'] = pkg_constants.BATCHGLM_PROVIDE_FIM
+        constructor_args['provide_hessian'] = pkg_constants.BATCHGLM_PROVIDE_HESSIAN
+    elif backend.lower() not in ["tf2"]:
+        pass
+    elif backend.lower() not in ["numpy"]:
+        pass
+    else:
+        raise ValueError('backend="%s" not recognized.' % backend)
+
     estim = Estimator(
         input_data=input_data,
         init_a=init_a,
         init_b=init_b,
-        provide_optimizers=provide_optimizers,
-        provide_batched=pkg_constants.BATCHGLM_PROVIDE_BATCHED,
-        provide_fim=pkg_constants.BATCHGLM_PROVIDE_FIM,
-        provide_hessian=pkg_constants.BATCHGLM_PROVIDE_HESSIAN,
         dtype=dtype,
         **constructor_args
     )
     estim.initialize()
-    estim.train_sequence(training_strategy=training_strategy)
+
+    # Assemble backend specific key word arguments to training function:
+    if batch_size is not None:
+        train_args["batch_size"] = batch_size
+    if backend.lower() in ["tf1"]:
+        pass
+    elif backend.lower() in ["tf2"]:
+        train_args["autograd"] = pkg_constants.BATCHGLM_AUTOGRAD
+        train_args["featurewise"] = pkg_constants.BATCHGLM_FEATUREWISE
+
+    estim.train_sequence(
+        training_strategy=training_strategy,
+        **train_args
+    )
 
     if close_session:
         estim.finalize()
-
     return estim
 
 
@@ -204,6 +244,7 @@ def lrt(
         size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray] = None,
         batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
+        train_args: dict = {},
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = False,
         dtype="float64",
@@ -346,6 +387,7 @@ def lrt(
         size_factors=size_factors,
         batch_size=batch_size,
         backend=backend,
+        train_args=train_args,
         training_strategy=training_strategy,
         quick_scale=quick_scale,
         dtype=dtype,
@@ -365,6 +407,7 @@ def lrt(
         size_factors=size_factors,
         batch_size=batch_size,
         backend=backend,
+        train_args=train_args,
         training_strategy=training_strategy,
         quick_scale=quick_scale,
         dtype=dtype,
@@ -401,6 +444,7 @@ def wald(
         size_factors: Union[np.ndarray, pd.core.series.Series, str] = None,
         batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
+        train_args: dict = {},
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = False,
         dtype="float64",
@@ -665,6 +709,7 @@ def wald(
         size_factors=size_factors,
         batch_size=batch_size,
         backend=backend,
+        train_args=train_args,
         training_strategy=training_strategy,
         quick_scale=quick_scale,
         dtype=dtype,
@@ -776,6 +821,7 @@ def two_sample(
         size_factors: np.ndarray = None,
         batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
+        train_args: dict = {},
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         is_sig_zerovar: bool = True,
         quick_scale: bool = None,
@@ -901,6 +947,7 @@ def two_sample(
             init_b="closed_form",
             batch_size=batch_size,
             backend=backend,
+            train_args=train_args,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
@@ -928,6 +975,7 @@ def two_sample(
             init_b="closed_form",
             batch_size=batch_size,
             backend=backend,
+            train_args=train_args,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
@@ -965,6 +1013,7 @@ def pairwise(
         size_factors: np.ndarray = None,
         batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
+        train_args: dict = {},
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         is_sig_zerovar: bool = True,
         quick_scale: bool = False,
@@ -1104,6 +1153,7 @@ def pairwise(
             init_b="closed_form",
             batch_size=batch_size,
             backend=backend,
+            train_args=train_args,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
@@ -1159,6 +1209,7 @@ def pairwise(
                     size_factors=size_factors[idx] if size_factors is not None else None,
                     batch_size=batch_size,
                     backend=backend,
+                    train_args=train_args,
                     training_strategy=training_strategy,
                     quick_scale=quick_scale,
                     is_sig_zerovar=is_sig_zerovar,
@@ -1197,6 +1248,7 @@ def versus_rest(
         size_factors: np.ndarray = None,
         batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
+        train_args: dict = {},
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         is_sig_zerovar: bool = True,
         quick_scale: bool = None,
@@ -1335,6 +1387,7 @@ def versus_rest(
             noise_model=noise_model,
             batch_size=batch_size,
             backend=backend,
+            train_args=train_args,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             size_factors=size_factors,
@@ -1442,6 +1495,7 @@ class _Partition:
             noise_model: str = None,
             batch_size: Union[None, int, Tuple[int, int]] = None,
             backend: str = "numpy",
+            train_args: dict = {},
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             is_sig_zerovar: bool = True,
             **kwargs
@@ -1507,6 +1561,7 @@ class _Partition:
                 size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
                 backend=backend,
+                train_args=train_args,
                 training_strategy=training_strategy,
                 is_sig_zerovar=is_sig_zerovar,
                 **kwargs
@@ -1606,6 +1661,7 @@ class _Partition:
             noise_model="nb",
             batch_size: Union[None, int, Tuple[int, int]] = None,
             backend: str = "numpy",
+            train_args: dict = {},
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             **kwargs
     ):
@@ -1694,6 +1750,7 @@ class _Partition:
                 size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
                 backend=backend,
+                train_args=train_args,
                 training_strategy=training_strategy,
                 **kwargs
             ))
@@ -1716,6 +1773,7 @@ class _Partition:
             size_factors: np.ndarray = None,
             batch_size: Union[None, int, Tuple[int, int]] = None,
             backend: str = "numpy",
+            train_args: dict = {},
             training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
             **kwargs
     ):
@@ -1806,6 +1864,7 @@ class _Partition:
                 size_factors=size_factors[idx] if size_factors is not None else None,
                 batch_size=batch_size,
                 backend=backend,
+                train_args=train_args,
                 training_strategy=training_strategy,
                 **kwargs
             ))
@@ -1836,6 +1895,7 @@ def continuous_1d(
         size_factors: Union[np.ndarray, pd.core.series.Series, str] = None,
         batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
+        train_args: dict = {},
         training_strategy: Union[str, List[Dict[str, object]], Callable] = "AUTO",
         quick_scale: bool = None,
         dtype="float64",
@@ -2144,6 +2204,7 @@ def continuous_1d(
             size_factors=size_factors,
             batch_size=batch_size,
             backend=backend,
+            train_args=train_args,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
@@ -2197,6 +2258,7 @@ def continuous_1d(
             size_factors=size_factors,
             batch_size=batch_size,
             backend=backend,
+            train_args=train_args,
             training_strategy=training_strategy,
             quick_scale=quick_scale,
             dtype=dtype,
