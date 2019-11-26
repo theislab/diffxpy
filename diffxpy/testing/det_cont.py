@@ -204,7 +204,9 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
 
     def _continuous_model(self, idx, non_numeric=False):
         """
-        Recover continuous fit for a gene.
+        Recover continuous fit for a gene in observed time points.
+
+        Gives interpolation for each observation.
 
         :param idx: Index of genes to recover fit for.
         :param non_numeric: Whether to include non-numeric covariates in fit.
@@ -231,14 +233,28 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
 
     def _continuous_interpolation(self, idx):
         """
-        Recover continuous fit for a gene.
+        Recover continuous fit for a gene in uniformely spaced time grid.
+
+        Gives interpolation for each grid point - more efficient for plotting for example.
 
         :param idx: Index of genes to recover fit for.
         :return: Continuuos fit for each cell for given gene.
         """
         idx = np.asarray(idx)
+        if len(idx.shape) == 0:
+            idx = np.array([idx])
+
         idx_basis = self._spline_par_loc_idx(intercept=True)
-        eta_loc = np.matmul(self._interpolated_spline_basis[:, :-1], self._model_estim.model.a[idx_basis, :][:, idx])
+        spline_basis_with_intercept = np.concatenate([
+            np.ones([self._interpolated_spline_basis.shape[0], 1]),
+            self._interpolated_spline_basis[:, :-1]
+        ], axis=1)
+        a = self._model_estim.model.a[idx_basis, :]
+        if isinstance(a, dask.array.core.Array):
+            a = a.compute()[:, idx]
+        else:
+            a = a[:, idx]
+        eta_loc = np.matmul(spline_basis_with_intercept, a)
         mu = np.exp(eta_loc)
         t_eval = self._interpolated_spline_basis[:, -1]
         return t_eval, mu
