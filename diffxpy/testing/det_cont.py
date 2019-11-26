@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import scipy
 import scipy.sparse
+import sparse
 from typing import Union
 
 from .det import _DifferentialExpressionTestSingle, DifferentialExpressionTestWald, DifferentialExpressionTestLRT
@@ -392,11 +393,14 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             axs.append(ax)
 
             y = self.x[:, g]
-            if isinstance(y, scipy.sparse.csr_matrix):
+            if isinstance(y, dask.array.core.Array):
+                y = y.compute()
+            if isinstance(y, scipy.sparse.spmatrix) or isinstance(y, sparse.COO):
                 y = np.asarray(y.todense()).flatten()
                 if self._model_estim.input_data.size_factors is not None:
                     y = y / self._model_estim.input_data.size_factors
             t_continuous, yhat = self._continuous_interpolation(idx=g)
+            yhat = yhat.flatten()
             if scalings is not None:
                 yhat = np.vstack([
                     [yhat],
@@ -413,6 +417,9 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             if log:
                 y = np.log(y + 1)
                 yhat = np.log(yhat + 1)
+
+            if isinstance(yhat, dask.array.core.Array):
+                yhat = yhat.compute()
 
             sns.scatterplot(
                 x=self._continuous_coords,
@@ -493,6 +500,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         # Build heatmap matrix.
         # Add in data.
         xcoord, data = self._continuous_interpolation(idx=gene_idx)
+        if isinstance(data, dask.array.core.Array):
+            data = data.compute()
         data = data.T
 
         if transform.lower() == "log10":

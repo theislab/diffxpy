@@ -11,6 +11,7 @@ import patsy
 import pandas as pd
 from random import sample
 import scipy.sparse
+import sparse
 from typing import Union, Dict, Tuple, List, Set
 
 from .utils import split_x, dmat_unique
@@ -1089,7 +1090,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         import matplotlib.pyplot as plt
         from matplotlib import gridspec
         from matplotlib import rcParams
-        from batchglm.api.models import Estimator, InputDataGLM
+        from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
 
         plt.ioff()
 
@@ -1250,6 +1251,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             g_idx = self.model_estim.input_data.features.index(g)
             # Raw data for boxplot:
             y = self.model_estim.x[:, g_idx]
+            if isinstance(y, dask.array.core.Array):
+                y = y.compute()
+            if isinstance(y, scipy.sparse.spmatrix) or isinstance(y, sparse.COO):
+                y = np.asarray(y.todense()).flatten()
             # Model fits:
             loc = self.model_estim.location[:, g_idx]
             scale = self.model_estim.scale[:, g_idx]
@@ -1270,6 +1275,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             if log1p_transform:
                 y = np.log(y + 1)
                 yhat = np.log(yhat + 1)
+            if isinstance(yhat, dask.array.core.Array):
+                yhat = yhat.compute()
 
             # Build DataFrame which contains all information for raw data:
             summary_raw = pd.DataFrame({"y": y, "data": "obs"})
