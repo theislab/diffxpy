@@ -754,12 +754,14 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         if len(self.coef_loc_totest) == 1:
             return self.model_estim.a_var[self.coef_loc_totest][0]
         else:
-            idx_max = np.argmax(np.abs(self.model_estim.a_var[self.coef_loc_totest]), axis=0)
+            idx0 = np.argmax(np.abs(self.model_estim.a_var[self.coef_loc_totest]), axis=0)
+            idx1 = np.arange(len(idx0))
             # Leave the below for debugging right now, dask has different indexing than numpy does here:
-            assert not isinstance(self.model_estim.a_var, dask.array.core.Array), "dask array found where no dask array should be"
+            assert not isinstance(self.model_estim.a_var, dask.array.core.Array), \
+                "self.model_estim.a_var was dask array, aborting. Please file issue on github."
             # Use advanced numpy indexing here:
             # https://docs.scipy.org/doc/numpy/reference/arrays.indexing.html#advanced-indexing
-            return self.model_estim.a_var[self.coef_loc_totest, :][tuple(idx_max), tuple(np.arange(len(idx_max)))]
+            return self.model_estim.a_var[self.coef_loc_totest, :][tuple(idx0), tuple(idx1)]
 
     def _ll(self):
         """
