@@ -4,6 +4,7 @@ try:
 except ImportError:
     anndata = None
 import batchglm.api as glm
+import dask
 import logging
 import numpy as np
 import patsy
@@ -742,7 +743,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         Returns one fold change per gene
 
         Returns coefficient if only one coefficient is testeed.
-        Returns mean absolute coefficient if multiple coefficients are tested.
+        Returns the coefficient that is the maximum absolute coefficient if multiple coefficients are tested.
         """
         # design = np.unique(self.model_estim.design_loc, axis=0)
         # dmat = np.zeros_like(design)
@@ -754,6 +755,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             return self.model_estim.a_var[self.coef_loc_totest][0]
         else:
             idx_max = np.argmax(np.abs(self.model_estim.a_var[self.coef_loc_totest]), axis=0)
+            # Leave the below for debugging right now, dask has different indexing than numpy does here:
+            assert not isinstance(idx_max, dask.array.core.Array), "dask array found where no dask array should be"
             return self.model_estim.a_var[self.coef_loc_totest, :][idx_max, :]
 
     def _ll(self):

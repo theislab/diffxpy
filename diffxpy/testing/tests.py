@@ -133,11 +133,25 @@ def _fit(
             from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
         else:
             raise ValueError('noise_model="%s" not recognized.' % noise_model)
+        if batch_size is None:
+            batch_size = 128
+        else:
+            if not isinstance(batch_size, int):
+                raise ValueError("batch_size has to be an integer if backend is tf1")
+        chunk_size_cells = int(1e9)
+        chunk_size_genes = 128
     elif backend.lower() in ["tf2"]:
         if noise_model == "nb" or noise_model == "negative_binomial":
             from batchglm.api.models.tf2.glm_nb import Estimator, InputDataGLM
         else:
             raise ValueError('noise_model="%s" not recognized.' % noise_model)
+        if batch_size is None:
+            batch_size = 128
+        else:
+            if not isinstance(batch_size, int):
+                raise ValueError("batch_size has to be an integer if backend is tf2")
+        chunk_size_cells = int(1e9)
+        chunk_size_genes = 128
     elif backend.lower() in ["numpy"]:
         if isinstance(training_strategy, str):
             if training_strategy.lower() == "auto":
@@ -147,10 +161,15 @@ def _fit(
         else:
             raise ValueError('noise_model="%s" not recognized.' % noise_model)
         # Set default chunk size:
-        if isinstance(batch_size, int):
-            raise ValueError("batch_size has to be a tuple if backend is numpy")
         if batch_size is None:
-            batch_size = (1e6, 100)
+            chunk_size_cells = int(1e9)
+            chunk_size_genes = 128
+            batch_size = (chunk_size_cells, chunk_size_genes)
+        else:
+            if isinstance(batch_size, int) or len(batch_size) != 2:
+                raise ValueError("batch_size has to be a tuple of length 2 if backend is numpy")
+            chunk_size_cells = batch_size[0]
+            chunk_size_genes = batch_size[1]
     else:
         raise ValueError('backend="%s" not recognized.' % backend)
 
@@ -164,8 +183,8 @@ def _fit(
         constraints_scale=constraints_scale,
         size_factors=size_factors,
         feature_names=gene_names,
-        chunk_size_cells=batch_size[0],
-        chunk_size_genes=batch_size[1],
+        chunk_size_cells=chunk_size_cells,
+        chunk_size_genes=chunk_size_genes,
         as_dask=backend.lower() in ["numpy"],
         cast_dtype=dtype
     )
@@ -174,8 +193,6 @@ def _fit(
     constructor_args = {}
     if quick_scale is not None:
         constructor_args["quick_scale"] = quick_scale
-    if batch_size is not None:
-        constructor_args["batch_size"] = batch_size
     # Backend-specific constructor arguments:
     if backend.lower() in ["tf1"]:
         constructor_args['provide_optimizers'] = {
@@ -190,10 +207,10 @@ def _fit(
             "irls_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_TR,
             "irls_gd_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_GD_TR
         }
-        #constructor_args['provide_optimizers'] = provide_optimizers
         constructor_args['provide_batched'] = pkg_constants.BATCHGLM_PROVIDE_BATCHED
         constructor_args['provide_fim'] = pkg_constants.BATCHGLM_PROVIDE_FIM
         constructor_args['provide_hessian'] = pkg_constants.BATCHGLM_PROVIDE_HESSIAN
+        constructor_args["batch_size"] = batch_size
     elif backend.lower() not in ["tf2"]:
         pass
     elif backend.lower() not in ["numpy"]:
@@ -218,6 +235,8 @@ def _fit(
     elif backend.lower() in ["tf2"]:
         train_args["autograd"] = pkg_constants.BATCHGLM_AUTOGRAD
         train_args["featurewise"] = pkg_constants.BATCHGLM_FEATUREWISE
+    elif backend.lower() in ["numpy"]:
+        pass
 
     estim.train_sequence(
         training_strategy=training_strategy,

@@ -4,6 +4,7 @@ try:
 except ImportError:
     anndata = None
 import batchglm.api as glm
+import dask
 import logging
 import numpy as np
 import pandas as pd
@@ -114,8 +115,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         else:
             idx, genes = self._idx_genes(genes)
 
-        max_val = self.max(genes=idx, non_numeric=non_numeric)
-        min_val = self.min(genes=idx, non_numeric=non_numeric)
+        min_val, max_val = self.min_max(genes=idx, non_numeric=non_numeric)
         max_val = np.nextafter(0, 1, out=max_val, where=max_val == 0)
         min_val = np.nextafter(0, 1, out=min_val, where=min_val == 0)
         return (np.log(max_val) - np.log(min_val)) / np.log(base)
@@ -223,6 +223,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             idx_basis = self._spline_par_loc_idx(intercept=True)
             mu = np.matmul(self._model_estim.input_data.design_loc[:, idx_basis],
                            self._model_estim.model.a[idx_basis, :][:, idx])
+        if isinstance(mu, dask.array.core.Array):
+            mu = mu.compute()
 
         mu = np.exp(mu)
         return mu
@@ -240,6 +242,23 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         mu = np.exp(eta_loc)
         t_eval = self._interpolated_spline_basis[:, -1]
         return t_eval, mu
+
+    def min_max(self, genes, non_numeric=False):
+        """
+        Return maximum and minimum of fitted expression value by gene.
+
+        :param genes: Genes for which to return maximum fitted value.
+        :param non_numeric: Whether to include non-numeric covariates in fit.
+        :return: Array of minimum and maximum fitted expression values by gene.
+        """
+        idx, genes = self._idx_genes(genes)
+        mins = []
+        maxs = []
+        for i in idx:
+            vals = self._continuous_model(idx=i, non_numeric=non_numeric)
+            mins.append(np.min(vals))
+            maxs.append(np.max(vals))
+        return np.array(mins), np.array(maxs)
 
     def max(self, genes, non_numeric=False):
         """
