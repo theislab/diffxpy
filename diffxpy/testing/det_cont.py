@@ -246,16 +246,12 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             idx = np.array([idx])
 
         idx_basis = self._spline_par_loc_idx(intercept=True)
-        spline_basis_with_intercept = np.concatenate([
-            np.ones([self._interpolated_spline_basis.shape[0], 1]),
-            self._interpolated_spline_basis[:, :-1]
-        ], axis=1)
         a = self._model_estim.model.a[idx_basis, :]
         if isinstance(a, dask.array.core.Array):
             a = a.compute()[:, idx]
         else:
             a = a[:, idx]
-        eta_loc = np.matmul(spline_basis_with_intercept, a)
+        eta_loc = np.matmul(self._interpolated_spline_basis[:, :-1], a)
         mu = np.exp(eta_loc)
         t_eval = self._interpolated_spline_basis[:, -1]
         return t_eval, mu
