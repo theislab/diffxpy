@@ -4,6 +4,7 @@ try:
 except ImportError:
     from anndata import Raw
 import batchglm.api as glm
+import dask
 import logging
 import numpy as np
 import pandas as pd
@@ -741,6 +742,81 @@ def wald(
         col_indices=col_indices,
         noise_model=noise_model,
         sample_description=sample_description
+    )
+    return de_test
+
+
+def wald_repeated(
+        det: DifferentialExpressionTestWald,
+        factor_loc_totest: Union[str, List[str]] = None,
+        coef_to_test: Union[str, List[str]] = None,
+        **kwargs
+):
+    """
+    Run another wald test on a DifferentialExpressionTestWald object that already contains a model fit.
+
+    This allows you to assess signficance of another parameter set without refitting the model.
+
+    :param factor_loc_totest: str, list of strings
+        List of factors of formula to test with Wald test.
+        E.g. "condition" or ["batch", "condition"] if formula_loc would be "~ 1 + batch + condition"
+    :param coef_to_test:
+        If there are more than two groups specified by `factor_loc_totest`,
+        this parameter allows to specify the group which should be tested.
+        Alternatively, if factor_loc_totest is not given, this list sets
+        the exact coefficients which are to be tested.
+    """
+    if len(kwargs) != 0:
+        logging.getLogger("diffxpy").debug("additional kwargs: %s", str(kwargs))
+
+    # Check that factor_loc_totest and coef_to_test are lists and not single strings:
+    if isinstance(factor_loc_totest, str):
+        factor_loc_totest = [factor_loc_totest]
+    if isinstance(coef_to_test, str):
+        coef_to_test = [coef_to_test]
+
+    # Check that design_loc is patsy, otherwise  use term_names for slicing.
+    par_loc_names = det.model_estim.model.design_loc_names
+    if factor_loc_totest is not None and coef_to_test is None:
+        col_indices = np.concatenate([np.where([
+            fac in x
+            for x in par_loc_names
+        ])[0] for fac in factor_loc_totest])
+    elif factor_loc_totest is None and coef_to_test is not None:
+        if not np.all([x in par_loc_names for x in coef_to_test]):
+            raise ValueError(
+                "the requested test coefficients %s were found in model coefficients %s" %
+                (", ".join([x for x in coef_to_test if x not in par_loc_names]),
+                 ", ".join(par_loc_names))
+            )
+        col_indices = np.asarray([
+            par_loc_names.index(x) for x in coef_to_test
+        ])
+    elif factor_loc_totest is None and coef_to_test is None:
+        raise ValueError("Do not supply factor_loc_totest and coef_to_test in wald_repeated, run a new wald test.")
+    else:
+        raise ValueError("Either set factor_loc_totest or coef_to_test.")
+    assert len(col_indices) > 0, "Could not find any matching columns!"
+
+    # Check that all tested coefficients are independent:
+    constraints_loc = det.model_estim.model.constraints_loc
+    if isinstance(constraints_loc, dask.array.core.Array):
+        constraints_loc = constraints_loc.compute()
+    for x in col_indices:
+        if np.sum(constraints_loc[x, :]) != 1:
+            raise ValueError("Constraints input is wrong: not all tested coefficients are unconstrained.")
+    # Adjust tested coefficients from dependent to independent (fitted) parameters:
+    col_indices = np.array([
+        np.where(constraints_loc[x, :] == 1)[0][0]
+        for x in col_indices
+    ])
+
+    # Prepare differential expression test.
+    de_test = DifferentialExpressionTestWald(
+        model_estim=det.model_estim,
+        col_indices=col_indices,
+        noise_model=det.noise_model,
+        sample_description=det.sample_description
     )
     return de_test
 
