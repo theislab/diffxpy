@@ -3,9 +3,10 @@ import numpy as np
 import pandas as pd
 import abc
 import json
+import os
 import warnings
 import urllib.request as request
-from typing import Union, List
+from typing import Union, List, Dict
 
 from ..stats import stats
 from ..testing import correction
@@ -286,34 +287,121 @@ class _GetInteractionsBioGrid(_GetInteractionsBase):
 
 
 class RefSetLoaderBioGrid:
+    """
+    This class loads a RefSet instance that is preloaded with interactions loaded from the BioGrid Web API
+
+    Example code:
+
+    access_key = 'your_biogrid_access_key'
+    ko_name_list = ['FOXA2', 'ARNT', 'ZAP70']
+
+    loader = RefSetLoaderBioGrid(access_key, ko_name_list)
+    ref_sets = loader.get_ref_set()  # -> now you can use the ref_sets instance as you are used to
+
+    # if you want to save the retrieved interactions and their sources
+    loader.save_sources_to_file()
+    loader.save_inters_to_file()
+    """
 
     def __init__(self,
                  access_key: str,
                  ko_name_list: List[str],
                  only_physical_or_genetic_inters=True):
+        """
+        :param access_key: your BioGrid access key
+            you can get one by filling out this form: https://webservice.thebiogrid.org/
+        :param ko_name_list: List[str]
+            name of the genes your knockouts are targeting
+            e.g. : ['FOXA2', 'ARNT', 'ZAP70']
+        :param only_physical_or_genetic_inters: bool
+            True: only physical and genetic interactions will be considered
+            False: all interactions will be considered
+        """
 
-        self.ref_sets = self.__create_refset(access_key=access_key,
-                                             ko_name_list=ko_name_list,
-                                             only_physical_or_genetic_inters=only_physical_or_genetic_inters)
+        self.__inters, self.__sources = self.__get_biogrid_data(
+            access_key=access_key,
+            ko_name_list=ko_name_list,
+            only_physical_or_genetic_inters=only_physical_or_genetic_inters
+        )
+
+        self.__ref_sets = self.__create_refset()
 
     @staticmethod
-    def __create_refset(access_key: str,
-                        ko_name_list: List[str],
-                        only_physical_or_genetic_inters: bool) -> RefSets:
-
+    def __get_biogrid_data(access_key: str,
+                           ko_name_list: List[str],
+                           only_physical_or_genetic_inters: bool):
         biogrid = _GetInteractionsBioGrid(access_key=access_key)
         inters, sources = biogrid.get_interactions(ko_gene_list=ko_name_list,
                                                    only_physical_or_genetic_inters=only_physical_or_genetic_inters)
 
+        return inters, sources
+
+    def __create_refset(self):
         ref_sets = RefSets()
 
-        for key in inters.keys():
-            ref_sets.add(id=str(key), source='BioGrid', gene_ids=inters[key])
+        for key in self.__inters.keys():
+            ref_sets.add(id=str(key), source='BioGrid', gene_ids=self.__inters[key])
 
         return ref_sets
 
     def get_refset(self):
-        return self.ref_sets
+        """
+        This method returns the RefSets instance preloaded with the interactions retrieved from BioGrid
+        :return: RefSets
+        """
+        return self.__ref_sets
+
+    def save_sources_to_file(self, save_dir='', save_format='json'):
+        """
+        This method saves all the sources of the interactions to file
+        :param save_dir: str
+            Path to the directory where data should be saved to
+        :param save_format: str
+            either: 'json' --> better format as it preserves the structure of the data
+            or: 'csv' --> flattens the data (not grouped by knockouts anymore)
+        :return: None
+        """
+        if save_format == 'json':
+            with open(os.path.join(save_dir, 'ref_data_sources.json'), 'w') as file:
+                json.dump(self.__sources, file, indent=4, sort_keys=True)
+        elif save_format == 'csv':
+            save_list = [[], [], [], []]
+            for key_ko_gene in self.__sources.keys():
+                for key_inter in self.__sources[key_ko_gene].keys():
+                    for source in self.__sources[key_ko_gene][key_inter]:
+                        save_list[0] = save_list[0] + [str(key_ko_gene)]
+                        save_list[1] = save_list[1] + [str(key_inter)]
+                        save_list[2] = save_list[2] + [source['PUBMED_AUTHOR']]
+                        save_list[3] = save_list[3] + [source['PUBMED_ID']]
+            df = pd.DataFrame(np.array(save_list).T)
+            df.to_csv(os.path.join(save_dir, 'ref_data_sources.csv'))
+        else:
+            raise ValueError('save_format you selected is not supported')
+        raise NotImplementedError
+
+    def save_inters_to_file(self, save_dir='', save_format='json'):
+        """
+        This method saves all the interactions retrieved from BioGrid to file
+        :param save_dir: str
+            Path to the directory where data should be saved to
+        :param save_format: str
+            either: 'json' --> better format as it preserves the structure of the data
+            or: 'csv' --> flattens the data (not grouped by knockouts anymore)
+        :return: None
+        """
+        if save_format == 'json':
+            with open(os.path.join(save_dir, 'ref_data.json'), 'w') as file:
+                json.dump(self.__inters, file, indent=4, sort_keys=True)
+        elif save_format == 'csv':
+            save_list = [[], []]
+            for key in self.__inters.keys():
+                inters = self.__inters[key]
+                save_list[0] = save_list[0] + ([str(key)] * len(inters))
+                save_list[1] = save_list[1] + inters
+            df = pd.DataFrame(np.array(save_list).T)
+            df.to_csv(os.path.join(save_dir, 'ref_data.csv'))
+        else:
+            raise ValueError('save_format you selected is not supported')
 
 
 def test(
