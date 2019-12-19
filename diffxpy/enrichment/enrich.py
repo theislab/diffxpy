@@ -1,7 +1,11 @@
 import logging
 import numpy as np
 import pandas as pd
-from typing import Union
+import abc
+import json
+import warnings
+import urllib.request as request
+from typing import Union, List
 
 from ..stats import stats
 from ..testing import correction
@@ -189,6 +193,127 @@ class RefSets:
                 x.intersect = x.genes.intersection(enq_set)
         else:
             x.intersect = self.get_set(id).genes.intersection(enq_set)  # bug
+
+
+class _GetInteractionsBase(abc.ABC):
+    """
+    This class defines an interface all GetInteraction class have to comply with
+    """
+
+    @abc.abstractmethod
+    def get_interactions(self, ko_gene_list: List[str], only_physical_or_genetic_inters=True):
+        """
+        This method returns a dictionary containing the possible interactions for each element of the list on input
+        gene names
+        :param ko_gene_list: List[str]
+            names of input genes e.g. ['FOXA2', 'OTX2', ...]
+        :param only_physical_or_genetic_inters: bool
+            if True -> only physical and genetic interactions are returned
+            else -> all kind of interactions are returned
+        :return: Dict[gene_name: str, List[interactions: str]]
+            the elements of ko_gene_list are the keys of the return dictionary
+            the entries for each key are the corresponding gene interactions
+        """
+        pass
+
+
+class _GetInteractionsBioGrid(_GetInteractionsBase):
+
+    def __init__(self, access_key: str):
+        self.accessKey = access_key
+
+    def __get_request(self, gene_name: str):
+        url = f'https://webservice.thebiogrid.org/interactions?searchNames=true' \
+            f'&geneList={gene_name}' \
+            f'&includeInteractors=true' \
+            f'&includeInteractorInteractions=false' \
+            f'&selfInteractionsExcluded=true' \
+            f'&taxId=9606' \
+            f'&accesskey={self.accessKey}' \
+            f'&format=json'
+
+        return url
+
+    def get_interactions(self, ko_gene_list: List[str], only_physical_or_genetic_inters=True):
+        """
+        See base class -> GetInteractionsBase
+        """
+        interactions = {}
+        sources = {}
+
+        for ko_gene in ko_gene_list:
+            interaction_list = []
+            sources[ko_gene.upper()] = {}
+            # noinspection PyBroadException
+            try:
+                with request.urlopen(self.__get_request(gene_name=ko_gene.upper())) as response:
+                    data = response.read()
+                    data = json.loads(data)
+                    for key in data.keys():
+                        gene_a = str(data[key]['OFFICIAL_SYMBOL_A']).upper()
+                        gene_b = str(data[key]['OFFICIAL_SYMBOL_B']).upper()
+                        interaction_type = str(data[key]['EXPERIMENTAL_SYSTEM_TYPE']).lower()
+                        # select the gene that is != ko_gene
+                        if gene_a == ko_gene.upper():
+                            gene = gene_b
+                        else:
+                            gene = gene_a
+
+                        if only_physical_or_genetic_inters:
+                            if interaction_type == 'physical' or interaction_type == 'genetic':
+                                interaction_list.append(gene)
+                                if gene not in sources[ko_gene.upper()]:
+                                    sources[ko_gene.upper()][gene] = [{'PUBMED_AUTHOR': data[key]['PUBMED_AUTHOR'],
+                                                                       'PUBMED_ID': data[key]['PUBMED_ID']}]
+                                else:
+                                    sources[ko_gene.upper()][gene] += [{'PUBMED_AUTHOR': data[key]['PUBMED_AUTHOR'],
+                                                                        'PUBMED_ID': data[key]['PUBMED_ID']}]
+                        else:
+                            interaction_list.append(gene)
+                            if gene not in sources[ko_gene.upper()]:
+                                sources[ko_gene.upper()][gene] = [{'PUBMED_AUTHOR': data[key]['PUBMED_AUTHOR'],
+                                                                   'PUBMED_ID': data[key]['PUBMED_ID']}]
+                            else:
+                                sources[ko_gene.upper()][gene] += [{'PUBMED_AUTHOR': data[key]['PUBMED_AUTHOR'],
+                                                                    'PUBMED_ID': data[key]['PUBMED_ID']}]
+            except Exception:
+                warnings.warn(f'Literature database: Could not get any interactions for {ko_gene.upper()} gene')
+
+            # remove redundant interactions
+            interactions[ko_gene.upper()] = list(np.unique(interaction_list))
+
+        return interactions, sources
+
+
+class RefSetLoaderBioGrid:
+
+    def __init__(self,
+                 access_key: str,
+                 ko_name_list: List[str],
+                 only_physical_or_genetic_inters=True):
+
+        self.ref_sets = self.__create_refset(access_key=access_key,
+                                             ko_name_list=ko_name_list,
+                                             only_physical_or_genetic_inters=only_physical_or_genetic_inters)
+
+    @staticmethod
+    def __create_refset(access_key: str,
+                        ko_name_list: List[str],
+                        only_physical_or_genetic_inters: bool) -> RefSets:
+
+        biogrid = _GetInteractionsBioGrid(access_key=access_key)
+        inters, sources = biogrid.get_interactions(ko_gene_list=ko_name_list,
+                                                   only_physical_or_genetic_inters=only_physical_or_genetic_inters)
+
+        ref_sets = RefSets()
+
+        for key in inters.keys():
+            ref_sets.add(id=str(key), source='BioGrid', gene_ids=inters[key])
+
+        return ref_sets
+
+    def get_refset(self):
+        return self.ref_sets
 
 
 def test(
