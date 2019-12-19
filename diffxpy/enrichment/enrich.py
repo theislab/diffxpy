@@ -6,7 +6,7 @@ import json
 import os
 import warnings
 import urllib.request as request
-from typing import Union, List, Dict
+from typing import Union, List
 
 from ..stats import stats
 from ..testing import correction
