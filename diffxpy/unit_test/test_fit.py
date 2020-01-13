@@ -17,7 +17,7 @@ class _TestFit:
         """
         Test if de.wald() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
-        of the two-side Kolmgorov-Smirnov test for equality of the observed 
+        of the two-side Kolmgorov-Smirnov test for equality of the observed
         p-value distribution and a uniform distribution.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
@@ -34,7 +34,7 @@ class _TestFit:
             raise ValueError("noise model %s not recognized" % noise_model)
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
+        sim.generate_sample_description(num_batches=1, num_conditions=1)
         sim.generate_params(rand_fn_scale=rand_fn_scale)
         sim.generate_data()
 
@@ -77,7 +77,7 @@ class _TestFit:
             raise ValueError("noise model %s not recognized" % noise_model)
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
+        sim.generate_sample_description(num_batches=1, num_conditions=1)
         sim.generate_params(rand_fn_scale=rand_fn_scale)
         sim.generate_data()
 
@@ -121,7 +121,7 @@ class _TestFit:
             raise ValueError("noise model %s not recognized" % noise_model)
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
+        sim.generate_sample_description(num_batches=1, num_conditions=1)
         sim.generate()
 
         random_sample_description = pd.DataFrame({
@@ -209,23 +209,23 @@ class TestFitNb(_TestFit, unittest.TestCase):
             noise_model="nb"
         )
 
-
+"""
 class TestFitNorm(_TestFit, unittest.TestCase):
-    """
+
     Normal noise model unit tests that tests whether model fit relay works.
-    """
+
 
     def test_model_fit(
             self,
             n_cells: int = 2000,
             n_genes: int = 2
     ):
-        """
+
         Test if model fit for "norm" noise model works.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
-        """
+
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
@@ -242,12 +242,12 @@ class TestFitNorm(_TestFit, unittest.TestCase):
             n_cells: int = 2000,
             n_genes: int = 2
     ):
-        """
+
         Test if partitioned model fit for "norm" noise model works.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
-        """
+
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
@@ -264,12 +264,12 @@ class TestFitNorm(_TestFit, unittest.TestCase):
             n_cells: int = 2000,
             n_genes: int = 2
     ):
-        """
+
         Test if residual fit for "norm" noise model works.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
-        """
+
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
@@ -280,7 +280,7 @@ class TestFitNorm(_TestFit, unittest.TestCase):
             n_genes=n_genes,
             noise_model="norm"
         )
-
+"""
 
 if __name__ == '__main__':
     unittest.main()
