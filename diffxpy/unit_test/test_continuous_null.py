@@ -34,7 +34,7 @@ class _TestContinuous:
             df=3,
             spline_basis=spline_basis,
             test=test,
-            quick_scale=True,
+            quick_scale=False,
             noise_model=self.noise_model
         )
         return test
@@ -61,7 +61,7 @@ class _TestContinuous:
             df=3,
             spline_basis=spline_basis,
             test=test,
-            quick_scale=True,
+            quick_scale=False,
             noise_model=self.noise_model
         )
         return test

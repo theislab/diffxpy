@@ -24,7 +24,7 @@ class _TestSingleDe:
             rand_fn_loc = lambda shape: np.random.uniform(5, 10, shape)
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         elif noise_model == "norm":
-            from batchglm.api.models.numpy.glm_nb import Simulator
+            from batchglm.api.models.numpy.glm_norm import Simulator
             rand_fn_loc = lambda shape: np.random.uniform(500, 1000, shape)
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:

@@ -4,11 +4,13 @@ try:
 except ImportError:
     anndata = None
 import batchglm.api as glm
+import dask
 import logging
 import numpy as np
 import pandas as pd
 import scipy
 import scipy.sparse
+import sparse
 from typing import Union
 
 from .det import _DifferentialExpressionTestSingle, DifferentialExpressionTestWald, DifferentialExpressionTestLRT
@@ -114,8 +116,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         else:
             idx, genes = self._idx_genes(genes)
 
-        max_val = self.max(genes=idx, non_numeric=non_numeric)
-        min_val = self.min(genes=idx, non_numeric=non_numeric)
+        min_val, max_val = self.min_max(genes=idx, non_numeric=non_numeric)
         max_val = np.nextafter(0, 1, out=max_val, where=max_val == 0)
         min_val = np.nextafter(0, 1, out=min_val, where=min_val == 0)
         return (np.log(max_val) - np.log(min_val)) / np.log(base)
@@ -204,7 +205,9 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
 
     def _continuous_model(self, idx, non_numeric=False):
         """
-        Recover continuous fit for a gene.
+        Recover continuous fit for a gene in observed time points.
+
+        Gives interpolation for each observation.
 
         :param idx: Index of genes to recover fit for.
         :param non_numeric: Whether to include non-numeric covariates in fit.
@@ -223,23 +226,52 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             idx_basis = self._spline_par_loc_idx(intercept=True)
             mu = np.matmul(self._model_estim.input_data.design_loc[:, idx_basis],
                            self._model_estim.model.a[idx_basis, :][:, idx])
+        if isinstance(mu, dask.array.core.Array):
+            mu = mu.compute()
 
         mu = np.exp(mu)
         return mu
 
     def _continuous_interpolation(self, idx):
         """
-        Recover continuous fit for a gene.
+        Recover continuous fit for a gene in uniformely spaced time grid.
+
+        Gives interpolation for each grid point - more efficient for plotting for example.
 
         :param idx: Index of genes to recover fit for.
         :return: Continuuos fit for each cell for given gene.
         """
         idx = np.asarray(idx)
+        if len(idx.shape) == 0:
+            idx = np.array([idx])
+
         idx_basis = self._spline_par_loc_idx(intercept=True)
-        eta_loc = np.matmul(self._interpolated_spline_basis[:, :-1], self._model_estim.model.a[idx_basis, :][:, idx])
+        a = self._model_estim.model.a[idx_basis, :]
+        if isinstance(a, dask.array.core.Array):
+            a = a.compute()[:, idx]
+        else:
+            a = a[:, idx]
+        eta_loc = np.matmul(self._interpolated_spline_basis[:, :-1], a)
         mu = np.exp(eta_loc)
         t_eval = self._interpolated_spline_basis[:, -1]
         return t_eval, mu
+
+    def min_max(self, genes, non_numeric=False):
+        """
+        Return maximum and minimum of fitted expression value by gene.
+
+        :param genes: Genes for which to return maximum fitted value.
+        :param non_numeric: Whether to include non-numeric covariates in fit.
+        :return: Array of minimum and maximum fitted expression values by gene.
+        """
+        idx, genes = self._idx_genes(genes)
+        mins = []
+        maxs = []
+        for i in idx:
+            vals = self._continuous_model(idx=i, non_numeric=non_numeric)
+            mins.append(np.min(vals))
+            maxs.append(np.max(vals))
+        return np.array(mins), np.array(maxs)
 
     def max(self, genes, non_numeric=False):
         """
@@ -357,11 +389,14 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             axs.append(ax)
 
             y = self.x[:, g]
-            if isinstance(y, scipy.sparse.csr_matrix):
+            if isinstance(y, dask.array.core.Array):
+                y = y.compute()
+            if isinstance(y, scipy.sparse.spmatrix) or isinstance(y, sparse.COO):
                 y = np.asarray(y.todense()).flatten()
                 if self._model_estim.input_data.size_factors is not None:
                     y = y / self._model_estim.input_data.size_factors
             t_continuous, yhat = self._continuous_interpolation(idx=g)
+            yhat = yhat.flatten()
             if scalings is not None:
                 yhat = np.vstack([
                     [yhat],
@@ -378,6 +413,9 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             if log:
                 y = np.log(y + 1)
                 yhat = np.log(yhat + 1)
+
+            if isinstance(yhat, dask.array.core.Array):
+                yhat = yhat.compute()
 
             sns.scatterplot(
                 x=self._continuous_coords,
@@ -458,6 +496,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         # Build heatmap matrix.
         # Add in data.
         xcoord, data = self._continuous_interpolation(idx=gene_idx)
+        if isinstance(data, dask.array.core.Array):
+            data = data.compute()
         data = data.T
 
         if transform.lower() == "log10":
