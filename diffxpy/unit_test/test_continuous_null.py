@@ -5,7 +5,7 @@ import pandas as pd
 import scipy.stats as stats
 import logging
 
-from batchglm.api.models.tf1.glm_nb import Simulator
+from batchglm.api.models.numpy.glm_nb import Simulator
 import diffxpy.api as de
 
 
@@ -34,7 +34,7 @@ class _TestContinuous:
             df=3,
             spline_basis=spline_basis,
             test=test,
-            quick_scale=True,
+            quick_scale=False,
             noise_model=self.noise_model
         )
         return test
@@ -61,7 +61,7 @@ class _TestContinuous:
             df=3,
             spline_basis=spline_basis,
             test=test,
-            quick_scale=True,
+            quick_scale=False,
             noise_model=self.noise_model
         )
         return test

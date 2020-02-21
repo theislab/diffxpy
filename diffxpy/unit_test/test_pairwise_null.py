@@ -18,11 +18,11 @@ class _TestPairwiseNull:
             n_groups: int
     ):
         if self.noise_model == "nb":
-            from batchglm.api.models.tf1.glm_nb import Simulator
+            from batchglm.api.models.numpy.glm_nb import Simulator
             rand_fn_loc = lambda shape: np.random.uniform(0.1, 1, shape)
             rand_fn_scale = lambda shape: np.random.uniform(0.5, 1, shape)
         elif self.noise_model == "norm" or self.noise_model is None:
-            from batchglm.api.models import Simulator
+            from batchglm.api.models.numpy.glm_norm import Simulator
             rand_fn_loc = lambda shape: np.random.uniform(500, 1000, shape)
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:

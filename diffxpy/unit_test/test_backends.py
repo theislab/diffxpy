@@ -7,13 +7,14 @@ import scipy.stats as stats
 import diffxpy.api as de
 
 
-class _TestSingleSfNull:
+class _TestSingleNullBackends:
 
     def _test_null_distribution_wald(
             self,
             n_cells: int,
             n_genes: int,
-            noise_model: str
+            noise_model: str,
+            backend: str
     ):
         """
         Test if de.wald() generates a uniform p-value distribution
@@ -43,18 +44,14 @@ class _TestSingleSfNull:
             "condition": np.random.randint(2, size=sim.nobs),
             "batch": np.random.randint(2, size=sim.nobs)
         })
-        random_sf = np.random.uniform(0.5, 1.5, sim.nobs)
 
         test = de.test.wald(
             data=sim.input_data,
             sample_description=random_sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition + batch",
-            size_factors=random_sf,
-            batch_size=500,
             noise_model=noise_model,
-            training_strategy="DEFAULT",
-            dtype="float64"
+            backend=backend
         )
         _ = test.summary()
 
@@ -67,19 +64,19 @@ class _TestSingleSfNull:
         return True
 
 
-class TestSingleSfNullNb(_TestSingleSfNull, unittest.TestCase):
+class TestSingleNullBackendsNb(_TestSingleNullBackends, unittest.TestCase):
     """
     Negative binomial noise model unit tests that test whether a test generates uniformly
     distributed p-values if data are sampled from the null model.
     """
 
-    def test_null_distribution_wald_nb(
+    def test_null_distribution_wald_nb_tf1(
             self,
             n_cells: int = 2000,
             n_genes: int = 200
     ):
         """
-        Test if wald() generates a uniform p-value distribution for "nb" noise model.
+        Test if wald() generates a uniform p-value distribution for "nb" noise model under tf1 backend
 
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
@@ -89,25 +86,20 @@ class TestSingleSfNullNb(_TestSingleSfNull, unittest.TestCase):
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         np.random.seed(1)
-        return self._test_null_distribution_wald(
+        _ = self._test_null_distribution_wald(
             n_cells=n_cells,
             n_genes=n_genes,
-            noise_model="nb"
+            noise_model="nb",
+            backend="tf1"
         )
 
-
-class TestSingleSfNullNorm(_TestSingleSfNull, unittest.TestCase):
-    """
-    Normal noise model unit tests that test whether a test generates uniformly
-    distributed p-values if data are sampled from the null model.
-    """
-    def test_null_distribution_wald_norm(
+    def test_null_distribution_wald_nb_tf2(
             self,
-            n_cells: int = 200,
+            n_cells: int = 2000,
             n_genes: int = 200
     ):
         """
-        Test if wald() generates a uniform p-value distribution for "norm" noise model.
+        Test if wald() generates a uniform p-value distribution for "nb" noise model under tf2 backend
 
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
@@ -117,10 +109,34 @@ class TestSingleSfNullNorm(_TestSingleSfNull, unittest.TestCase):
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         np.random.seed(1)
-        return self._test_null_distribution_wald(
+        _ = self._test_null_distribution_wald(
             n_cells=n_cells,
             n_genes=n_genes,
-            noise_model="norm"
+            noise_model="nb",
+            backend="tf2"
+        )
+
+    def test_null_distribution_wald_nb_numpy(
+            self,
+            n_cells: int = 2000,
+            n_genes: int = 200
+    ):
+        """
+        Test if wald() generates a uniform p-value distribution for "nb" noise model under numpy backend
+
+        :param n_cells: Number of cells to simulate (number of observations per test).
+        :param n_genes: Number of genes to simulate (number of tests).
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
+        _ = self._test_null_distribution_wald(
+            n_cells=n_cells,
+            n_genes=n_genes,
+            noise_model="nb",
+            backend="numpy"
         )
 
 

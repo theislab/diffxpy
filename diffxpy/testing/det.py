@@ -4,12 +4,14 @@ try:
 except ImportError:
     anndata = None
 import batchglm.api as glm
+import dask
 import logging
 import numpy as np
 import patsy
 import pandas as pd
 from random import sample
 import scipy.sparse
+import sparse
 from typing import Union, Dict, Tuple, List, Set
 
 from .utils import split_x, dmat_unique
@@ -742,7 +744,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         Returns one fold change per gene
 
         Returns coefficient if only one coefficient is testeed.
-        Returns mean absolute coefficient if multiple coefficients are tested.
+        Returns the coefficient that is the maximum absolute coefficient if multiple coefficients are tested.
         """
         # design = np.unique(self.model_estim.design_loc, axis=0)
         # dmat = np.zeros_like(design)
@@ -753,9 +755,14 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         if len(self.coef_loc_totest) == 1:
             return self.model_estim.a_var[self.coef_loc_totest][0]
         else:
-            idx_max = np.argmax(np.abs(self.model_estim.a_var[self.coef_loc_totest]), axis=0)
-            return self.model_estim.a_var[self.coef_loc_totest][
-                idx_max, np.arange(self.model_estim.a_var.shape[1])]
+            idx0 = np.argmax(np.abs(self.model_estim.a_var[self.coef_loc_totest]), axis=0)
+            idx1 = np.arange(len(idx0))
+            # Leave the below for debugging right now, dask has different indexing than numpy does here:
+            assert not isinstance(self.model_estim.a_var, dask.array.core.Array), \
+                "self.model_estim.a_var was dask array, aborting. Please file issue on github."
+            # Use advanced numpy indexing here:
+            # https://docs.scipy.org/doc/numpy/reference/arrays.indexing.html#advanced-indexing
+            return self.model_estim.a_var[self.coef_loc_totest, :][tuple(idx0), tuple(idx1)]
 
     def _ll(self):
         """
@@ -1083,7 +1090,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         import matplotlib.pyplot as plt
         from matplotlib import gridspec
         from matplotlib import rcParams
-        from batchglm.api.models import Estimator, InputDataGLM
+        from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
 
         plt.ioff()
 
@@ -1244,6 +1251,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             g_idx = self.model_estim.input_data.features.index(g)
             # Raw data for boxplot:
             y = self.model_estim.x[:, g_idx]
+            if isinstance(y, dask.array.core.Array):
+                y = y.compute()
+            if isinstance(y, scipy.sparse.spmatrix) or isinstance(y, sparse.COO):
+                y = np.asarray(y.todense()).flatten()
             # Model fits:
             loc = self.model_estim.location[:, g_idx]
             scale = self.model_estim.scale[:, g_idx]
@@ -1264,6 +1275,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             if log1p_transform:
                 y = np.log(y + 1)
                 yhat = np.log(yhat + 1)
+            if isinstance(yhat, dask.array.core.Array):
+                yhat = yhat.compute()
 
             # Build DataFrame which contains all information for raw data:
             summary_raw = pd.DataFrame({"y": y, "data": "obs"})

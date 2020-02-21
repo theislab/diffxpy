@@ -1,50 +1,48 @@
 Tutorials
 =========
 
-
-
 Differential testing
 --------------------
+
+We grouped tutorials by differential expression concepts:
+
+`Introduction <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/introduction_differential_testing.ipynb>`__ to differential expression testing.
+
+Differential expression analysis with `continuous <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/introduction_differential_testing.ipynb>`__ covariates such time, concentratino, pseudotime or space.
+
+How to run `multiple <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/multiple_tests_per_gene.ipynb>`__ tests per gene.
+
+
+Additionally, we also provide links to tutorials that discuss specific concepts as a subset of the tutorial:
 
 Single tests per gene
 ~~~~~~~~~~~~~~~~~~~~~
 
-How to perform likelihood-ratio tests `lrt <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/single/likelihood_ratio_test.ipynb>`__.
+How to perform likelihood-ratio tests `lrt <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/introduction_differential_testing.ipynb>`__.
 
-How to perform Wald tests for a single parameter `wald <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/single/wald_test.ipynb>`__.
+How to perform `wald <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/introduction_differential_testing.ipynb>`__ tests for a single parameter.
 
-How to perform Wald tests for multiple parameters `multiparameter wald <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/single/wald_test_multiple_effects.ipynb>`__.
+How to perform Wald tests for `multiple <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/introduction_differential_testing.ipynb>`__ parameters.
 
-How to perform t-tests `t_test <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/single/t_test.ipynb>`__.
+How to perform t-`tests <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/introduction_differential_testing.ipynb>`__.
 
-How to perform Wilcoxon tests `wilcoxon <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/single/wilcoxon_test.ipynb>`__.
-
-How to perform tests with continuous covariates such as time, pseudotime or space `continuous test <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/single/continuous_wald.ipynb>`__.
+How to perform `wilcoxon <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/introduction_differential_testing.ipynb>`__ (rank sum) tests.
 
 Map single tests across partitions of data set
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Set up a test and conduct test for each gene in each cluster or each sample etc.
-We show an example for doing this for a t-test in `partition <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/single/run_by_partition.ipynb>`__.
+Diffxpy allows you to define a data set partition and to conduct test on each gene in each partition. This is shown`here <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/multiple_tests_per_gene.ipynb>`__.
    
 Multiple tests per gene
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-How to perform pairwise tests `pairwise <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/multi/pairwise.ipynb>`__.
-
-How to perform group versus rest tests `versus_rest <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/multi/versus_rest.ipynb>`__.
+How to perform `pairwise tests, group versus rest tests and tests within each parition  <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/multiple_tests_per_gene.ipynb>`__ tests.
 
 
 Gene set enrichment: enrich
 ---------------------------
 
 How to conduct a gene set enrichment workflow `enrich <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/enrich/enrich.ipynb>`__.
-
-
-Integration with other packages
--------------------------------
-
-How to integrate with `scanpy <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/integration/scanpy_integration.ipynb>`__.
 
 
 Example work-flows on real data sets
