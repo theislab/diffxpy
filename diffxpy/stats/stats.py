@@ -277,7 +277,7 @@ def wald_test_chisq(
         for i in invertible
     ]).flatten()
     if invertible.shape[0] < theta_covar.shape[0]:
-        print("caught %i linalg singular matrix errors" % theta_covar.shape[0] - invertible.shape[0])
+        print("caught %i linalg singular matrix errors" % (theta_covar.shape[0] - invertible.shape[0]))
     pvals = 1 - scipy.stats.chi2(theta_mle.shape[0]).cdf(wald_statistic)
     return pvals
 
