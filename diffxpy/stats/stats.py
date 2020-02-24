@@ -265,7 +265,8 @@ def wald_test_chisq(
 
     theta_diff = theta_mle - theta0
     invertible = np.where(np.linalg.cond(theta_covar, p=None) < 1 / sys.float_info.epsilon)[0]
-    wald_statistic = np.array([
+    wald_statistic = np.zeros([theta_covar.shape[0]]) + np.nan
+    wald_statistic[invertible] = np.array([
         np.matmul(
             np.matmul(
                 theta_diff[:, [i]].T,
