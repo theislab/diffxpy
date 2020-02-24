@@ -912,7 +912,7 @@ def two_sample(
         test: str = "t-test",
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
-        noise_model: str = None,
+        noise_model: str = "nb",
         size_factors: np.ndarray = None,
         batch_size: Union[None, int, Tuple[int, int]] = None,
         backend: str = "numpy",
