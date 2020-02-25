@@ -2,6 +2,7 @@ import numpy as np
 import numpy.linalg
 import scipy.sparse
 import scipy.stats
+import sys
 from typing import Union
 
 
@@ -263,7 +264,9 @@ def wald_test_chisq(
             raise ValueError('stats.wald_test(): theta_mle and theta0 have to contain the same number of entries')
 
     theta_diff = theta_mle - theta0
-    wald_statistic = np.array([
+    invertible = np.where(np.linalg.cond(theta_covar, p=None) < 1 / sys.float_info.epsilon)[0]
+    wald_statistic = np.zeros([theta_covar.shape[0]]) + np.nan
+    wald_statistic[invertible] = np.array([
         np.matmul(
             np.matmul(
                 theta_diff[:, [i]].T,
@@ -271,8 +274,10 @@ def wald_test_chisq(
             ),
             theta_diff[:, [i]]
         )
-        for i in range(theta_diff.shape[1])
+        for i in invertible
     ]).flatten()
+    if invertible.shape[0] < theta_covar.shape[0]:
+        print("caught %i linalg singular matrix errors" % (theta_covar.shape[0] - invertible.shape[0]))
     pvals = 1 - scipy.stats.chi2(theta_mle.shape[0]).cdf(wald_statistic)
     return pvals
 
