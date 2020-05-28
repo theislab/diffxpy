@@ -190,9 +190,9 @@ class _TestSingleDe:
             det=test1,
             factor_loc_totest="condition"
         )
+        assert np.max(test.log10_pval_clean() - test1.log10_pval_clean()) < 1e-10
 
         self._eval(sim=sim, test=test)
-
         return True
 
     def _test_lrt_de(
