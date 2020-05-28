@@ -156,6 +156,45 @@ class _TestSingleDe:
 
         return True
 
+    def _test_wald_repeated_de(
+            self,
+            n_cells: int,
+            n_genes: int,
+            noise_model: str
+    ):
+        """
+        :param n_cells: Number of cells to simulate (number of observations per test).
+        :param n_genes: Number of genes to simulate (number of tests).
+        :param noise_model: Noise model to use for data fitting.
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        sim = self._prepare_data(
+            n_cells=n_cells,
+            n_genes=n_genes,
+            noise_model=noise_model
+        )
+
+        test1 = de.test.wald(
+            data=sim.input_data,
+            sample_description=sim.sample_description,
+            factor_loc_totest="condition",
+            formula_loc="~ 1 + condition",
+            noise_model=noise_model,
+            training_strategy="DEFAULT",
+            dtype="float64"
+        )
+        test = de.test.wald_repeated(
+            det=test1,
+            factor_loc_totest="condition"
+        )
+
+        self._eval(sim=sim, test=test)
+
+        return True
+
     def _test_lrt_de(
             self,
             n_cells: int,
@@ -258,6 +297,26 @@ class TestSingleDeNb(_TestSingleDe, unittest.TestCase):
 
         np.random.seed(1)
         return self._test_wald_de(
+            n_cells=n_cells,
+            n_genes=n_genes,
+            noise_model="nb"
+        )
+
+    def test_wald_repeated_de_nb(
+            self,
+            n_cells: int = 2000,
+            n_genes: int = 200
+    ):
+        """
+        :param n_cells: Number of cells to simulate (number of observations per test).
+        :param n_genes: Number of genes to simulate (number of tests).
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
+        return self._test_wald_repeated_de(
             n_cells=n_cells,
             n_genes=n_genes,
             noise_model="nb"

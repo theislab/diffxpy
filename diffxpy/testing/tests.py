@@ -785,15 +785,15 @@ def wald_repeated(
     elif factor_loc_totest is None and coef_to_test is not None:
         if not np.all([x in par_loc_names for x in coef_to_test]):
             raise ValueError(
-                "the requested test coefficients %s were found in model coefficients %s" %
+                "the requested test coefficients %s were not found in model coefficients %s" %
                 (", ".join([x for x in coef_to_test if x not in par_loc_names]),
                  ", ".join(par_loc_names))
             )
         col_indices = np.asarray([
             par_loc_names.index(x) for x in coef_to_test
         ])
-    elif factor_loc_totest is None and coef_to_test is None:
-        raise ValueError("Do not supply factor_loc_totest and coef_to_test in wald_repeated, run a new wald test.")
+    elif factor_loc_totest is not None and coef_to_test is not None:
+        raise ValueError("Do not supply both factor_loc_totest and coef_to_test in wald_repeated.")
     else:
         raise ValueError("Either set factor_loc_totest or coef_to_test.")
     assert len(col_indices) > 0, "Could not find any matching columns!"

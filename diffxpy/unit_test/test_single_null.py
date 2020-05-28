@@ -107,7 +107,6 @@ class _TestSingleNull:
             det=test1,
             factor_loc_totest="condition"
         )
-
         _ = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
