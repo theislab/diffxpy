@@ -271,3 +271,49 @@ def constraint_system_from_star(
         constraints=constraints,
         return_type=return_type
     )
+
+
+def bin_continuous_covariate(
+        factor_to_bin: str,
+        bins: Union[int, list, np.ndarray, Tuple],
+        data: Union[None, anndata.AnnData] = None,
+        sample_description: Union[None, pd.DataFrame] = None
+):
+    r"""
+    Bin a continuous covariate.
+
+    Adds the binned covariate to the table. If data is supplied, the covariate is added in place in data.obs, otherwise
+    the covariate is added in the sample_description and the new sample_description is returned.
+     Binning is performed on quantiles of the distribution.
+
+    :param factor_to_bin: Name of columns of factor to bin.
+    :param bins: Number of bins or iteratable with bin borders. If given as integer, the bins are defined on the
+        quantiles of the covariate, ie the bottom 20% of observations are in the first bin if bins==5.
+    :param data: Anndata object that contains sample description table in .obs.
+    :param sample_description: Sample description table.
+    :return: Sample description table with binned covariate added if sample_description was supplied, otherwise None is
+        returned as the new column was added in place.
+    """
+    if data is None and sample_description is not None:
+        sd = sample_description
+    elif data is not None and sample_description is None:
+        sd = data.obs
+    else:
+        raise ValueError("supply either data or sample_description")
+    if isinstance(bins, list) or isinstance(bins, np.ndarray) or isinstance(bins, Tuple):
+        bins = np.asarray(bins)
+    else:
+        bins = np.arange(0, 1, 1 / bins)
+
+    fac_binned = glm.data.bin_continuous_covariate(
+        sample_description=sd,
+        factor_to_bin=factor_to_bin,
+        bins=bins
+    )
+    if data is None and sample_description is not None:
+        sd[factor_to_bin + "_binned"] = fac_binned
+        return sample_description
+    elif data is not None and sample_description is None:
+        data.obs[factor_to_bin + "_binned"] = fac_binned
+    else:
+        assert False

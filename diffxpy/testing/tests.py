@@ -1028,7 +1028,7 @@ def two_sample(
         if noise_model is None:
             raise ValueError("Please specify noise_model")
         formula_loc = '~ 1 + grouping'
-        formula_scale = '~ 1 + grouping'
+        formula_scale = '~ 1'
         de_test = wald(
             data=data,
             factor_loc_totest="grouping",
@@ -1040,8 +1040,6 @@ def two_sample(
             sample_description=sample_description,
             noise_model=noise_model,
             size_factors=size_factors,
-            init_a="closed_form",
-            init_b="closed_form",
             batch_size=batch_size,
             backend=backend,
             train_args=train_args,

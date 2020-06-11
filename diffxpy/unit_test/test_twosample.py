@@ -7,7 +7,7 @@ import scipy.stats as stats
 import diffxpy.api as de
 
 
-class TestVsRest(unittest.TestCase):
+class TestTwosample(unittest.TestCase):
 
     def test_null_distribution_wald(self, n_cells: int = 2000, n_genes: int = 100, n_groups: int = 2):
         """
@@ -32,15 +32,11 @@ class TestVsRest(unittest.TestCase):
             "condition": np.random.randint(n_groups, size=sim.nobs)
         })
 
-        test = de.test.versus_rest(
+        test = de.test.two_sample(
             data=sim.input_data,
-            grouping="condition",
+            grouping=random_sample_description["condition"].values,
             test="wald",
             noise_model="nb",
-            sample_description=random_sample_description,
-            batch_size=500,
-            training_strategy="DEFAULT",
-            dtype="float64"
         )
         summary = test.summary()
 
@@ -52,7 +48,7 @@ class TestVsRest(unittest.TestCase):
 
         return True
 
-    def test_null_distribution_lrt(self, n_cells: int = 2000, n_genes: int = 100):
+    def test_null_distribution_lrt(self, n_cells: int = 2000, n_genes: int = 100, n_groups: int = 2):
         """
         Test if de.test_wald_loc() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -64,7 +60,7 @@ class TestVsRest(unittest.TestCase):
         """
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
-        logging.getLogger("diffxpy").setLevel(logging.ERROR)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
         from batchglm.api.models.numpy.glm_nb import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
@@ -72,25 +68,21 @@ class TestVsRest(unittest.TestCase):
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(n_groups, size=sim.nobs)
         })
 
-        test = de.test.versus_rest(
+        test = de.test.two_sample(
             data=sim.input_data,
-            grouping="condition",
-            test="lrt",
+            grouping=random_sample_description["condition"],
+            test="wald",
             noise_model="nb",
-            sample_description=random_sample_description,
-            batch_size=500,
-            training_strategy="DEFAULT",
-            dtype="float64"
         )
         summary = test.summary()
 
         # Compare p-value distribution under null model against uniform distribution.
         pval_h0 = stats.kstest(test.pval.flatten(), 'uniform').pvalue
 
-        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of test_lrt(): %f' % pval_h0)
+        logging.getLogger("diffxpy").info('KS-test pvalue for null model match of test_wald_loc(): %f' % pval_h0)
         assert pval_h0 > 0.05, "KS-Test failed: pval_h0=%f is <= 0.05!" % np.round(pval_h0, 5)
 
         return True
@@ -118,12 +110,10 @@ class TestVsRest(unittest.TestCase):
             "condition": np.random.randint(n_groups, size=sim.nobs)
         })
 
-        test = de.test.versus_rest(
+        test = de.test.two_sample(
             data=sim.input_data,
-            grouping="condition",
-            test="rank",
-            sample_description=random_sample_description,
-            dtype="float64"
+            grouping=random_sample_description["condition"],
+            test="rank"
         )
         summary = test.summary()
 
@@ -148,7 +138,7 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-        from batchglm.api.models.numpy.glm_norm import Simulator
+        from batchglm.api.models.numpy.glm_nb import Simulator
 
         sim = Simulator(num_observations=n_cells, num_features=n_genes)
         sim.generate_sample_description(num_batches=0, num_conditions=0)
@@ -158,12 +148,10 @@ class TestVsRest(unittest.TestCase):
             "condition": np.random.randint(n_groups, size=sim.nobs)
         })
 
-        test = de.test.versus_rest(
+        test = de.test.two_sample(
             data=sim.input_data,
-            grouping="condition",
-            test="t-test",
-            sample_description=random_sample_description,
-            dtype="float64"
+            grouping=random_sample_description["condition"],
+            test="t_test"
         )
         summary = test.summary()
 
