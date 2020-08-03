@@ -1564,8 +1564,8 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         x0, x1 = split_x(data, grouping)
 
         # Only compute p-values for genes with non-zero observations and non-zero group-wise variance.
-        mean_x0 = np.asarray(np.mean(x0, axis=0)).flatten().astype(dtype=np.float)
-        mean_x1 = np.asarray(np.mean(x1, axis=0)).flatten().astype(dtype=np.float)
+        mean_x0 = np.asarray(np.mean(x0, axis=0, dtype=np.float)).flatten()
+        mean_x1 = np.asarray(np.mean(x1, axis=0, dtype=np.float)).flatten()
         # Avoid unnecessary mean computation:
         self._mean = np.asarray(np.average(
             a=np.vstack([mean_x0, mean_x1]),
@@ -1575,13 +1575,13 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
             returned=False
         )).flatten()
         self._ave_nonzero = self._mean != 0  # omit all-zero features
-        if isinstance(x0, scipy.sparse.csr_matrix):
+        if isinstance(x0, scipy.sparse.spmatrix):
             # Efficient analytic expression of variance without densification.
-            var_x0 = np.asarray(np.mean(x0.power(2), axis=0)).flatten().astype(dtype=np.float) - np.square(mean_x0)
-            var_x1 = np.asarray(np.mean(x1.power(2), axis=0)).flatten().astype(dtype=np.float) - np.square(mean_x1)
+            var_x0 = np.asarray(np.mean(x0.power(2, dtype=np.float), axis=0)).flatten() - np.square(mean_x0)
+            var_x1 = np.asarray(np.mean(x1.power(2, dtype=np.float), axis=0)).flatten() - np.square(mean_x1)
         else:
-            var_x0 = np.asarray(np.var(x0, axis=0)).flatten().astype(dtype=np.float)
-            var_x1 = np.asarray(np.var(x1, axis=0)).flatten().astype(dtype=np.float)
+            var_x0 = np.asarray(np.var(x0, axis=0, dtype=np.float)).flatten()
+            var_x1 = np.asarray(np.var(x1, axis=0, dtype=np.float)).flatten()
         self._var_geq_zero = np.logical_or(
             var_x0 > 0,
             var_x1 > 0
@@ -1690,8 +1690,8 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
 
         x0, x1 = split_x(data, grouping)
 
-        mean_x0 = np.asarray(np.mean(x0, axis=0)).flatten().astype(dtype=np.float)
-        mean_x1 = np.asarray(np.mean(x1, axis=0)).flatten().astype(dtype=np.float)
+        mean_x0 = np.asarray(np.mean(x0, axis=0, dtype=np.float)).flatten()
+        mean_x1 = np.asarray(np.mean(x1, axis=0, dtype=np.float)).flatten()
         # Avoid unnecessary mean computation:
         self._mean = np.asarray(np.average(
             a=np.vstack([mean_x0, mean_x1]),
@@ -1700,7 +1700,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
             axis=0,
             returned=False
         )).flatten()
-        if isinstance(x0, scipy.sparse.csr_matrix):
+        if isinstance(x0, scipy.sparse.spmatrix):
             # Efficient analytic expression of variance without densification.
             var_x0 = np.asarray(np.mean(x0.power(2), axis=0)).flatten().astype(dtype=np.float) - np.square(mean_x0)
             var_x1 = np.asarray(np.mean(x1.power(2), axis=0)).flatten().astype(dtype=np.float) - np.square(mean_x1)
