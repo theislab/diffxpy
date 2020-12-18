@@ -189,7 +189,7 @@ def model(
         sample_description=sample_description
     )
 
-    design_loc, constraints_loc = constraint_system_from_star(
+    design_loc, design_loc_names, constraints_loc, term_names_loc = constraint_system_from_star(
         dmat=dmat_loc,
         sample_description=sample_description,
         formula=formula_loc,
@@ -197,7 +197,7 @@ def model(
         constraints=constraints_loc,
         return_type="patsy"
     )
-    design_scale, constraints_scale = constraint_system_from_star(
+    design_scale, design_scale_names, constraints_scale, term_names_scale = constraint_system_from_star(
         dmat=dmat_scale,
         sample_description=sample_description,
         formula=formula_scale,
@@ -211,6 +211,8 @@ def model(
         data=data,
         design_loc=design_loc,
         design_scale=design_scale,
+        design_loc_names=design_loc_names,
+        design_scale_names=design_scale_names,
         constraints_loc=constraints_loc,
         constraints_scale=constraints_scale,
         init_a=init_a,
