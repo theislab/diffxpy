@@ -19,7 +19,7 @@ logger = logging.getLogger("diffxpy")
 
 class _DifferentialExpressionTestPairwiseBase(_DifferentialExpressionTestMulti):
     """
-    Pairwise differential expression tests base class.
+    Pairwise differential expression tests base_glmm class.
 
     Defines API of accessing test results of pairs of groups. The underlying accessors depend
     on the type of test and are defined in the subclasses.
@@ -445,9 +445,9 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
 
 class _DifferentialExpressionTestPairwiseLazyBase(_DifferentialExpressionTestPairwiseBase):
     """
-    Lazy pairwise differential expression tests base class.
+    Lazy pairwise differential expression tests base_glmm class.
 
-    In addition to the method of a standard pairwise test, this base class throws errors for attributes
+    In addition to the method of a standard pairwise test, this base_glmm class throws errors for attributes
     that are not accessible in a lazy pairwise test.
     """
 
