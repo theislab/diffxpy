@@ -80,9 +80,10 @@ def model(
     :param constraints_loc: Constraints for location model. Can be one of the following:
 
             - np.ndarray:
-                Array with constraints in rows and model parameters in columns.
-                Each constraint contains non-zero entries for the a of parameters that
-                has to sum to zero. This constraint is enforced by binding one parameter
+                Array with constraints in columns and model parameters in rows.
+                Each constraint contains non-zero entries for the constrained parameters that
+                have to sum to zero. For a non-constrained parameter the revelant constraint column 
+                contains 1 in the parameter row. This constraint is enforced by binding one parameter
                 to the negative sum of the other parameters, effectively representing that
                 parameter as a function of the other parameters. This dependent
                 parameter is indicated by a -1 in this array, the independent parameters
@@ -113,9 +114,10 @@ def model(
     :param constraints_scale: Constraints for scale model. Can be one of the following:
 
             - np.ndarray:
-                Array with constraints in rows and model parameters in columns.
-                Each constraint contains non-zero entries for the a of parameters that
-                has to sum to zero. This constraint is enforced by binding one parameter
+                Array with constraints in columns and model parameters in rows.
+                Each constraint contains non-zero entries for the constrained parameters that
+                have to sum to zero. For a non-constrained parameter the revelant constraint column 
+                contains 1 in the parameter row. This constraint is enforced by binding one parameter
                 to the negative sum of the other parameters, effectively representing that
                 parameter as a function of the other parameters. This dependent
                 parameter is indicated by a -1 in this array, the independent parameters
@@ -289,9 +291,10 @@ def residuals(
     :param constraints_loc: Constraints for location model. Can be one of the following:
 
             - np.ndarray:
-                Array with constraints in rows and model parameters in columns.
-                Each constraint contains non-zero entries for the a of parameters that
-                has to sum to zero. This constraint is enforced by binding one parameter
+                Array with constraints in columns and model parameters in rows.
+                Each constraint contains non-zero entries for the constrained parameters that
+                have to sum to zero. For a non-constrained parameter the revelant constraint column 
+                contains 1 in the parameter row. This constraint is enforced by binding one parameter
                 to the negative sum of the other parameters, effectively representing that
                 parameter as a function of the other parameters. This dependent
                 parameter is indicated by a -1 in this array, the independent parameters
@@ -322,9 +325,10 @@ def residuals(
     :param constraints_scale: Constraints for scale model. Can be one of the following:
 
             - np.ndarray:
-                Array with constraints in rows and model parameters in columns.
-                Each constraint contains non-zero entries for the a of parameters that
-                has to sum to zero. This constraint is enforced by binding one parameter
+                Array with constraints in columns and model parameters in rows.
+                Each constraint contains non-zero entries for the constrained parameters that
+                have to sum to zero. For a non-constrained parameter the revelant constraint column 
+                contains 1 in the parameter row. This constraint is enforced by binding one parameter
                 to the negative sum of the other parameters, effectively representing that
                 parameter as a function of the other parameters. This dependent
                 parameter is indicated by a -1 in this array, the independent parameters
@@ -548,9 +552,10 @@ class _Partition:
         :param constraints_loc: Constraints for location model. Can be one of the following:
 
                 - np.ndarray:
-                    Array with constraints in rows and model parameters in columns.
-                    Each constraint contains non-zero entries for the a of parameters that
-                    has to sum to zero. This constraint is enforced by binding one parameter
+                    Array with constraints in columns and model parameters in rows.
+                    Each constraint contains non-zero entries for the constrained parameters that
+                    have to sum to zero. For a non-constrained parameter the revelant constraint column 
+                    contains 1 in the parameter row. This constraint is enforced by binding one parameter
                     to the negative sum of the other parameters, effectively representing that
                     parameter as a function of the other parameters. This dependent
                     parameter is indicated by a -1 in this array, the independent parameters
@@ -581,9 +586,10 @@ class _Partition:
         :param constraints_scale: Constraints for scale model. Can be one of the following:
 
                 - np.ndarray:
-                    Array with constraints in rows and model parameters in columns.
-                    Each constraint contains non-zero entries for the a of parameters that
-                    has to sum to zero. This constraint is enforced by binding one parameter
+                    Array with constraints in columns and model parameters in rows.
+                    Each constraint contains non-zero entries for the constrained parameters that
+                    have to sum to zero. For a non-constrained parameter the revelant constraint column 
+                    contains 1 in the parameter row. This constraint is enforced by binding one parameter
                     to the negative sum of the other parameters, effectively representing that
                     parameter as a function of the other parameters. This dependent
                     parameter is indicated by a -1 in this array, the independent parameters
@@ -705,9 +711,10 @@ class _Partition:
         :param constraints_loc: Constraints for location model. Can be one of the following:
 
                 - np.ndarray:
-                    Array with constraints in rows and model parameters in columns.
-                    Each constraint contains non-zero entries for the a of parameters that
-                    has to sum to zero. This constraint is enforced by binding one parameter
+                    Array with constraints in columns and model parameters in rows.
+                    Each constraint contains non-zero entries for the constrained parameters that
+                    have to sum to zero. For a non-constrained parameter the revelant constraint column 
+                    contains 1 in the parameter row. This constraint is enforced by binding one parameter
                     to the negative sum of the other parameters, effectively representing that
                     parameter as a function of the other parameters. This dependent
                     parameter is indicated by a -1 in this array, the independent parameters
@@ -738,9 +745,10 @@ class _Partition:
         :param constraints_scale: Constraints for scale model. Can be one of the following:
 
                 - np.ndarray:
-                    Array with constraints in rows and model parameters in columns.
-                    Each constraint contains non-zero entries for the a of parameters that
-                    has to sum to zero. This constraint is enforced by binding one parameter
+                    Array with constraints in columns and model parameters in rows.
+                    Each constraint contains non-zero entries for the constrained parameters that
+                    have to sum to zero. For a non-constrained parameter the revelant constraint column 
+                    contains 1 in the parameter row. This constraint is enforced by binding one parameter
                     to the negative sum of the other parameters, effectively representing that
                     parameter as a function of the other parameters. This dependent
                     parameter is indicated by a -1 in this array, the independent parameters
