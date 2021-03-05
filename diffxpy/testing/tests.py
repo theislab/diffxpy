@@ -52,18 +52,20 @@ def _fit(
     :param design_loc: Design matrix of location model.
     :param design_loc: Design matrix of scale model.
     :param constraints_loc: : Constraints for location model.
-        Array with constraints in rows and model parameters in columns.
-        Each constraint contains non-zero entries for the a of parameters that
-        has to sum to zero. This constraint is enforced by binding one parameter
+        Array with constraints in columns and model parameters in rows.
+        Each constraint contains non-zero entries for the constrained parameters that
+        have to sum to zero. For a non-constrained parameter the revelant constraint column 
+        contains 1 in the parameter row. This constraint is enforced by binding one parameter
         to the negative sum of the other parameters, effectively representing that
         parameter as a function of the other parameters. This dependent
         parameter is indicated by a -1 in this array, the independent parameters
         of that constraint (which may be dependent at an earlier constraint)
         are indicated by a 1.
     :param constraints_scale: : Constraints for scale model.
-        Array with constraints in rows and model parameters in columns.
-        Each constraint contains non-zero entries for the a of parameters that
-        has to sum to zero. This constraint is enforced by binding one parameter
+        Array with constraints in columns and model parameters in rows.
+        Each constraint contains non-zero entries for the constrained parameters that
+        have to sum to zero. For a non-constrained parameter the revelant constraint column 
+        contains 1 in the parameter row. This constraint is enforced by binding one parameter
         to the negative sum of the other parameters, effectively representing that
         parameter as a function of the other parameters. This dependent
         parameter is indicated by a -1 in this array, the independent parameters
@@ -519,9 +521,10 @@ def wald(
     :param constraints_loc: Constraints for location model. Can be one of the following:
 
             - np.ndarray:
-                Array with constraints in rows and model parameters in columns.
-                Each constraint contains non-zero entries for the a of parameters that
-                has to sum to zero. This constraint is enforced by binding one parameter
+                Array with constraints in columns and model parameters in rows.
+                Each constraint contains non-zero entries for the constrained parameters that
+                have to sum to zero. For a non-constrained parameter the revelant constraint column 
+                contains 1 in the parameter row. This constraint is enforced by binding one parameter
                 to the negative sum of the other parameters, effectively representing that
                 parameter as a function of the other parameters. This dependent
                 parameter is indicated by a -1 in this array, the independent parameters
@@ -552,9 +555,10 @@ def wald(
     :param constraints_scale: Constraints for scale model. Can be one of the following:
 
             - np.ndarray:
-                Array with constraints in rows and model parameters in columns.
-                Each constraint contains non-zero entries for the a of parameters that
-                has to sum to zero. This constraint is enforced by binding one parameter
+                Array with constraints in columns and model parameters in rows.
+                Each constraint contains non-zero entries for the constrained parameters that
+                have to sum to zero. For a non-constrained parameter the revelant constraint column 
+                contains 1 in the parameter row. This constraint is enforced by binding one parameter
                 to the negative sum of the other parameters, effectively representing that
                 parameter as a function of the other parameters. This dependent
                 parameter is indicated by a -1 in this array, the independent parameters
@@ -1896,9 +1900,10 @@ class _Partition:
             This makes sense for number of genes, time, pseudotime or space
             for example.
         :param constraints_loc: : Constraints for location model.
-            Array with constraints in rows and model parameters in columns.
-            Each constraint contains non-zero entries for the a of parameters that
-            has to sum to zero. This constraint is enforced by binding one parameter
+            Array with constraints in columns and model parameters in rows.
+            Each constraint contains non-zero entries for the constrained parameters that
+            have to sum to zero. For a non-constrained parameter the revelant constraint column 
+            contains 1 in the parameter row. This constraint is enforced by binding one parameter
             to the negative sum of the other parameters, effectively representing that
             parameter as a function of the other parameters. This dependent
             parameter is indicated by a -1 in this array, the independent parameters
@@ -1906,9 +1911,10 @@ class _Partition:
             are indicated by a 1. It is highly recommended to only use this option
             together with prebuilt design matrix for the location model, dmat_loc.
         :param constraints_scale: : Constraints for scale model.
-            Array with constraints in rows and model parameters in columns.
-            Each constraint contains non-zero entries for the a of parameters that
-            has to sum to zero. This constraint is enforced by binding one parameter
+            Array with constraints in columns and model parameters in rows.
+            Each constraint contains non-zero entries for the constrained parameters that
+            have to sum to zero. For a non-constrained parameter the revelant constraint column 
+            contains 1 in the parameter row. This constraint is enforced by binding one parameter
             to the negative sum of the other parameters, effectively representing that
             parameter as a function of the other parameters. This dependent
             parameter is indicated by a -1 in this array, the independent parameters
