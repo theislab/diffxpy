@@ -36,9 +36,7 @@ Diffxpy allows you to define a data set partition and to conduct test on each ge
 Multiple tests per gene
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-How to perform `pairwise <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/multiple_tests_per_gene.ipynb>`__ tests.
-
-How to perform group tests versus all other groups (versus `rest <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/multiversus_rest.ipynb>`__).
+How to perform `pairwise tests, group versus rest tests and tests within each parition  <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/multiple_tests_per_gene.ipynb>`__ tests.
 
 
 Gene set enrichment: enrich
