@@ -12,4 +12,4 @@ sphinx-autodoc-typehints
 sphinx_rtd_theme
 jinja2
 docutils
-
+sparse==0.9.1
