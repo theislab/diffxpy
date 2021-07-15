@@ -698,7 +698,10 @@ def wald(
                 as_numeric=as_numeric
             )
         else:
-            coef_loc_names = dmat_loc.columns.tolist()
+            if isinstance(dmat_loc, patsy.design_info.DesignMatrix):
+                coef_loc_names = dmat_loc.design_info.column_names
+            else:
+                coef_loc_names = dmat_loc.columns.tolist()
         if not np.all([x in coef_loc_names for x in coef_to_test]):
             raise ValueError(
                 "the requested test coefficients %s were found in model coefficients %s" %
