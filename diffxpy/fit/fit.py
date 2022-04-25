@@ -17,7 +17,7 @@ from .external import parse_gene_names, parse_sample_description, parse_size_fac
 
 
 def model(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
         formula_loc: Union[None, str] = None,
         formula_scale: Union[None, str] = "~1",
         as_numeric: Union[List[str], Tuple[str], str] = (),
@@ -226,7 +226,7 @@ def model(
 
 
 def residuals(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
         formula_loc: Union[None, str] = None,
         formula_scale: Union[None, str] = "~1",
         as_numeric: Union[List[str], Tuple[str], str] = (),
@@ -374,7 +374,7 @@ def residuals(
         Should be "float32" for single precision or "float64" for double precision.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
-    estim = model(
+    model_container = model(
         data=data,
         formula_loc=formula_loc,
         formula_scale=formula_scale,
@@ -395,12 +395,12 @@ def residuals(
         dtype=dtype,
         ** kwargs
     )
-    residuals = estim.x - estim.model.location
+    residuals = model_container.x - model_container.model.location
     return residuals
 
 
 def partition(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
         parts: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
@@ -454,7 +454,7 @@ class _Partition:
 
     def __init__(
             self,
-            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
             parts: Union[str, np.ndarray, list],
             gene_names: Union[np.ndarray, list] = None,
             sample_description: pd.DataFrame = None,
@@ -481,7 +481,7 @@ class _Partition:
             same order as in data or string-type column identifier of size-factor containing
             column in sample description.
         """
-        if isinstance(data, glm.typing.InputDataBase):
+        if isinstance(data, glm.utils.data.InputDataGLM):
             self.x = data.x
         elif isinstance(data, anndata.AnnData) or isinstance(data, Raw):
             self.x = data.X

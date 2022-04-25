@@ -341,13 +341,13 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
     lazy test evaluation.
     """
 
-    model_estim: glm.typing.EstimatorBaseTyping
+    model_estim: glm.train.numpy.nb.model_container
     theta_mle: np.ndarray
     theta_sd: np.ndarray
 
     def __init__(
             self,
-            model_estim: glm.typing.EstimatorBaseTyping,
+            model_estim: glm.train.numpy.nb.model_container,
             grouping,
             groups,
             correction_type: str
@@ -387,7 +387,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.model_estim.input_data.features)
+        return np.asarray(self.model_estim.model.features)
 
     @property
     def x(self):
@@ -526,13 +526,13 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
     memory.
     """
 
-    model_estim: glm.typing.EstimatorBaseTyping
+    model_estim: glm.train.numpy.nb.model_container
     _theta_mle: np.ndarray
     _theta_sd: np.ndarray
 
     def __init__(
             self,
-            model_estim: glm.typing.EstimatorBaseTyping,
+            model_estim: glm.train.numpy.nb.model_container,
             grouping, groups,
             correction_type="global"
     ):
@@ -580,7 +580,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.model_estim.input_data.features)
+        return np.asarray(self.model_estim.model.features)
 
     @property
     def x(self):
