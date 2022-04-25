@@ -395,7 +395,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
 
     @property
     def log_likelihood(self):
-        return self.model_estim.log_likelihood
+        return self.model_estim.ll
 
     @property
     def model_gradient(self):
@@ -588,7 +588,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
 
     @property
     def log_likelihood(self):
-        return self.model_estim.log_likelihood
+        return self.model_estim.ll
 
     @property
     def model_gradient(self):

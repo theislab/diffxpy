@@ -502,12 +502,12 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         return self.full_estim.jacobian
 
     def _test(self):
-        if np.any(self.full_estim.log_likelihood < self.reduced_estim.log_likelihood):
+        if np.any(self.full_estim.ll < self.reduced_estim.ll):
             logger.warning("Test assumption failed: full model is (partially) less probable than reduced model")
 
         return stats.likelihood_ratio_test(
-            ll_full=self.full_estim.log_likelihood,
-            ll_reduced=self.reduced_estim.log_likelihood,
+            ll_full=self.full_estim.ll,
+            ll_reduced=self.reduced_estim.ll,
             df_full=self.full_estim.model.constraints_loc.shape[1] +
                     self.full_estim.model.constraints_scale.shape[1],
             df_reduced=self.reduced_estim.model.constraints_loc.shape[1] +
@@ -771,7 +771,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         :return: np.ndarray
         """
-        return self.model_estim.log_likelihood
+        return self.model_estim.ll
 
     def _ave(self):
         """
