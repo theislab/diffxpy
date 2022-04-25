@@ -206,7 +206,7 @@ def model(
         return_type="patsy"
     )
 
-    model = _fit(
+    estim = _fit(
         noise_model=noise_model,
         data=data,
         design_loc=design_loc,
@@ -222,7 +222,7 @@ def model(
         quick_scale=quick_scale,
         dtype=dtype
     )
-    return model
+    return estim
 
 
 def residuals(
@@ -374,7 +374,7 @@ def residuals(
         Should be "float32" for single precision or "float64" for double precision.
     :param kwargs: [Debugging] Additional arguments will be passed to the _fit method.
     """
-    model_container = model(
+    estim = model(
         data=data,
         formula_loc=formula_loc,
         formula_scale=formula_scale,
@@ -395,7 +395,7 @@ def residuals(
         dtype=dtype,
         ** kwargs
     )
-    residuals = model_container.x - model_container.model.location
+    residuals = estim.model_container.model.x - estim.model_container.model.location
     return residuals
 
 

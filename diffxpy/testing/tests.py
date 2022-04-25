@@ -127,38 +127,14 @@ def _fit(
     :param close_session: If True, will finalize the estimator. Otherwise, return the estimator itself.
     """
     # Load estimator for required noise model and backend:
-    if backend.lower() in ["tf1"]:
-        if noise_model == "nb" or noise_model == "negative_binomial":
-            from batchglm.api.models.tf1.glm_nb import Estimator, InputDataGLM
-        elif noise_model == "norm" or noise_model == "normal":
-            from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
-        else:
-            raise ValueError('noise_model="%s" not recognized.' % noise_model)
-        if batch_size is None:
-            batch_size = 128
-        else:
-            if not isinstance(batch_size, int):
-                raise ValueError("batch_size has to be an integer if backend is tf1")
-        chunk_size_cells = int(1e9)
-        chunk_size_genes = 128
-    elif backend.lower() in ["tf2"]:
-        if noise_model == "nb" or noise_model == "negative_binomial":
-            from batchglm.api.models.tf2.glm_nb import Estimator, InputDataGLM
-        else:
-            raise ValueError('noise_model="%s" not recognized.' % noise_model)
-        if batch_size is None:
-            batch_size = 128
-        else:
-            if not isinstance(batch_size, int):
-                raise ValueError("batch_size has to be an integer if backend is tf2")
-        chunk_size_cells = int(1e9)
-        chunk_size_genes = 128
-    elif backend.lower() in ["numpy"]:
+    if backend.lower() in ["numpy"]:
         if isinstance(training_strategy, str):
             if training_strategy.lower() == "auto":
                 training_strategy = "DEFAULT"
         if noise_model == "nb" or noise_model == "negative_binomial":
-            from batchglm.api.models.numpy.glm_nb import Estimator, InputDataGLM
+            from batchglm.train.numpy.glm_nb import Estimator
+            from batchglm.utils.input import InputDataGLM
+            from batchglm.models.glm_nb import Model
         else:
             raise ValueError('noise_model="%s" not recognized.' % noise_model)
         # Set default chunk size:
@@ -194,45 +170,19 @@ def _fit(
     constructor_args = {}
     if quick_scale is not None:
         constructor_args["quick_scale"] = quick_scale
-    # Backend-specific constructor arguments:
-    if backend.lower() in ["tf1"]:
-        constructor_args['provide_optimizers'] = {
-            "gd": pkg_constants.BATCHGLM_OPTIM_GD,
-            "adam": pkg_constants.BATCHGLM_OPTIM_ADAM,
-            "adagrad": pkg_constants.BATCHGLM_OPTIM_ADAGRAD,
-            "rmsprop": pkg_constants.BATCHGLM_OPTIM_RMSPROP,
-            "nr": pkg_constants.BATCHGLM_OPTIM_NEWTON,
-            "nr_tr": pkg_constants.BATCHGLM_OPTIM_NEWTON_TR,
-            "irls": pkg_constants.BATCHGLM_OPTIM_IRLS,
-            "irls_gd": pkg_constants.BATCHGLM_OPTIM_IRLS_GD,
-            "irls_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_TR,
-            "irls_gd_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_GD_TR
-        }
-        constructor_args['provide_batched'] = pkg_constants.BATCHGLM_PROVIDE_BATCHED
-        constructor_args['provide_fim'] = pkg_constants.BATCHGLM_PROVIDE_FIM
-        constructor_args['provide_hessian'] = pkg_constants.BATCHGLM_PROVIDE_HESSIAN
-        constructor_args["batch_size"] = batch_size
     elif backend.lower() not in ["tf2"]:
         pass
     elif backend.lower() not in ["numpy"]:
         pass
     else:
         raise ValueError('backend="%s" not recognized.' % backend)
-
-    estim = Estimator(
-        input_data=input_data,
-        init_a=init_a,
-        init_b=init_b,
-        dtype=dtype,
-        **constructor_args
-    )
+    model = Model(input_data=input_data)
+    estim = Estimator(model=model)
     estim.initialize()
 
     # Assemble backend specific key word arguments to training function:
     if batch_size is not None:
         train_args["batch_size"] = batch_size
-    if backend.lower() in ["tf1"]:
-        pass
     elif backend.lower() in ["tf2"]:
         train_args["autograd"] = pkg_constants.BATCHGLM_AUTOGRAD
         train_args["featurewise"] = pkg_constants.BATCHGLM_FEATUREWISE
