@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 
-from batchglm.api.models.numpy.glm_nb import Simulator
+from batchglm.models.glm_nb import Model
 import diffxpy.api as de
 
 
@@ -24,18 +24,21 @@ class TestPartitionNull(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=2)
-        sim.generate()
-
+        model = Model()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=2
+        )
         sample_description = pd.DataFrame({
-            "covar1": np.random.randint(2, size=sim.nobs),
-            "covar2": np.random.randint(2, size=sim.nobs)
+            "covar1": np.random.randint(2, size=n_cells),
+            "covar2": np.random.randint(2, size=n_cells)
         })
-        sample_description["cond"] = sim.sample_description["condition"].values
+        sample_description["cond"] = model.sample_description["condition"].values
 
         partition = de.test.partition(
-            data=sim.x,
+            data=model.x,
             parts="cond",
             sample_description=sample_description
         )
@@ -69,18 +72,21 @@ class TestPartitionNull(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=2)
-        sim.generate()
-
+        model = Model()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=2
+        )
         sample_description = pd.DataFrame({
-            "covar1": np.random.randint(4, size=sim.nobs),
-            "covar2": np.random.randint(2, size=sim.nobs)
+            "covar1": np.random.randint(4, size=n_cells),
+            "covar2": np.random.randint(2, size=n_cells)
         })
-        sample_description["cond"] = sim.sample_description["condition"].values
+        sample_description["cond"] = model.sample_description["condition"].values
 
         partition = de.test.partition(
-            data=sim.x,
+            data=model.x,
             parts="cond",
             sample_description=sample_description
         )
@@ -114,18 +120,21 @@ class TestPartitionNull(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=2)
-        sim.generate()
-
+        model = Model()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=2
+        )
         sample_description = pd.DataFrame({
-            "covar1": np.random.randint(2, size=sim.nobs),
-            "covar2": np.random.randint(2, size=sim.nobs)
+            "covar1": np.random.randint(2, size=n_cells),
+            "covar2": np.random.randint(2, size=n_cells)
         })
-        sample_description["cond"] = sim.sample_description["condition"].values
+        sample_description["cond"] = model.sample_description["condition"].values
 
         partition = de.test.partition(
-            data=sim.x,
+            data=model.x,
             parts="cond",
             sample_description=sample_description
         )
@@ -161,17 +170,20 @@ class TestPartitionNull(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=2)
-        sim.generate()
-
+        model = Model()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=2
+        )
         sample_description = pd.DataFrame({
-            "covar1": np.random.randint(2, size=sim.nobs)
+            "covar1": np.random.randint(2, size=n_cells),
         })
-        sample_description["cond"] = sim.sample_description["condition"].values
+        sample_description["cond"] = model.sample_description["condition"].values
 
         partition = de.test.partition(
-            data=sim.x,
+            data=model.x,
             parts="cond",
             sample_description=sample_description
         )
@@ -204,17 +216,20 @@ class TestPartitionNull(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=2)
-        sim.generate()
-
+        model = Model()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=2
+        )
         sample_description = pd.DataFrame({
-            "covar1": np.random.randint(2, size=sim.nobs)
+            "covar1": np.random.randint(2, size=n_cells),
         })
-        sample_description["cond"] = sim.sample_description["condition"].values
+        sample_description["cond"] = model.sample_description["condition"].values
 
         partition = de.test.partition(
-            data=sim.x,
+            data=model.x,
             parts="cond",
             sample_description=sample_description
         )
