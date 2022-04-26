@@ -17,7 +17,7 @@ from .external import parse_gene_names, parse_sample_description, parse_size_fac
 
 
 def model(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         formula_loc: Union[None, str] = None,
         formula_scale: Union[None, str] = "~1",
         as_numeric: Union[List[str], Tuple[str], str] = (),
@@ -226,7 +226,7 @@ def model(
 
 
 def residuals(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         formula_loc: Union[None, str] = None,
         formula_scale: Union[None, str] = "~1",
         as_numeric: Union[List[str], Tuple[str], str] = (),
@@ -400,7 +400,7 @@ def residuals(
 
 
 def partition(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         parts: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
@@ -454,7 +454,7 @@ class _Partition:
 
     def __init__(
             self,
-            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
             parts: Union[str, np.ndarray, list],
             gene_names: Union[np.ndarray, list] = None,
             sample_description: pd.DataFrame = None,
@@ -481,7 +481,7 @@ class _Partition:
             same order as in data or string-type column identifier of size-factor containing
             column in sample description.
         """
-        if isinstance(data, glm.utils.data.InputDataGLM):
+        if isinstance(data, glm.utils.input.InputDataGLM):
             self.x = data.x
         elif isinstance(data, anndata.AnnData) or isinstance(data, Raw):
             self.x = data.X

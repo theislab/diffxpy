@@ -457,7 +457,6 @@ class _DifferentialExpressionTestSingle(_DifferentialExpressionTest, metaclass=a
 
         return res
 
-glm.train.
 
 class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
     """
@@ -1555,7 +1554,7 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         super().__init__()
         if isinstance(data, anndata.AnnData) or isinstance(data, anndata.Raw):
             data = data.X
-        elif isinstance(data, glm.utils.data.InputDataGLM):
+        elif isinstance(data, glm.utils.input.InputDataGLM):
             data = data.x
         self._x = data
         self.sample_description = sample_description
@@ -1682,7 +1681,7 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
         super().__init__()
         if isinstance(data, anndata.AnnData) or isinstance(data, anndata.Raw):
             data = data.X
-        elif isinstance(data, glm.utils.data.InputDataGLM):
+        elif isinstance(data, glm.utils.input.InputDataGLM):
             data = data.x
         self._x = data
         self.sample_description = sample_description

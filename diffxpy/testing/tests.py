@@ -200,7 +200,7 @@ def _fit(
 
 
 def lrt(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         full_formula_loc: str,
         reduced_formula_loc: str,
         full_formula_scale: str = "~1",
@@ -396,7 +396,7 @@ def lrt(
 
 
 def wald(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         factor_loc_totest: Union[str, List[str]] = None,
         coef_to_test: Union[str, List[str]] = None,
         formula_loc: Union[None, str] = None,
@@ -772,7 +772,7 @@ def wald_repeated(
 
 
 def t_test(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         grouping,
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
@@ -814,7 +814,7 @@ def t_test(
 
 
 def rank_test(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         grouping: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
@@ -856,7 +856,7 @@ def rank_test(
 
 
 def two_sample(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = "t-test",
@@ -1045,7 +1045,7 @@ def two_sample(
 
 
 def pairwise(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = "z-test",
@@ -1220,7 +1220,7 @@ def pairwise(
     else:
         if isinstance(data, anndata.AnnData) or isinstance(data, anndata.Raw):
             data = data.X
-        elif isinstance(data, glm.utils.data.InputDataGLM):
+        elif isinstance(data, glm.utils.input.InputDataGLM):
             data = data.x
         groups = np.unique(grouping)
         pvals = np.tile(np.NaN, [len(groups), len(groups), data.shape[1]])
@@ -1281,7 +1281,7 @@ def pairwise(
 
 
 def versus_rest(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
@@ -1457,7 +1457,7 @@ def versus_rest(
 
 
 def partition(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         parts: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None
@@ -1500,7 +1500,7 @@ class _Partition:
 
     def __init__(
             self,
-            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
             parts: Union[str, np.ndarray, list],
             gene_names: Union[np.ndarray, list] = None,
             sample_description: pd.DataFrame = None
@@ -1515,7 +1515,7 @@ class _Partition:
         :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
         :param sample_description: optional pandas.DataFrame containing sample annotations
         """
-        if isinstance(data, glm.utils.data.InputDataGLM):
+        if isinstance(data, glm.utils.input.InputDataGLM):
             self.x = data.x
         elif isinstance(data, anndata.AnnData) or isinstance(data, Raw):
             self.x = data.X
@@ -1919,7 +1919,7 @@ class _Partition:
 
 
 def continuous_1d(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.data.InputDataGLM],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         continuous: str,
         factor_loc_totest: Union[str, List[str]],
         formula_loc: str,
