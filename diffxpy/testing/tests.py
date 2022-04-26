@@ -1521,6 +1521,8 @@ class _Partition:
             self.x = data.X
         elif isinstance(data, np.ndarray):
             self.x = data
+        elif isinstance(data, dask.array.core.Array):
+            self.x = data.compute()
         else:
             raise ValueError("data type %s not recognized" % type(data))
         self.gene_names = parse_gene_names(data, gene_names)

@@ -22,6 +22,7 @@ def parse_gene_names(
         gene_names: Union[list, np.ndarray, None]
 ):
     if gene_names is None:
+        print(data)
         if anndata is not None and (isinstance(data, anndata.AnnData) or isinstance(data, Raw)):
             gene_names = data.var_names
         elif isinstance(data, glm.utils.input.InputDataGLM):
