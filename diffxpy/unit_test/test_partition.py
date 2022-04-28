@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 
-from batchglm.models.glm_nb import Model
+from batchglm.models.glm_nb import Model as NBModel
 import diffxpy.api as de
 
 
@@ -24,7 +24,7 @@ class TestPartitionNull(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        model = Model()
+        model = NBModel()
         model.generate_artificial_data(
             n_obs=n_cells,
             n_vars=n_genes,
@@ -39,6 +39,7 @@ class TestPartitionNull(unittest.TestCase):
 
         partition = de.test.partition(
             data=model.x,
+            gene_names=model.features,
             parts="cond",
             sample_description=sample_description
         )
@@ -72,7 +73,7 @@ class TestPartitionNull(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        model = Model()
+        model = NBModel()
         model.generate_artificial_data(
             n_obs=n_cells,
             n_vars=n_genes,
@@ -87,6 +88,7 @@ class TestPartitionNull(unittest.TestCase):
 
         partition = de.test.partition(
             data=model.x,
+            gene_names=model.features,
             parts="cond",
             sample_description=sample_description
         )
@@ -120,7 +122,7 @@ class TestPartitionNull(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        model = Model()
+        model = NBModel()
         model.generate_artificial_data(
             n_obs=n_cells,
             n_vars=n_genes,
@@ -135,6 +137,7 @@ class TestPartitionNull(unittest.TestCase):
 
         partition = de.test.partition(
             data=model.x,
+            gene_names=model.features,
             parts="cond",
             sample_description=sample_description
         )
@@ -170,7 +173,7 @@ class TestPartitionNull(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        model = Model()
+        model = NBModel()
         model.generate_artificial_data(
             n_obs=n_cells,
             n_vars=n_genes,
@@ -184,6 +187,7 @@ class TestPartitionNull(unittest.TestCase):
 
         partition = de.test.partition(
             data=model.x,
+            gene_names=model.features,
             parts="cond",
             sample_description=sample_description
         )
@@ -216,7 +220,7 @@ class TestPartitionNull(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        model = Model()
+        model = NBModel()
         model.generate_artificial_data(
             n_obs=n_cells,
             n_vars=n_genes,
@@ -230,6 +234,7 @@ class TestPartitionNull(unittest.TestCase):
 
         partition = de.test.partition(
             data=model.x,
+            gene_names=model.features,
             parts="cond",
             sample_description=sample_description
         )

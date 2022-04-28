@@ -319,25 +319,25 @@ def lrt(
         sample_description=sample_description
     )
 
-    full_design_loc = glm.data.design_matrix(
+    full_design_loc = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=full_formula_loc,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
         return_type="patsy"
     )
-    reduced_design_loc = glm.data.design_matrix(
+    reduced_design_loc = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_loc,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
         return_type="patsy"
     )
-    full_design_scale = glm.data.design_matrix(
+    full_design_scale = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=full_formula_scale,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
         return_type="patsy"
     )
-    reduced_design_scale = glm.data.design_matrix(
+    reduced_design_scale = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_scale,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
@@ -1181,7 +1181,7 @@ def pairwise(
 
     if test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest':
         # -1 in formula removes intercept
-        dmat = glm.data.design_matrix(
+        dmat = glm.utils.data.design_matrix(
             sample_description,
             formula="~ 1 - 1 + grouping"
         )

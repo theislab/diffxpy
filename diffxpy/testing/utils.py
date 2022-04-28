@@ -136,7 +136,7 @@ def design_matrix(
     """ Create a design matrix from some sample description.
 
     This function defaults to perform formatting if dmat is directly supplied as a pd.DataFrame.
-    This function relays batchglm.data.design_matrix() to behave like the other wrappers in diffxpy.
+    This function relays batchglm.utils.data.design_matrix() to behave like the other wrappers in diffxpy.
 
     :param data: Input data matrix (observations x features) or (cells x genes).
     :param sample_description: pandas.DataFrame of length "num_observations" containing explanatory variables as columns
@@ -169,7 +169,7 @@ def design_matrix(
     else:
         as_categorical = True
 
-    return glm.data.design_matrix(
+    return glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=formula,
         as_categorical=as_categorical,
@@ -187,7 +187,7 @@ def preview_coef_names(
     Return coefficient names of model.
 
     Use this to preview what the model would look like.
-    This function relays batchglm.data.preview_coef_names() to behave like the other wrappers in diffxpy.
+    This function relays batchglm.utils.data.preview_coef_names() to behave like the other wrappers in diffxpy.
 
     :param sample_description: pandas.DataFrame of length "num_observations" containing explanatory variables as columns
     :param formula: model formula as string, describing the relations of the explanatory variables.
@@ -206,7 +206,7 @@ def preview_coef_names(
     if isinstance(as_numeric, tuple):
         as_numeric = list(as_numeric)
 
-    return glm.data.preview_coef_names(
+    return glm.utils.data.preview_coef_names(
         sample_description=sample_description,
         formula=formula,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
@@ -224,7 +224,7 @@ def constraint_system_from_star(
     """
     Create a design matrix and a constraint matrix.
 
-    This function relays batchglm.data.constraint_matrix_from_star() to behave like the other wrappers in diffxpy.
+    This function relays batchglm.utils.data.constraint_matrix_from_star() to behave like the other wrappers in diffxpy.
 
     :param dmat: Pre-built model design matrix.
     :param sample_description: pandas.DataFrame of length "num_observations" containing explanatory variables as columns
@@ -264,7 +264,7 @@ def constraint_system_from_star(
     else:
         as_categorical = True
 
-    return glm.data.constraint_system_from_star(
+    return glm.utils.data.constraint_system_from_star(
         dmat=dmat,
         sample_description=sample_description,
         formula=formula,
@@ -306,7 +306,7 @@ def bin_continuous_covariate(
     else:
         bins = np.arange(0, 1, 1 / bins)
 
-    fac_binned = glm.data.bin_continuous_covariate(
+    fac_binned = glm.utils.data.bin_continuous_covariate(
         sample_description=sd,
         factor_to_bin=factor_to_bin,
         bins=bins
