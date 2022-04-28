@@ -191,19 +191,19 @@ def model(
     )
 
     design_loc, constraints_loc = constraint_system_from_star(
+        constraints=constraints_loc,
         dmat=dmat_loc,
         sample_description=sample_description,
         formula=formula_loc,
         as_numeric=as_numeric,
-        constraints=constraints_loc,
         return_type="patsy"
     )
     design_scale, constraints_scale = constraint_system_from_star(
+        constraints=constraints_scale,
         dmat=dmat_scale,
         sample_description=sample_description,
         formula=formula_scale,
         as_numeric=as_numeric,
-        constraints=constraints_scale,
         return_type="patsy"
     )
 

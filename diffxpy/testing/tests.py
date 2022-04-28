@@ -595,19 +595,19 @@ def wald(
 
     # Build design matrices and constraints.
     design_loc, design_loc_names, constraints_loc, term_names_loc = constraint_system_from_star(
+        constraints=constraints_loc,
         dmat=dmat_loc,
         sample_description=sample_description,
         formula=formula_loc,
         as_numeric=as_numeric,
-        constraints=constraints_loc,
         return_type="patsy"
     )
     design_scale, design_scale_names, constraints_scale, term_names_scale = constraint_system_from_star(
+        constraints=constraints_scale,
         dmat=dmat_scale,
         sample_description=sample_description,
         formula=formula_scale,
         as_numeric=as_numeric,
-        constraints=constraints_scale,
         return_type="patsy"
     )
 

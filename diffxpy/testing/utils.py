@@ -214,11 +214,11 @@ def preview_coef_names(
 
 
 def constraint_system_from_star(
+        constraints: dict = {},
         dmat: Union[None, patsy.design_info.DesignMatrix] = None,
         sample_description: Union[None, pd.DataFrame] = None,
         formula: Union[None, str] = None,
         as_numeric: Union[List[str], Tuple[str], str] = (),
-        constraints: dict = {},
         return_type: str = "patsy",
 ) -> Tuple:
     """
@@ -265,11 +265,11 @@ def constraint_system_from_star(
         as_categorical = True
 
     return glm.utils.data.constraint_system_from_star(
+        constraints,
         dmat=dmat,
         sample_description=sample_description,
         formula=formula,
         as_categorical=as_categorical,
-        constraints=constraints,
         return_type=return_type
     )
 
