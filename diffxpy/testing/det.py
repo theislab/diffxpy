@@ -729,7 +729,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.model_estim.model.features)
+        return np.asarray(self.model_estim.model_container.model.features)
 
     @property
     def x(self):
@@ -753,16 +753,16 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # loc = dmat @ self.model_estim.par_link_loc[self.coef_loc_totest]
         # return loc[1] - loc[0]
         if len(self.coef_loc_totest) == 1:
-            return self.model_estim.theta_location[self.coef_loc_totest][0]
+            return self.model_estim.model_container.theta_location[self.coef_loc_totest][0]
         else:
-            idx0 = np.argmax(np.abs(self.model_estim.theta_location[self.coef_loc_totest]), axis=0)
+            idx0 = np.argmax(np.abs(self.model_estim.model_container.theta_location[self.coef_loc_totest]), axis=0)
             idx1 = np.arange(len(idx0))
             # Leave the below for debugging right now, dask has different indexing than numpy does here:
-            assert not isinstance(self.model_estim.theta_location, dask.array.core.Array), \
-                "self.model_estim.theta_location was dask array, aborting. Please file issue on github."
+            assert not isinstance(self.model_estim.model_container.theta_location, dask.array.core.Array), \
+                "self.model_estim.model_container.theta_location was dask array, aborting. Please file issue on github."
             # Use advanced numpy indexing here:
             # https://docs.scipy.org/doc/numpy/reference/arrays.indexing.html#advanced-indexing
-            return self.model_estim.theta_location[self.coef_loc_totest, :][tuple(idx0), tuple(idx1)]
+            return self.model_estim.model_container.theta_location[self.coef_loc_totest, :][tuple(idx0), tuple(idx1)]
 
     def _ll(self):
         """
@@ -789,10 +789,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # Check whether single- or multiple parameters are tested.
         # For a single parameter, the wald statistic distribution is approximated
         # with a normal distribution, for multiple parameters, a chi-square distribution is used.
-        self.theta_mle = self.model_estim.theta_location[self.coef_loc_totest]
+        self.theta_mle = self.model_estim.model_container.theta_location[self.coef_loc_totest]
         if len(self.coef_loc_totest) == 1:
             self.theta_mle = self.theta_mle[0]
-            self.theta_sd = self.model_estim.fisher_inv[:, self.coef_loc_totest[0], self.coef_loc_totest[0]]
+            self.theta_sd = self.model_estim.model_container.fisher_inv[:, self.coef_loc_totest[0], self.coef_loc_totest[0]]
             self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test(
@@ -801,12 +801,12 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 theta0=0
             )
         else:
-            self.theta_sd = np.diagonal(self.model_estim.fisher_inv, axis1=-2, axis2=-1).copy()
+            self.theta_sd = np.diagonal(self.model_estim.model_container.fisher_inv, axis1=-2, axis2=-1).copy()
             self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test_chisq(
                 theta_mle=self.theta_mle,
-                theta_covar=self.model_estim.fisher_inv[:, self.coef_loc_totest, :][:, :, self.coef_loc_totest],
+                theta_covar=self.model_estim.model_container.fisher_inv[:, self.coef_loc_totest, :][:, :, self.coef_loc_totest],
                 theta0=0
             )
 
@@ -964,14 +964,14 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 constraints_loc=self.model_estim.model.constraints_loc,
                 constraints_scale=self.model_estim.model.constraints_scale[[0], [0]],
                 size_factors=self.model_estim.model.size_factors,
-                feature_names=self.model_estim.model.features,
+                feature_names=self.model_estim.model_container.model.features,
             )
             estim_ols = Estimator(
                 input_data=input_data_ols,
                 init_model=None,
                 init_a="standard",
                 init_b="standard",
-                dtype=self.model_estim.theta_location.dtype
+                dtype=self.model_estim.model_container.theta_location.dtype
             )
             estim_ols.initialize()
             store_ols = estim_ols.finalize()
@@ -985,7 +985,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         theta_location_ols = store_ols.theta_location
         theta_location_ols[1:, :] = (theta_location_ols[1:, :] + theta_location_ols[[0], :]) / theta_location_ols[[0], :]
 
-        theta_location_user = self.model_estim.theta_location
+        theta_location_user = self.model_estim.model_container.theta_location
         # Translate coefficients from both fits to be multiplicative in identity space.
         if self.noise_model == "nb":
             theta_location_user = np.exp(theta_location_user)  # self.model_estim.inverse_link_loc(theta_location_user)
@@ -999,7 +999,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 "user": theta_location_user[i, :],
                 "ols": theta_location_ols[i, :],
                 "coef": par_loc[i]
-            }) for i in range(self.model_estim.theta_location.shape[0])
+            }) for i in range(self.model_estim.model_container.theta_location.shape[0])
         ]
 
         plt.ioff()
@@ -1103,14 +1103,14 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 constraints_loc=self.model_estim.model.constraints_loc,
                 constraints_scale=self.model_estim.model.constraints_scale[[0], [0]],
                 size_factors=self.model_estim.model.size_factors,
-                feature_names=self.model_estim.model.features,
+                feature_names=self.model_estim.model_container.model.features,
             )
             estim_ols = Estimator(
                 input_data=input_data_ols,
                 init_model=None,
                 init_a="standard",
                 init_b="standard",
-                dtype=self.model_estim.theta_location.dtype
+                dtype=self.model_estim.model_container.theta_location.dtype
             )
             estim_ols.initialize()
             store_ols = estim_ols.finalize()
@@ -1145,7 +1145,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         x = np.asarray(self.model_estim.X[pred_n_cells, :]).flatten()
 
         y_user = self.model_estim.model.inverse_link_loc(
-            np.matmul(self.model_estim.model.design_loc[pred_n_cells, :], self.model_estim.theta_location).flatten()
+            np.matmul(self.model_estim.model.design_loc[pred_n_cells, :], self.model_estim.model_container.theta_location).flatten()
         )
         y_ols = store_ols.inverse_link_loc(
             np.matmul(store_ols.design_loc[pred_n_cells, :], store_ols.theta_location).flatten()
@@ -1247,8 +1247,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         summaries_genes = []
         for i, g in enumerate(gene_names):
-            assert g in self.model_estim.model.features, "gene %g not found" % g
-            g_idx = self.model_estim.model.features.index(g)
+            assert g in self.model_estim.model_container.model.features, "gene %g not found" % g
+            g_idx = self.model_estim.model_container.model.features.index(g)
             # Raw data for boxplot:
             y = self.model_estim.x[:, g_idx]
             if isinstance(y, dask.array.core.Array):

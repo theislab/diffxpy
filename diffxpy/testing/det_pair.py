@@ -387,7 +387,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.model_estim.model.features)
+        return np.asarray(self.model_estim.model_container.model.features)
 
     @property
     def x(self):
@@ -580,7 +580,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.model_estim.model.features)
+        return np.asarray(self.model_estim.model_container.model.features)
 
     @property
     def x(self):
