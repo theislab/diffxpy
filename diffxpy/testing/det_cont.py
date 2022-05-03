@@ -197,7 +197,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :param intercept: Whether to include intercept.
         :return: Indices of spline basis parameters of location model.
         """
-        par_loc_names = self._model_estim.model.loc_names
+        par_loc_names = self._model_estim.model_container.model.loc_names
         idx = [par_loc_names.index(x) for x in self._spline_coefs]
         if 'Intercept' in par_loc_names and intercept:
             idx = np.concatenate([np.where([[x == 'Intercept' for x in par_loc_names]])[0], idx])
@@ -218,14 +218,14 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             idx = np.array([idx])
 
         if non_numeric:
-            mu = np.matmul(self._model_estim.model.design_loc,
-                           self._model_estim.model.a[:, idx])
+            mu = np.matmul(self._model_estim.model_container.model.design_loc,
+                           self._model_estim.model_container.model.a[:, idx])
             if self._size_factors is not None:
-                mu = mu + self._model_estim.model.size_factors
+                mu = mu + self._model_estim.model_container.model.size_factors
         else:
             idx_basis = self._spline_par_loc_idx(intercept=True)
-            mu = np.matmul(self._model_estim.model.design_loc[:, idx_basis],
-                           self._model_estim.model.a[idx_basis, :][:, idx])
+            mu = np.matmul(self._model_estim.model_container.model.design_loc[:, idx_basis],
+                           self._model_estim.model_container.model.a[idx_basis, :][:, idx])
         if isinstance(mu, dask.array.core.Array):
             mu = mu.compute()
 
@@ -246,7 +246,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             idx = np.array([idx])
 
         idx_basis = self._spline_par_loc_idx(intercept=True)
-        a = self._model_estim.model.a[idx_basis, :]
+        a = self._model_estim.model_container.model.a[idx_basis, :]
         if isinstance(a, dask.array.core.Array):
             a = a.compute()[:, idx]
         else:
@@ -393,8 +393,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
                 y = y.compute()
             if isinstance(y, scipy.sparse.spmatrix) or isinstance(y, sparse.COO):
                 y = np.asarray(y.todense()).flatten()
-                if self._model_estim.model.size_factors is not None:
-                    y = y / self._model_estim.model.size_factors
+                if self._model_estim.model_container.model.size_factors is not None:
+                    y = y / self._model_estim.model_container.model.size_factors
             t_continuous, yhat = self._continuous_interpolation(idx=g)
             yhat = yhat.flatten()
             if scalings is not None:
@@ -402,7 +402,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
                     [yhat],
                     [
                         yhat * np.expand_dims(
-                            np.exp(self._model_estim.a_var[self._model_estim.model.loc_names.index(x), g]),
+                            np.exp(self._model_estim.a_var[self._model_estim.model_container.model.loc_names.index(x), g]),
                             axis=0
                         )
                         for i, x in enumerate(scalings)

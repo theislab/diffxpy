@@ -319,25 +319,25 @@ def lrt(
         sample_description=sample_description
     )
 
-    full_design_loc = glm.utils.data.design_matrix(
+    full_design_loc, _ = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=full_formula_loc,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
         return_type="patsy"
     )
-    reduced_design_loc = glm.utils.data.design_matrix(
+    reduced_design_loc, _ = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_loc,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
         return_type="patsy"
     )
-    full_design_scale = glm.utils.data.design_matrix(
+    full_design_scale, _ = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=full_formula_scale,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
         return_type="patsy"
     )
-    reduced_design_scale = glm.utils.data.design_matrix(
+    reduced_design_scale, _ = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_scale,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
@@ -726,7 +726,7 @@ def wald_repeated(
         coef_to_test = [coef_to_test]
 
     # Check that design_loc is patsy, otherwise  use term_names for slicing.
-    par_loc_names = det.model_estim.model.design_loc_names
+    par_loc_names = det.model_estim.model_container.model.design_loc_names
     if factor_loc_totest is not None and coef_to_test is None:
         col_indices = np.concatenate([np.where([
             fac in x
@@ -749,7 +749,7 @@ def wald_repeated(
     assert len(col_indices) > 0, "Could not find any matching columns!"
 
     # Check that all tested coefficients are independent:
-    constraints_loc = det.model_estim.model.constraints_loc
+    constraints_loc = det.model_estim.model_container.model.constraints_loc
     if isinstance(constraints_loc, dask.array.core.Array):
         constraints_loc = constraints_loc.compute()
     for x in col_indices:
@@ -1181,7 +1181,7 @@ def pairwise(
 
     if test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest':
         # -1 in formula removes intercept
-        dmat = glm.utils.data.design_matrix(
+        dmat, _ = glm.utils.data.design_matrix(
             sample_description,
             formula="~ 1 - 1 + grouping"
         )
@@ -1649,7 +1649,6 @@ class _Partition:
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 is_sig_zerovar=is_sig_zerovar,
-                dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,
@@ -1685,7 +1684,6 @@ class _Partition:
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 is_sig_zerovar=is_sig_zerovar,
-                dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,

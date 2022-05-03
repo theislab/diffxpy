@@ -191,8 +191,8 @@ class TestConstrained(unittest.TestCase):
                              'tech1', 'tech2', 'tech3', 'tech4']
         dmat_est = pd.DataFrame(data=dmat, columns=coefficient_names)
 
-        dmat_est_loc = de.utils.design_matrix(dmat=dmat_est, return_type="dataframe")
-        dmat_est_scale = de.utils.design_matrix(dmat=dmat_est.iloc[:, [0]], return_type="dataframe")
+        dmat_est_loc, _ = de.utils.design_matrix(dmat=dmat_est, return_type="dataframe")
+        dmat_est_scale, _ = de.utils.design_matrix(dmat=dmat_est.iloc[:, [0]], return_type="dataframe")
 
         # Build constraints:
         constraints_loc = de.utils.constraint_matrix_from_string(

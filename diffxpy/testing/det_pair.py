@@ -395,11 +395,11 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
 
     @property
     def log_likelihood(self):
-        return self.model_estim.ll
+        return self.model_estim.model_container.ll
 
     @property
     def model_gradient(self):
-        return self.model_estim.jacobian
+        return self.model_estim.model_container.jac
 
     def _ave(self):
         """
@@ -588,11 +588,11 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
 
     @property
     def log_likelihood(self):
-        return self.model_estim.ll
+        return self.model_estim.model_container.ll
 
     @property
     def model_gradient(self):
-        return self.model_estim.jacobian
+        return self.model_estim.model_container.jac
 
     def _ave(self):
         """
