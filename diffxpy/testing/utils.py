@@ -4,6 +4,7 @@ try:
 except ImportError:
     from anndata import Raw
 import batchglm.api as glm
+import dask
 import numpy as np
 import pandas as pd
 import patsy
@@ -119,6 +120,8 @@ def split_x(data, grouping):
 
 
 def dmat_unique(dmat, sample_description):
+    if isinstance(dmat, dask.array.core.Array):
+        dmat = dmat.compute()
     dmat, idx = np.unique(dmat, axis=0, return_index=True)
     sample_description = sample_description.iloc[idx].reset_index(drop=True)
 

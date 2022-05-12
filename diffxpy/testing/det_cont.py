@@ -219,13 +219,13 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
 
         if non_numeric:
             mu = np.matmul(self._model_estim.model_container.model.design_loc,
-                           self._model_estim.model_container.model.a[:, idx])
+                           self._model_estim.model_container.model.theta_location_constrained[:, idx])
             if self._size_factors is not None:
                 mu = mu + self._model_estim.model_container.model.size_factors
         else:
             idx_basis = self._spline_par_loc_idx(intercept=True)
             mu = np.matmul(self._model_estim.model_container.model.design_loc[:, idx_basis],
-                           self._model_estim.model_container.model.a[idx_basis, :][:, idx])
+                           self._model_estim.model_container.model.theta_location_constrained[idx_basis, :][:, idx])
         if isinstance(mu, dask.array.core.Array):
             mu = mu.compute()
 
@@ -246,7 +246,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
             idx = np.array([idx])
 
         idx_basis = self._spline_par_loc_idx(intercept=True)
-        a = self._model_estim.model_container.model.a[idx_basis, :]
+        a = self._model_estim.model_container.model.theta_location_constrained[idx_basis, :]
         if isinstance(a, dask.array.core.Array):
             a = a.compute()[:, idx]
         else:

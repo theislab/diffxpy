@@ -558,7 +558,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         # make the design matrix + sample description unique again
         dmat, sample_description = dmat_unique(dmat, sample_description)
 
-        locations = self.full_estim.model_container.model.inverse_link_loc(np.matmul(dmat, self.full_estim.model_container.model.a))
+        locations = self.full_estim.model_container.model.inverse_link_loc(np.matmul(dmat, self.full_estim.model_container.model.theta_location_constrained))
         locations = np.log(locations) / np.log(base)
 
         dist = np.expand_dims(locations, axis=0)
@@ -616,7 +616,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
         dmat, sample_description = dmat_unique(dmat, sample_description)
 
-        retval = self.full_estim.model_container.model.inverse_link_loc(np.matmul(dmat, self.full_estim.model_container.model.a))
+        retval = self.full_estim.model_container.model.inverse_link_loc(np.matmul(dmat, self.full_estim.model_container.model.theta_location_constrained))
         retval = pd.DataFrame(retval, columns=self.full_estim.model_container.model.features)
         for col in sample_description:
             retval[col] = sample_description[col]
@@ -757,12 +757,12 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         else:
             idx0 = np.argmax(np.abs(self.model_estim.model_container.theta_location[self.coef_loc_totest]), axis=0)
             idx1 = np.arange(len(idx0))
-            # Leave the below for debugging right now, dask has different indexing than numpy does here:
-            assert not isinstance(self.model_estim.model_container.theta_location, dask.array.core.Array), \
-                "self.model_estim.model_container.theta_location was dask array, aborting. Please file issue on github."
-            # Use advanced numpy indexing here:
-            # https://docs.scipy.org/doc/numpy/reference/arrays.indexing.html#advanced-indexing
-            return self.model_estim.model_container.theta_location[self.coef_loc_totest, :][tuple(idx0), tuple(idx1)]
+            if isinstance(self.model_estim.model_container.theta_location, dask.array.core.Array):
+                return self.model_estim.model_container.theta_location[self.coef_loc_totest, :].vindex[idx0.compute(), idx1].T
+            else:
+                # Use advanced numpy indexing here:
+                # https://docs.scipy.org/doc/numpy/reference/arrays.indexing.html#advanced-indexing
+                return self.model_estim.model_container.theta_location[self.coef_loc_totest, :][tuple(idx0), tuple(idx1)]
 
     def _ll(self):
         """
@@ -1870,7 +1870,10 @@ class _DifferentialExpressionTestMulti(_DifferentialExpressionTest, metaclass=ab
         # next, get argmax of flattened logfc and unravel the true indices from it
         r, c = np.unravel_index(flat_logfc.argmax(0), raw_logfc.shape[:2])
         # if logfc is maximal in the lower triangular matrix, multiply it with -1
-        logfc = raw_logfc[r, c, np.arange(raw_logfc.shape[-1])] * np.where(r <= c, 1, -1)
+        if isinstance(raw_logfc, dask.array.core.Array):
+            logfc = raw_logfc.vindex[r.compute(), c.compute(), np.arange(raw_logfc.shape[-1])] * np.where(r <= c, 1, -1)
+        else:
+            logfc = raw_logfc[r, c, np.arange(raw_logfc.shape[-1])] * np.where(r <= c, 1, -1)
 
         res = pd.DataFrame({
             "gene": self.gene_ids,
