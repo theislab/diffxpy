@@ -9,7 +9,8 @@ import pandas as pd
 import patsy
 import scipy.sparse
 from typing import List, Tuple, Union
-
+import dask
+import logging
 
 # Relay util functions for diffxpy api.
 # design_matrix, preview_coef_names and constraint_system_from_star are redefined here.
@@ -118,6 +119,8 @@ def split_x(data, grouping):
 
 
 def dmat_unique(dmat, sample_description):
+    if isinstance(dmat, dask.array.core.Array):
+        dmat = dmat.compute()
     dmat, idx = np.unique(dmat, axis=0, return_index=True)
     sample_description = sample_description.iloc[idx].reset_index(drop=True)
 

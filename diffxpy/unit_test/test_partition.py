@@ -33,9 +33,10 @@ class TestPartitionNull(unittest.TestCase):
             "covar2": np.random.randint(2, size=sim.nobs)
         })
         sample_description["cond"] = sim.sample_description["condition"].values
-
+        gene_names = ["gene" + str(i) for i in range(sim.x.shape[1])]
         partition = de.test.partition(
             data=sim.x,
+            gene_names=gene_names,
             parts="cond",
             sample_description=sample_description
         )
@@ -78,9 +79,10 @@ class TestPartitionNull(unittest.TestCase):
             "covar2": np.random.randint(2, size=sim.nobs)
         })
         sample_description["cond"] = sim.sample_description["condition"].values
-
+        gene_names = ["gene" + str(i) for i in range(sim.x.shape[1])]
         partition = de.test.partition(
             data=sim.x,
+            gene_names=gene_names,
             parts="cond",
             sample_description=sample_description
         )
@@ -123,9 +125,10 @@ class TestPartitionNull(unittest.TestCase):
             "covar2": np.random.randint(2, size=sim.nobs)
         })
         sample_description["cond"] = sim.sample_description["condition"].values
-
+        gene_names = ["gene" + str(i) for i in range(sim.x.shape[1])]
         partition = de.test.partition(
             data=sim.x,
+            gene_names=gene_names,
             parts="cond",
             sample_description=sample_description
         )
@@ -169,16 +172,16 @@ class TestPartitionNull(unittest.TestCase):
             "covar1": np.random.randint(2, size=sim.nobs)
         })
         sample_description["cond"] = sim.sample_description["condition"].values
-
+        gene_names = ["gene" + str(i) for i in range(sim.x.shape[1])]
         partition = de.test.partition(
             data=sim.x,
+            gene_names=gene_names,
             parts="cond",
             sample_description=sample_description
         )
         det = partition.t_test(
             grouping="covar1",
             is_logged=False,
-            dtype="float64"
         )
         summary = det.summary()
 
@@ -212,15 +215,15 @@ class TestPartitionNull(unittest.TestCase):
             "covar1": np.random.randint(2, size=sim.nobs)
         })
         sample_description["cond"] = sim.sample_description["condition"].values
-
+        gene_names = ["gene" + str(i) for i in range(sim.x.shape[1])]
         partition = de.test.partition(
             data=sim.x,
+            gene_names=gene_names,
             parts="cond",
             sample_description=sample_description
         )
         det = partition.rank_test(
             grouping="covar1",
-            dtype="float64"
         )
         summary = det.summary()
 

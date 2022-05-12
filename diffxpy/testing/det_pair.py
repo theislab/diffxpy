@@ -5,6 +5,7 @@ except ImportError:
     anndata = None
 import batchglm.api as glm
 import logging
+import dask
 import numpy as np
 import pandas as pd
 from typing import List, Union
@@ -241,7 +242,10 @@ class _DifferentialExpressionTestPairwiseBase(_DifferentialExpressionTestMulti):
         # next, get argmax of flattened logfc and unravel the true indices from it
         r, c = np.unravel_index(flat_logfc.argmax(0), raw_logfc.shape[:2])
         # if logfc is maximal in the lower triangular matrix, multiply it with -1
-        logfc = raw_logfc[r, c, np.arange(raw_logfc.shape[-1])] * np.where(r <= c, 1, -1)
+        if isinstance(raw_logfc, dask.array.core.Array):
+            logfc = raw_logfc.vindex[r.compute(), c.compute(), np.arange(raw_logfc.shape[-1])] * np.where(r <= c, 1, -1)
+        else:
+            logfc = raw_logfc[r, c, np.arange(raw_logfc.shape[-1])] * np.where(r <= c, 1, -1)
 
         res = pd.DataFrame({
             "gene": self.gene_ids,

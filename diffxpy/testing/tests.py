@@ -369,25 +369,25 @@ def lrt(
         sample_description=sample_description
     )
 
-    full_design_loc = glm.data.design_matrix(
+    full_design_loc, _ = glm.data.design_matrix(
         sample_description=sample_description,
         formula=full_formula_loc,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
         return_type="patsy"
     )
-    reduced_design_loc = glm.data.design_matrix(
+    reduced_design_loc, _ = glm.data.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_loc,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
         return_type="patsy"
     )
-    full_design_scale = glm.data.design_matrix(
+    full_design_scale, _ = glm.data.design_matrix(
         sample_description=sample_description,
         formula=full_formula_scale,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
         return_type="patsy"
     )
-    reduced_design_scale = glm.data.design_matrix(
+    reduced_design_scale, _ = glm.data.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_scale,
         as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
@@ -421,8 +421,8 @@ def lrt(
         constraints_loc=None,
         constraints_scale=None,
         gene_names=gene_names,
-        init_a="init_model",
-        init_b="init_model",
+        init_a="standard",
+        init_b="standard",
         init_model=reduced_model,
         size_factors=size_factors,
         batch_size=batch_size,
@@ -1231,7 +1231,7 @@ def pairwise(
 
     if test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest':
         # -1 in formula removes intercept
-        dmat = glm.data.design_matrix(
+        dmat, _ = glm.data.design_matrix(
             sample_description,
             formula="~ 1 - 1 + grouping"
         )
@@ -1697,7 +1697,6 @@ class _Partition:
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 is_sig_zerovar=is_sig_zerovar,
-                dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,
@@ -1733,7 +1732,6 @@ class _Partition:
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 is_sig_zerovar=is_sig_zerovar,
-                dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,
