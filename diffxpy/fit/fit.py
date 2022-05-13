@@ -396,7 +396,7 @@ def residuals(
         dtype=dtype,
         ** kwargs
     )
-    residuals = estim.model_container.model.x - estim.model_container.model.location
+    residuals = estim.model_container.x - estim.model_container.location
     return residuals
 
 

@@ -486,7 +486,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.full_estim.model_container.model.features)
+        return np.asarray(self.full_estim.model_container.features)
 
     @property
     def x(self):
@@ -501,16 +501,22 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         return self.full_estim.jacobian
 
     def _test(self):
-        if np.any(self.full_estim.model_container.ll < self.reduced_estim.model_container.ll):
+        ll_full = self.full_estim.model_container.ll_byfeature
+        ll_reduced = self.reduced_estim.model_container.ll_byfeature
+        if isinstance(ll_full, dask.array.core.Array):
+            ll_full = ll_full.compute()
+        if isinstance(ll_reduced, dask.array.core.Array):
+            ll_reduced = ll_reduced.compute()
+        if np.any(ll_full < ll_reduced):
             logger.warning("Test assumption failed: full model is (partially) less probable than reduced model")
 
         return stats.likelihood_ratio_test(
-            ll_full=self.full_estim.model_container.ll,
-            ll_reduced=self.reduced_estim.model_container.ll,
-            df_full=self.full_estim.model_container.model.constraints_loc.shape[1] +
-                    self.full_estim.model_container.model.constraints_scale.shape[1],
-            df_reduced=self.reduced_estim.model_container.model.constraints_loc.shape[1] +
-                       self.reduced_estim.model_container.model.constraints_scale.shape[1],
+            ll_full=ll_full,
+            ll_reduced=ll_reduced,
+            df_full=self.full_estim.model_container.constraints_loc.shape[1] +
+                    self.full_estim.model_container.constraints_scale.shape[1],
+            df_reduced=self.reduced_estim.model_container.constraints_loc.shape[1] +
+                       self.reduced_estim.model_container.constraints_scale.shape[1],
         )
 
     def _ave(self):
@@ -539,7 +545,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
         di = self.full_design_loc_info
         sample_description = self.sample_description[[f.name() for f in di.subset(factors).factor_infos]]
-        dmat = self.full_estim.model_container.model.design_loc
+        dmat = self.full_estim.model_container.design_loc
 
         # make rows unique
         dmat, sample_description = dmat_unique(dmat, sample_description)
@@ -558,7 +564,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         # make the design matrix + sample description unique again
         dmat, sample_description = dmat_unique(dmat, sample_description)
 
-        locations = self.full_estim.model_container.model.inverse_link_loc(np.matmul(dmat, self.full_estim.model_container.model.theta_location_constrained))
+        locations = self.full_estim.model_container.inverse_link_loc(np.matmul(dmat, self.full_estim.model_container.theta_location_constrained))
         locations = np.log(locations) / np.log(base)
 
         dist = np.expand_dims(locations, axis=0)
@@ -612,12 +618,12 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
         di = self.full_design_loc_info
         sample_description = self.sample_description[[f.name() for f in di.factor_infos]]
-        dmat = self.full_estim.model_container.model.design_loc
+        dmat = self.full_estim.model_container.design_loc
 
         dmat, sample_description = dmat_unique(dmat, sample_description)
 
-        retval = self.full_estim.model_container.model.inverse_link_loc(np.matmul(dmat, self.full_estim.model_container.model.theta_location_constrained))
-        retval = pd.DataFrame(retval, columns=self.full_estim.model_container.model.features)
+        retval = self.full_estim.model_container.inverse_link_loc(np.matmul(dmat, self.full_estim.model_container.theta_location_constrained))
+        retval = pd.DataFrame(retval, columns=self.full_estim.model_container.features)
         for col in sample_description:
             retval[col] = sample_description[col]
 
@@ -634,12 +640,12 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
         di = self.full_design_loc_info
         sample_description = self.sample_description[[f.name() for f in di.factor_infos]]
-        dmat = self.full_estim.model_container.model.design_scale
+        dmat = self.full_estim.model_container.design_scale
 
         dmat, sample_description = dmat_unique(dmat, sample_description)
 
         retval = self.full_estim.inverse_link_scale(dmat.doc(self.full_estim.par_link_scale))
-        retval = pd.DataFrame(retval, columns=self.full_estim.model_container.model.features)
+        retval = pd.DataFrame(retval, columns=self.full_estim.model_container.features)
         for col in sample_description:
             retval[col] = sample_description[col]
 
@@ -729,7 +735,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.model_estim.model_container.model.features)
+        return np.asarray(self.model_estim.model_container.features)
 
     @property
     def x(self):
@@ -737,7 +743,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
     @property
     def model_gradient(self):
-        return self.model_estim.model_container.jac
+        return self.model_estim.model_container.jac # should be by gene/feature?
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -770,7 +776,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         :return: np.ndarray
         """
-        return self.model_estim.model_container.ll
+        return self.model_estim.model_container.ll_byfeature
 
     def _ave(self):
         """
@@ -877,10 +883,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         plt.ioff()
 
-        grouping = np.asarray(self.model_estim.model_container.model.design_loc[:, self.coef_loc_totest])
+        grouping = np.asarray(self.model_estim.model_container.design_loc[:, self.coef_loc_totest])
         # Normalize by size factors that were used in regression.
-        if self.model_estim.model_container.model.size_factors is not None:
-            sf = np.broadcast_to(np.expand_dims(self.model_estim.model_container.model.size_factors, axis=1),
+        if self.model_estim.model_container.size_factors is not None:
+            sf = np.broadcast_to(np.expand_dims(self.model_estim.model_container.size_factors, axis=1),
                                  shape=self.model_estim.x.shape)
         else:
             sf = np.ones(shape=(self.model_estim.x.shape[0], 1))
@@ -958,13 +964,13 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # Run OLS model fit to have comparison coefficients.
         if self._store_ols is None:
             input_data_ols = InputDataGLM(
-                data=self.model_estim.model_container.model.data,
-                design_loc=self.model_estim.model_container.model.design_loc,
-                design_scale=self.model_estim.model_container.model.design_scale[:, [0]],
-                constraints_loc=self.model_estim.model_container.model.constraints_loc,
-                constraints_scale=self.model_estim.model_container.model.constraints_scale[[0], [0]],
-                size_factors=self.model_estim.model_container.model.size_factors,
-                feature_names=self.model_estim.model_container.model.features,
+                data=self.model_estim.model_container.data,
+                design_loc=self.model_estim.model_container.design_loc,
+                design_scale=self.model_estim.model_container.design_scale[:, [0]],
+                constraints_loc=self.model_estim.model_container.constraints_loc,
+                constraints_scale=self.model_estim.model_container.constraints_scale[[0], [0]],
+                size_factors=self.model_estim.model_container.size_factors,
+                feature_names=self.model_estim.model_container.features,
             )
             estim_ols = Estimator(
                 input_data=input_data_ols,
@@ -980,7 +986,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             store_ols = self._store_ols
 
         # Prepare parameter summary of both model fits.
-        par_loc = self.model_estim.model_container.model.data.coords["design_loc_params"].values
+        par_loc = self.model_estim.model_container.data.coords["design_loc_params"].values
 
         theta_location_ols = store_ols.theta_location
         theta_location_ols[1:, :] = (theta_location_ols[1:, :] + theta_location_ols[[0], :]) / theta_location_ols[[0], :]
@@ -1097,13 +1103,13 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # Run OLS model fit to have comparison coefficients.
         if self._store_ols is None:
             input_data_ols = InputDataGLM(
-                data=self.model_estim.model_container.model.data,
-                design_loc=self.model_estim.model_container.model.design_loc,
-                design_scale=self.model_estim.model_container.model.design_scale[:, [0]],
-                constraints_loc=self.model_estim.model_container.model.constraints_loc,
-                constraints_scale=self.model_estim.model_container.model.constraints_scale[[0], [0]],
-                size_factors=self.model_estim.model_container.model.size_factors,
-                feature_names=self.model_estim.model_container.model.features,
+                data=self.model_estim.model_container.data,
+                design_loc=self.model_estim.model_container.design_loc,
+                design_scale=self.model_estim.model_container.design_scale[:, [0]],
+                constraints_loc=self.model_estim.model_container.constraints_loc,
+                constraints_scale=self.model_estim.model_container.constraints_scale[[0], [0]],
+                size_factors=self.model_estim.model_container.size_factors,
+                feature_names=self.model_estim.model_container.features,
             )
             estim_ols = Estimator(
                 input_data=input_data_ols,
@@ -1139,13 +1145,13 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         pred_n_cells = sample(
             population=list(np.arange(0, self.model_estim.X.shape[0])),
-            k=np.min([20, self.model_estim.model_container.model.design_loc.shape[0]])
+            k=np.min([20, self.model_estim.model_container.design_loc.shape[0]])
         )
 
         x = np.asarray(self.model_estim.X[pred_n_cells, :]).flatten()
 
-        y_user = self.model_estim.model_container.model.inverse_link_loc(
-            np.matmul(self.model_estim.model_container.model.design_loc[pred_n_cells, :], self.model_estim.model_container.theta_location).flatten()
+        y_user = self.model_estim.model_container.inverse_link_loc(
+            np.matmul(self.model_estim.model_container.design_loc[pred_n_cells, :], self.model_estim.model_container.theta_location).flatten()
         )
         y_ols = store_ols.inverse_link_loc(
             np.matmul(store_ols.design_loc[pred_n_cells, :], store_ols.theta_location).flatten()
@@ -1247,8 +1253,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         summaries_genes = []
         for i, g in enumerate(gene_names):
-            assert g in self.model_estim.model_container.model.features, "gene %g not found" % g
-            g_idx = self.model_estim.model_container.model.features.index(g)
+            assert g in self.model_estim.model_container.features, "gene %g not found" % g
+            g_idx = self.model_estim.model_container.features.index(g)
             # Raw data for boxplot:
             y = self.model_estim.x[:, g_idx]
             if isinstance(y, dask.array.core.Array):

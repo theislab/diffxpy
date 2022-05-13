@@ -177,7 +177,11 @@ def _fit(
     else:
         raise ValueError('backend="%s" not recognized.' % backend)
     model = Model(input_data=input_data)
-    estim = Estimator(model=model)
+    estim = Estimator(
+        model=model,
+        init_location=init_a,
+        init_scale=init_b
+    )
     estim.initialize()
 
     # Assemble backend specific key word arguments to training function:
@@ -371,8 +375,8 @@ def lrt(
         constraints_loc=None,
         constraints_scale=None,
         gene_names=gene_names,
-        init_a="init_model",
-        init_b="init_model",
+        init_a="auto",
+        init_b="auto",
         init_model=reduced_model,
         size_factors=size_factors,
         batch_size=batch_size,
@@ -726,7 +730,7 @@ def wald_repeated(
         coef_to_test = [coef_to_test]
 
     # Check that design_loc is patsy, otherwise  use term_names for slicing.
-    par_loc_names = det.model_estim.model_container.model.design_loc_names
+    par_loc_names = det.model_estim.model_container.design_loc_names
     if factor_loc_totest is not None and coef_to_test is None:
         col_indices = np.concatenate([np.where([
             fac in x
@@ -749,7 +753,7 @@ def wald_repeated(
     assert len(col_indices) > 0, "Could not find any matching columns!"
 
     # Check that all tested coefficients are independent:
-    constraints_loc = det.model_estim.model_container.model.constraints_loc
+    constraints_loc = det.model_estim.model_container.constraints_loc
     if isinstance(constraints_loc, dask.array.core.Array):
         constraints_loc = constraints_loc.compute()
     for x in col_indices:

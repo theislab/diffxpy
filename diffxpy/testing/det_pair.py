@@ -387,7 +387,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.model_estim.model_container.model.features)
+        return np.asarray(self.model_estim.model_container.features)
 
     @property
     def x(self):
@@ -395,11 +395,11 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
 
     @property
     def log_likelihood(self):
-        return self.model_estim.model_container.ll
+        return self.model_estim.model_container.ll # should be by gene/feature?
 
     @property
     def model_gradient(self):
-        return self.model_estim.model_container.jac
+        return self.model_estim.model_container.jac # should be by gene/feature?
 
     def _ave(self):
         """
@@ -580,7 +580,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.model_estim.model_container.model.features)
+        return np.asarray(self.model_estim.model_container.features)
 
     @property
     def x(self):
@@ -588,11 +588,11 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
 
     @property
     def log_likelihood(self):
-        return self.model_estim.model_container.ll
+        return self.model_estim.model_container.ll # should be by gene/feature?
 
     @property
     def model_gradient(self):
-        return self.model_estim.model_container.jac
+        return self.model_estim.model_container.jac # should be by gene/feature?
 
     def _ave(self):
         """
