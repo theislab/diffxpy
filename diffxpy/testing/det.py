@@ -739,11 +739,13 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
     @property
     def x(self):
-        return self.model_estim.x
+        return self.model_estim.model_container.x
 
     @property
     def model_gradient(self):
-        return self.model_estim.model_container.jac # should be by gene/feature?
+        return np.sum(
+            np.abs(self.model_estim.model_container.jac.compute() / self.model_estim.model_container.x.shape[0]), axis=1
+        )
 
     def log_fold_change(self, base=np.e, **kwargs):
         """
@@ -887,11 +889,11 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # Normalize by size factors that were used in regression.
         if self.model_estim.model_container.size_factors is not None:
             sf = np.broadcast_to(np.expand_dims(self.model_estim.model_container.size_factors, axis=1),
-                                 shape=self.model_estim.x.shape)
+                                 shape=self.model_estim.model_container.x.shape)
         else:
-            sf = np.ones(shape=(self.model_estim.x.shape[0], 1))
+            sf = np.ones(shape=(self.model_estim.model_container.x.shape[0], 1))
         ttest = t_test(
-            data=self.model_estim.x / sf,
+            data=self.model_estim.model_container.x / sf,
             grouping=grouping,
             gene_names=self.gene_ids,
         )
@@ -1256,7 +1258,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
             assert g in self.model_estim.model_container.features, "gene %g not found" % g
             g_idx = self.model_estim.model_container.features.index(g)
             # Raw data for boxplot:
-            y = self.model_estim.x[:, g_idx]
+            y = self.model_estim.model_container.x[:, g_idx]
             if isinstance(y, dask.array.core.Array):
                 y = y.compute()
             if isinstance(y, scipy.sparse.spmatrix) or isinstance(y, sparse.COO):

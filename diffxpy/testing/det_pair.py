@@ -371,7 +371,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
         _ = self.qval
 
     def _test(self, **kwargs):
-        pvals = np.tile(np.NaN, [len(self.groups), len(self.groups), self.model_estim.x.shape[1]])
+        pvals = np.tile(np.NaN, [len(self.groups), len(self.groups), self.model_estim.model_container.x.shape[1]])
         for i, g1 in enumerate(self.groups):
             for j, g2 in enumerate(self.groups[(i + 1):]):
                 j = j + i + 1
@@ -391,15 +391,17 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
 
     @property
     def x(self):
-        return self.model_estim.x
+        return self.model_estim.model_container.x
 
     @property
     def log_likelihood(self):
-        return self.model_estim.model_container.ll # should be by gene/feature?
+        return self.model_estim.model_container.ll_byfeature
 
     @property
     def model_gradient(self):
-        return self.model_estim.model_container.jac # should be by gene/feature?
+        return np.sum(
+            np.abs(self.model_estim.model_container.jac.compute() / self.model_estim.model_container.x.shape[0]), axis=1
+        )
 
     def _ave(self):
         """
@@ -408,7 +410,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
         :return: np.ndarray
         """
 
-        return np.asarray(np.mean(self.model_estim.x, axis=0)).flatten()
+        return np.asarray(np.mean(self.model_estim.model_container.x, axis=0)).flatten()
 
     def _pval_pairs(self, idx0, idx1):
         """
@@ -431,7 +433,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
         :param base: Base of logarithm.
         :return: log fold change values
         """
-        logfc = np.tile(np.NaN, [len(idx0), len(idx1), self.model_estim.x.shape[1]])
+        logfc = np.tile(np.NaN, [len(idx0), len(idx1), self.model_estim.model_container.x.shape[1]])
         for i, xi in enumerate(idx0):
             for j, xj in enumerate(idx1):
                 logfc[i, j, :] = self._theta_mle[xj, :] - self._theta_mle[xi, :]
@@ -563,7 +565,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
         :param idx1: List of indices of second set of group of observations in pair-wise comparison.
         :return: p-values
         """
-        pvals = np.tile(np.NaN, [len(idx0), len(idx1), self.model_estim.x.shape[1]])
+        pvals = np.tile(np.NaN, [len(idx0), len(idx1), self.model_estim.model_container.x.shape[1]])
         for i, xi in enumerate(idx0):
             for j, xj in enumerate(idx1):
                 if i != j:
@@ -584,15 +586,17 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
 
     @property
     def x(self):
-        return self.model_estim.x
+        return self.model_estim.model_container.x
 
     @property
     def log_likelihood(self):
-        return self.model_estim.model_container.ll # should be by gene/feature?
+        return self.model_estim.model_container.ll_byfeature # should be by gene/feature?
 
     @property
     def model_gradient(self):
-        return self.model_estim.model_container.jac # should be by gene/feature?
+        return np.sum(
+            np.abs(self.model_estim.model_container.jac.compute() / self.model_estim.model_container.x.shape[0]), axis=1
+        )
 
     def _ave(self):
         """
@@ -600,7 +604,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
 
         :return: np.ndarray
         """
-        return np.asarray(np.mean(self.model_estim.x, axis=0)).flatten()
+        return np.asarray(np.mean(self.model_estim.model_container.x, axis=0)).flatten()
 
     def _log_fold_change_pairs(self, idx0, idx1, base):
         """
