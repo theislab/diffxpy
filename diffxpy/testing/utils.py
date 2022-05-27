@@ -263,7 +263,7 @@ def constraint_system_from_star(
         as_numeric = list(as_numeric)
 
     if sample_description is not None:
-        as_categorical = [False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical = [x for x in sample_description.columns.values if x not in as_numeric]
     else:
         as_categorical = True
 
