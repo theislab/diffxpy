@@ -326,25 +326,25 @@ def lrt(
     full_design_loc, _ = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=full_formula_loc,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        as_categorical=[x for x in sample_description.columns.values if x not in as_numeric],
         return_type="patsy"
     )
     reduced_design_loc, _ = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_loc,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        as_categorical=[x for x in sample_description.columns.values if x not in as_numeric],
         return_type="patsy"
     )
     full_design_scale, _ = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=full_formula_scale,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        as_categorical=[x for x in sample_description.columns.values if x not in as_numeric],
         return_type="patsy"
     )
     reduced_design_scale, _ = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_scale,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        as_categorical=[x for x in sample_description.columns.values if x not in as_numeric],
         return_type="patsy"
     )
 

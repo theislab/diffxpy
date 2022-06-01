@@ -168,7 +168,7 @@ def design_matrix(
         sample_description = parse_sample_description(data, sample_description)
 
     if sample_description is not None:
-        as_categorical = [False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical = [x for x in sample_description.columns.values if x not in as_numeric]
     else:
         as_categorical = True
 
@@ -212,7 +212,7 @@ def preview_coef_names(
     return glm.utils.data.preview_coef_names(
         sample_description=sample_description,
         formula=formula,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical=[x for x in sample_description.columns.values if x not in as_numeric]
     )
 
 
@@ -266,6 +266,10 @@ def constraint_system_from_star(
         as_categorical = [x for x in sample_description.columns.values if x not in as_numeric]
     else:
         as_categorical = True
+    import logging
+
+    logger = logging.getLogger("diffxpy")
+    logger.error(as_categorical)
 
     return glm.utils.data.constraint_system_from_star(
         constraints,
