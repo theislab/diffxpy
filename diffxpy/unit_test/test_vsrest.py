@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+from batchglm.models.glm_nb import Model as NBModel
 
 import diffxpy.api as de
 
@@ -22,23 +23,26 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-        from batchglm.api.models.numpy.glm_nb import Simulator
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.nobs)
+            "condition": np.random.randint(n_groups, size=n_cells)
         })
 
         test = de.test.versus_rest(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             grouping="condition",
             test="wald",
             noise_model="nb",
             sample_description=random_sample_description,
-            batch_size=500,
+            # batch_size=(500, 500), # why was this here?
             training_strategy="DEFAULT",
             dtype="float64"
         )
@@ -65,23 +69,26 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.ERROR)
-        from batchglm.api.models.numpy.glm_nb import Simulator
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(2, size=n_cells)
         })
 
         test = de.test.versus_rest(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             grouping="condition",
             test="lrt",
             noise_model="nb",
             sample_description=random_sample_description,
-            batch_size=500,
+            # batch_size=(500, 500), # why was this here?
             training_strategy="DEFAULT",
             dtype="float64"
         )
@@ -108,18 +115,21 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-        from batchglm.api.models.numpy.glm_nb import Simulator
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.nobs)
+            "condition": np.random.randint(n_groups, size=n_cells)
         })
 
         test = de.test.versus_rest(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             grouping="condition",
             test="rank",
             sample_description=random_sample_description,
@@ -148,18 +158,21 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-        from batchglm.api.models.numpy.glm_norm import Simulator
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.nobs)
+            "condition": np.random.randint(n_groups, size=n_cells)
         })
 
         test = de.test.versus_rest(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             grouping="condition",
             test="t-test",
             sample_description=random_sample_description,
