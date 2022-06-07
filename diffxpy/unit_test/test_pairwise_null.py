@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+from batchglm.models.glm_nb import Model as NBModel
 
 import diffxpy.api as de
 
@@ -17,29 +18,32 @@ class _TestPairwiseNull:
             n_genes: int,
             n_groups: int
     ):
+
+
         if self.noise_model == "nb":
-            from batchglm.api.models.numpy.glm_nb import Simulator
             rand_fn_loc = lambda shape: np.random.uniform(0.1, 1, shape)
             rand_fn_scale = lambda shape: np.random.uniform(0.5, 1, shape)
-        elif self.noise_model == "norm" or self.noise_model is None:
-            from batchglm.api.models.numpy.glm_norm import Simulator
-            rand_fn_loc = lambda shape: np.random.uniform(500, 1000, shape)
-            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+        # elif self.noise_model == "norm" or self.noise_model is None:
+        #     from batchglm.api.models.numpy.glm_norm import Simulator
+        #     rand_fn_loc = lambda shape: np.random.uniform(500, 1000, shape)
+        #     rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
             raise ValueError("noise model %s not recognized" % self.noise_model)
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate_params(
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
             rand_fn_loc=rand_fn_loc,
             rand_fn_scale=rand_fn_scale
         )
-        sim.generate_data()
 
         random_sample_description = pd.DataFrame({
-            "condition": [str(x) for x in np.random.randint(n_groups, size=sim.nobs)]
+            "condition": [str(x) for x in np.random.randint(n_groups, size=n_cells)]
         })
-        return sim, random_sample_description
+        return model, random_sample_description
 
     def _test_null_distribution_basic(
             self,
@@ -59,13 +63,14 @@ class _TestPairwiseNull:
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
-        sim, sample_description = self._prepate_data(
+        model, sample_description = self._prepate_data(
             n_cells=n_cells,
             n_genes=n_genes,
             n_groups=n_groups
         )
         det = de.test.pairwise(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=sample_description,
             grouping="condition",
             test=test,
