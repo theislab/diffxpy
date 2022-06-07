@@ -3,6 +3,7 @@ import logging
 import numpy as np
 
 import diffxpy.api as de
+from batchglm.models.glm_nb import Model as NBModel
 
 
 class _TestSingleDe:
@@ -20,9 +21,9 @@ class _TestSingleDe:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.numpy.glm_nb import Simulator
             rand_fn_loc = lambda shape: np.random.uniform(5, 10, shape)
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+            model = NBModel()
         elif noise_model == "norm":
             from batchglm.api.models.numpy.glm_norm import Simulator
             rand_fn_loc = lambda shape: np.random.uniform(500, 1000, shape)
@@ -31,19 +32,20 @@ class _TestSingleDe:
             raise ValueError("noise model %s not recognized" % noise_model)
 
         num_non_de = n_genes // 2
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=2)
-        sim.generate_params(
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=2,
             rand_fn_loc=rand_fn_loc,
             rand_fn_scale=rand_fn_scale
         )
-        sim.a_var[1, :num_non_de] = 0
-        sim.b_var[1, :num_non_de] = 0
+        model.theta_location[1, :num_non_de] = 0
+        model.theta_scale[1, :num_non_de] = 0
         self.isDE = np.arange(n_genes) >= num_non_de
-        sim.generate_data()
-        return sim
+        return model
 
-    def _eval(self, sim, test):
+    def _eval(self, model, test):
         idx_de = np.where(self.isDE)[0]
         idx_nonde = np.where(np.logical_not(self.isDE))[0]
 
@@ -61,7 +63,7 @@ class _TestSingleDe:
         assert frac_de_of_non_de <= 0.1, "too many false-positives %f" % frac_de_of_non_de
         assert frac_de_of_de >= 0.5, "too many false-negatives %f" % frac_de_of_de
 
-        return sim
+        return model
 
     def _test_rank_de(
             self,
@@ -76,19 +78,20 @@ class _TestSingleDe:
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = self._prepare_data(
+        model = self._prepare_data(
             n_cells=n_cells,
             n_genes=n_genes,
             noise_model="norm"
         )
 
         test = de.test.rank_test(
-            data=sim.input_data,
-            sample_description=sim.sample_description,
+            data=model.x,
+            gene_names=model.features,
+            sample_description=model.sample_description,
             grouping="condition"
         )
 
-        self._eval(sim=sim, test=test)
+        self._eval(model=model, test=test)
 
         return True
 
@@ -105,19 +108,20 @@ class _TestSingleDe:
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = self._prepare_data(
+        model = self._prepare_data(
             n_cells=n_cells,
             n_genes=n_genes,
             noise_model="norm"
         )
 
         test = de.test.t_test(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             grouping="condition",
-            sample_description=sim.sample_description
+            sample_description=model.sample_description,
         )
 
-        self._eval(sim=sim, test=test)
+        self._eval(model=model, test=test)
 
         return True
 
@@ -136,15 +140,16 @@ class _TestSingleDe:
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = self._prepare_data(
+        model = self._prepare_data(
             n_cells=n_cells,
             n_genes=n_genes,
             noise_model=noise_model
         )
 
         test = de.test.wald(
-            data=sim.input_data,
-            sample_description=sim.sample_description,
+            data=model.x,
+            gene_names=model.features,
+            sample_description=model.sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition",
             noise_model=noise_model,
@@ -152,7 +157,7 @@ class _TestSingleDe:
             dtype="float64"
         )
 
-        self._eval(sim=sim, test=test)
+        self._eval(model=model, test=test)
 
         return True
 
@@ -171,15 +176,16 @@ class _TestSingleDe:
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = self._prepare_data(
+        model = self._prepare_data(
             n_cells=n_cells,
             n_genes=n_genes,
             noise_model=noise_model
         )
 
         test = de.test.lrt(
-            data=sim.input_data,
-            sample_description=sim.sample_description,
+            data=model.x,
+            gene_names=model.features,
+            sample_description=model.sample_description,
             full_formula_loc="~ 1 + condition",
             full_formula_scale="~ 1",
             reduced_formula_loc="~ 1",
@@ -189,7 +195,7 @@ class _TestSingleDe:
             dtype="float64"
         )
 
-        self._eval(sim=sim, test=test)
+        self._eval(model=model, test=test)
 
         return True
 
