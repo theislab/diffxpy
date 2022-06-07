@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+from batchglm.models.glm_nb import Model as NBModel
 
 import diffxpy.api as de
 
@@ -26,26 +27,29 @@ class _TestSingleNull:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.numpy.glm_nb import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+            model = NBModel()
+            model.generate_artificial_data(
+                n_obs=n_cells,
+                n_vars=n_genes,
+                num_batches=0,
+                num_conditions=0,
+                rand_fn_scale=rand_fn_scale
+            )
         elif noise_model == "norm":
             from batchglm.api.models.numpy.glm_norm import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate_params(rand_fn_scale=rand_fn_scale)
-        sim.generate_data()
-
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs),
-            "batch": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(2, size=n_cells),
+            "batch": np.random.randint(2, size=n_cells)
         })
 
         test = de.test.wald(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition + batch",
@@ -78,26 +82,29 @@ class _TestSingleNull:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.numpy.glm_nb import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+            model = NBModel()
+            model.generate_artificial_data(
+                n_obs=n_cells,
+                n_vars=n_genes,
+                num_batches=0,
+                num_conditions=0,
+                rand_fn_scale=rand_fn_scale
+            )
         elif noise_model == "norm":
             from batchglm.api.models.numpy.glm_norm import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate_params(rand_fn_scale=rand_fn_scale)
-        sim.generate_data()
-
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs),
-            "batch": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(2, size=n_cells),
+            "batch": np.random.randint(2, size=n_cells)
         })
 
         test1 = de.test.wald(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition + batch",
@@ -135,22 +142,25 @@ class _TestSingleNull:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.numpy.glm_nb import Simulator
+            model = NBModel()
+            model.generate_artificial_data(
+                n_obs=n_cells,
+                n_vars=n_genes,
+                num_batches=0,
+                num_conditions=0,
+            )
         elif noise_model == "norm":
             from batchglm.api.models.numpy.glm_norm import Simulator
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
-
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(4, size=sim.nobs)
+            "condition": np.random.randint(4, size=n_cells)
         })
 
         test = de.test.wald(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition",
@@ -183,22 +193,25 @@ class _TestSingleNull:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.numpy.glm_nb import Simulator
+            model = NBModel()
+            model.generate_artificial_data(
+                n_obs=n_cells,
+                n_vars=n_genes,
+                num_batches=0,
+                num_conditions=0,
+            )
         elif noise_model == "norm":
             from batchglm.api.models.numpy.glm_norm import Simulator
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
-
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(2, size=n_cells)
         })
 
         test = de.test.lrt(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             full_formula_loc="~ 1 + condition",
             full_formula_scale="~ 1",
@@ -237,7 +250,7 @@ class _TestSingleNull:
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(2, size=n_cells)
         })
 
         test = de.test.t_test(
@@ -277,7 +290,7 @@ class _TestSingleNull:
         sim.generate()
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(2, size=n_cells)
         })
 
         test = de.test.rank_test(

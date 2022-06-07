@@ -465,17 +465,17 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
     sample_description: pd.DataFrame
     full_design_loc_info: patsy.design_info
-    full_estim: glm.train.numpy.nb.model_container
+    full_estim: glm.train.numpy.nb.Estimator
     reduced_design_loc_info: patsy.design_info
-    reduced_estim: glm.train.numpy.nb.model_container
+    reduced_estim: glm.train.numpy.nb.Estimator
 
     def __init__(
             self,
             sample_description: pd.DataFrame,
             full_design_loc_info: patsy.design_info,
-            full_estim: glm.train.numpy.nb.model_container,
+            full_estim: glm.train.numpy.nb.Estimator,
             reduced_design_loc_info: patsy.design_info,
-            reduced_estim: glm.train.numpy.nb.model_container
+            reduced_estim: glm.train.numpy.nb.Estimator
     ):
         super().__init__()
         self.sample_description = sample_description
@@ -490,15 +490,20 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
     @property
     def x(self):
-        return self.full_estim.x
+        return self.full_estim.model_container.x
 
     @property
     def reduced_model_gradient(self):
-        return self.reduced_estim.jacobian
+        return np.sum(
+            np.abs(self.reduced_estim.model_container.jac.compute() / self.reduced_estim.model_container.x.shape[0]), axis=1
+        )
 
     @property
     def full_model_gradient(self):
-        return self.full_estim.jacobian
+        return np.sum(
+            np.abs(self.full_estim.model_container.jac.compute() / self.full_estim.model_container.x.shape[0]),
+            axis=1
+        )
 
     def _test(self):
         ll_full = self.full_estim.model_container.ll_byfeature
@@ -526,7 +531,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         :return: np.ndarray
         """
 
-        return np.asarray(np.mean(self.full_estim.x, axis=0)).flatten()
+        return np.asarray(np.mean(self.full_estim.model_container.x, axis=0)).flatten()
 
     def _log_fold_change(self, factors: Union[Dict, Tuple, Set, List], base=np.e):
         """
