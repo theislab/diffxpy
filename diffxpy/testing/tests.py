@@ -622,7 +622,7 @@ def wald(
         if not isinstance(design_loc, patsy.design_info.DesignMatrix):
             col_indices = np.where([
                 x in factor_loc_totest
-                for x in term_names_loc
+                for x in design_loc_names # should match the matrix it comes from?
             ])[0]
         else:
             # Select coefficients to test via formula model:
