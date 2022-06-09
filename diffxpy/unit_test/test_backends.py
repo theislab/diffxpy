@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 from batchglm.models.glm_nb import Model as NBModel
+from batchglm.models.glm_norm import Model as NormModel
 
 import diffxpy.api as de
 
@@ -27,14 +28,14 @@ class _TestSingleNullBackends:
         :param n_genes: Number of genes to simulate (number of tests).
         :param noise_model: Noise model to use for data fitting.
         """
-        # if noise_model == "nb":
-        #     from batchglm.api.models.numpy.glm_nb import Simulator
-        #     rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
-        # elif noise_model == "norm":
-        #     from batchglm.api.models.numpy.glm_norm import Simulator
-        rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+        if noise_model == "nb":
+            model = NBModel()
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+        elif noise_model == "norm":
+            model = NormModel()
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
 
-        model = NBModel()
+
         model.generate_artificial_data(
             n_obs=n_cells,
             n_vars=n_genes,
