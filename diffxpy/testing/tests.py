@@ -11,6 +11,7 @@ import pandas as pd
 import patsy
 import scipy.sparse
 from typing import Union, List, Dict, Callable, Tuple
+from batchglm.utils.input import InputDataGLM
 
 from diffxpy import pkg_constants
 from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, \
@@ -133,8 +134,10 @@ def _fit(
                 training_strategy = "DEFAULT"
         if noise_model == "nb" or noise_model == "negative_binomial":
             from batchglm.train.numpy.glm_nb import Estimator
-            from batchglm.utils.input import InputDataGLM
             from batchglm.models.glm_nb import Model
+        elif noise_model == "norm" or noise_model == "normal":
+            from batchglm.train.numpy.glm_norm import Estimator
+            from batchglm.models.glm_norm import Model
         else:
             raise ValueError('noise_model="%s" not recognized.' % noise_model)
         # Set default chunk size:
