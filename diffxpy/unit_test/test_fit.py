@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 
 import diffxpy.api as de
-
+from batchglm.models.glm_nb import Model as NBModel
+from batchglm.models.glm_norm import Model as NormModel
 
 class _TestFit:
 
@@ -25,12 +26,14 @@ class _TestFit:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.models.glm_nb import Model
+            model = NBModel()
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+        elif noise_model == "norm":
+            model = NormModel()
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
-        model = Model()
         model.generate_artificial_data(
             n_obs=n_cells,
             n_vars=n_genes,
@@ -70,12 +73,14 @@ class _TestFit:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.models.glm_nb import Model
+            model = NBModel()
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+        elif noise_model == "norm":
+            model = NormModel()
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
-        model = Model()
         model.generate_artificial_data(
             n_obs=n_cells,
             n_vars=n_genes,
@@ -118,11 +123,12 @@ class _TestFit:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.models.glm_nb import Model
+            model = NBModel()
+        elif noise_model == "norm":
+            model = NormModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
-        model = Model()
         model.generate_artificial_data(
             n_obs=n_cells,
             n_vars=n_genes,
@@ -217,76 +223,76 @@ class TestFitNb(_TestFit, unittest.TestCase):
         )
 
 
-# class TestFitNorm(_TestFit, unittest.TestCase):
-#     """
-#     Normal noise model unit tests that tests whether model fit relay works.
-#     """
-#
-#     def test_model_fit(
-#             self,
-#             n_cells: int = 2000,
-#             n_genes: int = 2
-#     ):
-#         """
-#         Test if model fit for "norm" noise model works.
-#
-#         :param n_cells: Number of cells to simulate (number of observations per test).
-#         :param n_genes: Number of genes to simulate (number of tests).
-#         """
-#         logging.getLogger("tensorflow").setLevel(logging.ERROR)
-#         logging.getLogger("batchglm").setLevel(logging.WARNING)
-#         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-#
-#         np.random.seed(1)
-#         return self._test_model_fit(
-#             n_cells=n_cells,
-#             n_genes=n_genes,
-#             noise_model="norm"
-#         )
-#
-#     def test_model_fit_partition(
-#             self,
-#             n_cells: int = 2000,
-#             n_genes: int = 2
-#     ):
-#         """
-#         Test if partitioned model fit for "norm" noise model works.
-#
-#         :param n_cells: Number of cells to simulate (number of observations per test).
-#         :param n_genes: Number of genes to simulate (number of tests).
-#         """
-#         logging.getLogger("tensorflow").setLevel(logging.ERROR)
-#         logging.getLogger("batchglm").setLevel(logging.WARNING)
-#         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-#
-#         np.random.seed(1)
-#         return self._test_model_fit_partition(
-#             n_cells=n_cells,
-#             n_genes=n_genes,
-#             noise_model="norm"
-#         )
-#
-#     def test_residuals_fit(
-#             self,
-#             n_cells: int = 2000,
-#             n_genes: int = 2
-#     ):
-#         """
-#         Test if residual fit for "norm" noise model works.
-#
-#         :param n_cells: Number of cells to simulate (number of observations per test).
-#         :param n_genes: Number of genes to simulate (number of tests).
-#         """
-#         logging.getLogger("tensorflow").setLevel(logging.ERROR)
-#         logging.getLogger("batchglm").setLevel(logging.WARNING)
-#         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-#
-#         np.random.seed(1)
-#         return self._test_residuals_fit(
-#             n_cells=n_cells,
-#             n_genes=n_genes,
-#             noise_model="norm"
-#         )
+class TestFitNorm(_TestFit, unittest.TestCase):
+    """
+    Normal noise model unit tests that tests whether model fit relay works.
+    """
+
+    def test_model_fit(
+            self,
+            n_cells: int = 2000,
+            n_genes: int = 2
+    ):
+        """
+        Test if model fit for "norm" noise model works.
+
+        :param n_cells: Number of cells to simulate (number of observations per test).
+        :param n_genes: Number of genes to simulate (number of tests).
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
+        return self._test_model_fit(
+            n_cells=n_cells,
+            n_genes=n_genes,
+            noise_model="norm"
+        )
+
+    def test_model_fit_partition(
+            self,
+            n_cells: int = 2000,
+            n_genes: int = 2
+    ):
+        """
+        Test if partitioned model fit for "norm" noise model works.
+
+        :param n_cells: Number of cells to simulate (number of observations per test).
+        :param n_genes: Number of genes to simulate (number of tests).
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
+        return self._test_model_fit_partition(
+            n_cells=n_cells,
+            n_genes=n_genes,
+            noise_model="norm"
+        )
+
+    def test_residuals_fit(
+            self,
+            n_cells: int = 2000,
+            n_genes: int = 2
+    ):
+        """
+        Test if residual fit for "norm" noise model works.
+
+        :param n_cells: Number of cells to simulate (number of observations per test).
+        :param n_genes: Number of genes to simulate (number of tests).
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
+        return self._test_residuals_fit(
+            n_cells=n_cells,
+            n_genes=n_genes,
+            noise_model="norm"
+        )
 
 
 if __name__ == '__main__':
