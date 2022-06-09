@@ -5,7 +5,7 @@ import pandas as pd
 import scipy.stats as stats
 import logging
 
-from batchglm.api.models.numpy.glm_nb import Simulator
+from batchglm.models.glm_nb import Model as NBModel
 import diffxpy.api as de
 
 
@@ -15,16 +15,16 @@ class _TestContinuous:
 
     def _fit_continuous(
         self,
-        sim,
+        model,
         sample_description,
         constrained,
         test,
         spline_basis
     ):
         test = de.test.continuous_1d(
-            data=sim.input_data,
+            data=model.x,
             sample_description=sample_description,
-            gene_names=["gene" + str(i) for i in range(sim.input_data.num_features)],
+            gene_names=model.features,
             formula_loc="~ 1 + continuous + batch" if constrained else "~ 1 + continuous",
             formula_scale="~ 1",
             factor_loc_totest="continuous",
@@ -41,16 +41,16 @@ class _TestContinuous:
 
     def _fit_continuous_interaction(
         self,
-        sim,
+        model,
         sample_description,
         constrained,
         test,
         spline_basis
     ):
         test = de.test.continuous_1d(
-            data=sim.input_data,
+            data=model.x,
             sample_description=sample_description,
-            gene_names=["gene" + str(i) for i in range(sim.input_data.num_features)],
+            gene_names=model.features,
             formula_loc="~ 1 + continuous + condition + continuous:condition" if not constrained else \
                 "~ 1 + continuous + condition + continuous:condition + batch",
             formula_scale="~ 1",
@@ -74,19 +74,23 @@ class _TestContinuous:
             spline_basis: str
     ):
         n_timepoints = 5
-        sim = Simulator(num_observations=n_timepoints*200, num_features=ngenes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate_params()
-        sim.generate_data()
+        model = NBModel()
+        nobs = n_timepoints*200
+        model.generate_artificial_data(
+            n_obs=nobs,
+            n_vars=ngenes,
+            num_batches=0,
+            num_conditions=0,
+        )
 
         random_sample_description = pd.DataFrame({
-            "continuous": np.asarray(np.random.randint(0, n_timepoints, size=sim.nobs), dtype=float)
+            "continuous": np.asarray(np.random.randint(0, n_timepoints, size=nobs), dtype=float)
         })
         random_sample_description["batch"] = [str(int(x)) + str(np.random.randint(0, 3))
                                               for x in random_sample_description["continuous"]]
-        random_sample_description["size_factors"] = np.random.uniform(0.9, 1.1, sim.nobs)  # TODO put into simulation.
+        random_sample_description["size_factors"] = np.random.uniform(0.9, 1.1, nobs)  # TODO put into simulation.
         det = self._fit_continuous(
-            sim=sim,
+            model=model,
             sample_description=random_sample_description,
             test=test,
             constrained=constrained,
@@ -102,21 +106,25 @@ class _TestContinuous:
             spline_basis: str
     ):
         n_timepoints = 5
-        sim = Simulator(num_observations=n_timepoints*200, num_features=ngenes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate_params()
-        sim.generate_data()
+        model = NBModel()
+        nobs = n_timepoints * 200
+        model.generate_artificial_data(
+            n_obs=nobs,
+            n_vars=ngenes,
+            num_batches=0,
+            num_conditions=0,
+        )
 
         random_sample_description = pd.DataFrame({
-            "continuous": np.asarray(np.random.randint(0, n_timepoints, size=sim.nobs), dtype=float)
+            "continuous": np.asarray(np.random.randint(0, n_timepoints, size=nobs), dtype=float)
         })
         random_sample_description["condition"] = [str(np.random.randint(0, 2))
                                                   for x in random_sample_description["continuous"]]
         random_sample_description["batch"] = [x + str(np.random.randint(0, 3))
                                               for x in random_sample_description["condition"]]
-        random_sample_description["size_factors"] = np.random.uniform(0.9, 1.1, sim.nobs)  # TODO put into simulation.
+        random_sample_description["size_factors"] = np.random.uniform(0.9, 1.1, nobs)  # TODO put into simulation.
         det = self._fit_continuous_interaction(
-            sim=sim,
+            model=model,
             sample_description=random_sample_description,
             test=test,
             constrained=constrained,
