@@ -34,8 +34,6 @@ class _TestSingleSfNull:
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
-        from batchglm.models.glm_nb import Model as NBModel
-
         model = NBModel()
         model.generate_artificial_data(
             n_obs=n_cells,
