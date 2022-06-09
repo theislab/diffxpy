@@ -5,6 +5,7 @@ import numpy as np
 import diffxpy.api as de
 
 from batchglm.models.glm_nb import Model as NBModel
+from batchglm.models.glm_nb import Model as NormModel
 
 class _TestContinuousDe:
     noise_model: str
@@ -20,7 +21,7 @@ class _TestContinuousDe:
             rand_fn_loc = lambda shape: np.random.uniform(2, 5, shape)
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         elif self.noise_model == "norm":
-            from batchglm.api.models.numpy.glm_norm import Simulator
+            model = NormModel()
             rand_fn_loc = lambda shape: np.random.uniform(500, 1000, shape)
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
