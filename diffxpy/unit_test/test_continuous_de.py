@@ -5,7 +5,7 @@ import numpy as np
 import diffxpy.api as de
 
 from batchglm.models.glm_nb import Model as NBModel
-from batchglm.models.glm_nb import Model as NormModel
+from batchglm.models.glm_norm import Model as NormModel
 
 class _TestContinuousDe:
     noise_model: str

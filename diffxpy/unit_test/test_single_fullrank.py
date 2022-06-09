@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from batchglm.models.glm_nb import Model as NBModel
+from batchglm.models.glm_norm import Model as NormModel
 
 import diffxpy.api as de
 
@@ -25,7 +26,7 @@ class _TestSingleFullRank(unittest.TestCase):
             model = NBModel()
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         elif self.noise_model == "norm":
-            from batchglm.api.models.numpy.glm_norm import Simulator
+            model = NormModel()
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
             raise ValueError("noise model %s not recognized" % self.noise_model)
