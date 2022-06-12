@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 from batchglm.models.glm_nb import Model as NBModel
+from batchglm.models.glm_norm import Model as NormModel
 
 import diffxpy.api as de
 
@@ -23,14 +24,15 @@ class _TestPairwiseNull:
         if self.noise_model == "nb":
             rand_fn_loc = lambda shape: np.random.uniform(0.1, 1, shape)
             rand_fn_scale = lambda shape: np.random.uniform(0.5, 1, shape)
-        # elif self.noise_model == "norm" or self.noise_model is None:
-        #     from batchglm.api.models.numpy.glm_norm import Simulator
-        #     rand_fn_loc = lambda shape: np.random.uniform(500, 1000, shape)
-        #     rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+            model = NBModel()
+        elif self.noise_model == "norm" or self.noise_model is None:
+            rand_fn_loc = lambda shape: np.random.uniform(500, 1000, shape)
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+            model = NormModel()
         else:
             raise ValueError("noise model %s not recognized" % self.noise_model)
 
-        model = NBModel()
+
         model.generate_artificial_data(
             n_obs=n_cells,
             n_vars=n_genes,
