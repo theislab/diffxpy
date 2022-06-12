@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 from batchglm.models.glm_nb import Model as NBModel
+from batchglm.models.glm_nb import Model as NormModel
 
 import diffxpy.api as de
 
@@ -29,18 +30,18 @@ class _TestSingleNull:
         if noise_model == "nb":
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
             model = NBModel()
-            model.generate_artificial_data(
-                n_obs=n_cells,
-                n_vars=n_genes,
-                num_batches=0,
-                num_conditions=0,
-                rand_fn_scale=rand_fn_scale
-            )
         elif noise_model == "norm":
-            from batchglm.api.models.numpy.glm_norm import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+            model = NormModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+            rand_fn_scale=rand_fn_scale
+        )
 
         random_sample_description = pd.DataFrame({
             "condition": np.random.randint(2, size=n_cells),
@@ -84,18 +85,18 @@ class _TestSingleNull:
         if noise_model == "nb":
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
             model = NBModel()
-            model.generate_artificial_data(
-                n_obs=n_cells,
-                n_vars=n_genes,
-                num_batches=0,
-                num_conditions=0,
-                rand_fn_scale=rand_fn_scale
-            )
         elif noise_model == "norm":
-            from batchglm.api.models.numpy.glm_norm import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+            model = NormModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+            rand_fn_scale=rand_fn_scale
+        )
 
         random_sample_description = pd.DataFrame({
             "condition": np.random.randint(2, size=n_cells),
@@ -143,17 +144,16 @@ class _TestSingleNull:
         """
         if noise_model == "nb":
             model = NBModel()
-            model.generate_artificial_data(
-                n_obs=n_cells,
-                n_vars=n_genes,
-                num_batches=0,
-                num_conditions=0,
-            )
         elif noise_model == "norm":
-            from batchglm.api.models.numpy.glm_norm import Simulator
+            model = NormModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
-
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+        )
         random_sample_description = pd.DataFrame({
             "condition": np.random.randint(4, size=n_cells)
         })
@@ -194,17 +194,16 @@ class _TestSingleNull:
         """
         if noise_model == "nb":
             model = NBModel()
-            model.generate_artificial_data(
-                n_obs=n_cells,
-                n_vars=n_genes,
-                num_batches=0,
-                num_conditions=0,
-            )
         elif noise_model == "norm":
-            from batchglm.api.models.numpy.glm_norm import Simulator
+            model = NormModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
-
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+        )
         random_sample_description = pd.DataFrame({
             "condition": np.random.randint(2, size=n_cells)
         })
@@ -243,18 +242,22 @@ class _TestSingleNull:
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
-        from batchglm.api.models.numpy.glm_norm import Simulator
+        model = NormModel()
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+        )
 
         random_sample_description = pd.DataFrame({
             "condition": np.random.randint(2, size=n_cells)
         })
 
         test = de.test.t_test(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             grouping="condition",
             is_logged=False
@@ -283,18 +286,21 @@ class _TestSingleNull:
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
-        from batchglm.api.models.numpy.glm_norm import Simulator
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NormModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+        )
 
         random_sample_description = pd.DataFrame({
             "condition": np.random.randint(2, size=n_cells)
         })
 
         test = de.test.rank_test(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             grouping="condition"
         )
