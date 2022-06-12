@@ -6,6 +6,7 @@ import scipy.stats as stats
 
 import diffxpy.api as de
 from batchglm.models.glm_nb import Model as NBModel
+from batchglm.models.glm_norm import Model as NormModel
 
 
 class _TestSingleSfNull:
@@ -28,13 +29,14 @@ class _TestSingleSfNull:
         """
         if noise_model == "nb":
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
-        # elif noise_model == "norm":
-        #     from batchglm.api.models.numpy.glm_norm import Simulator
-        #     rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+            model = NBModel()
+        elif noise_model == "norm":
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+            model = NormModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
-        model = NBModel()
+
         model.generate_artificial_data(
             n_obs=n_cells,
             n_vars=n_genes,
@@ -106,27 +108,27 @@ class TestSingleSfNullNorm(_TestSingleSfNull, unittest.TestCase):
     Normal noise model unit tests that test whether a test generates uniformly
     distributed p-values if data are sampled from the null model.
     """
-    # def test_null_distribution_wald_norm(
-    #         self,
-    #         n_cells: int = 200,
-    #         n_genes: int = 200
-    # ):
-    #     """
-    #     Test if wald() generates a uniform p-value distribution for "norm" noise model.
-    #
-    #     :param n_cells: Number of cells to simulate (number of observations per test).
-    #     :param n_genes: Number of genes to simulate (number of tests).
-    #     """
-    #     logging.getLogger("tensorflow").setLevel(logging.ERROR)
-    #     logging.getLogger("batchglm").setLevel(logging.WARNING)
-    #     logging.getLogger("diffxpy").setLevel(logging.WARNING)
-    #
-    #     np.random.seed(1)
-    #     return self._test_null_distribution_wald(
-    #         n_cells=n_cells,
-    #         n_genes=n_genes,
-    #         noise_model="norm"
-    #     )
+    def test_null_distribution_wald_norm(
+            self,
+            n_cells: int = 200,
+            n_genes: int = 200
+    ):
+        """
+        Test if wald() generates a uniform p-value distribution for "norm" noise model.
+
+        :param n_cells: Number of cells to simulate (number of observations per test).
+        :param n_genes: Number of genes to simulate (number of tests).
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
+        return self._test_null_distribution_wald(
+            n_cells=n_cells,
+            n_genes=n_genes,
+            noise_model="norm"
+        )
 
 
 if __name__ == '__main__':
