@@ -29,17 +29,23 @@ class _TestContinuousDe:
 
         n_timepoints = 7
 
+        num_non_de = round(ngenes / 2)
+        def theta_location_setter(x):
+            x[1, :num_non_de] = 0
+            return x
+        def theta_scale_setter(x):
+            x[1, :num_non_de] = 0
+            return x
         model.generate_artificial_data(
             n_obs=n_timepoints*200,
             n_vars=ngenes,
             num_batches=0,
             num_conditions=n_timepoints,
             rand_fn_loc=rand_fn_loc,
-            rand_fn_scale=rand_fn_scale
+            rand_fn_scale=rand_fn_scale,
+            theta_location_setter=theta_location_setter,
+            theta_scale_setter=theta_scale_setter
         )
-        num_non_de = round(ngenes / 2)
-        model.theta_location[1:, :num_non_de] = 0  # Set all condition effects of non DE genes to zero.
-        model.theta_scale[1:, :] = 0  # Use constant dispersion across all conditions.
         self.isDE = np.arange(ngenes) >= num_non_de
 
         random_sample_description = model.sample_description

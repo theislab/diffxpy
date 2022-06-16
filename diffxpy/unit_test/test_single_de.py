@@ -33,16 +33,22 @@ class _TestSingleDe:
             raise ValueError("noise model %s not recognized" % noise_model)
 
         num_non_de = n_genes // 2
+        def theta_location_setter(x):
+            x[1, :num_non_de] = 0
+            return x
+        def theta_scale_setter(x):
+            x[1, :num_non_de] = 0
+            return x
         model.generate_artificial_data(
             n_obs=n_cells,
             n_vars=n_genes,
             num_batches=0,
             num_conditions=2,
             rand_fn_loc=rand_fn_loc,
-            rand_fn_scale=rand_fn_scale
+            rand_fn_scale=rand_fn_scale,
+            theta_location_setter=theta_location_setter,
+            theta_scale_setter=theta_scale_setter,
         )
-        model.theta_location[1, :num_non_de] = 0
-        model.theta_scale[1, :num_non_de] = 0
         self.isDE = np.arange(n_genes) >= num_non_de
         return model
 
