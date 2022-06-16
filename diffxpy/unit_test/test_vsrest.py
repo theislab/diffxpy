@@ -7,7 +7,7 @@ from batchglm.models.glm_nb import Model as NBModel
 
 import diffxpy.api as de
 
-
+# NOTE: This test fails sometimes, and passes other times.
 class TestVsRest(unittest.TestCase):
 
     def test_null_distribution_wald(self, n_cells: int = 2000, n_genes: int = 100, n_groups: int = 2):
