@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 from batchglm.models.glm_nb import Model as NBModel
-from batchglm.models.glm_nb import Model as NormModel
+from batchglm.models.glm_norm import Model as NormModel
 
 import diffxpy.api as de
 
@@ -467,7 +467,7 @@ class TestSingleNullNorm(_TestSingleNull, unittest.TestCase):
     """
     def test_null_distribution_wald_norm(
             self,
-            n_cells: int = 200,
+            n_cells: int = 2000,
             n_genes: int = 200
     ):
         """
