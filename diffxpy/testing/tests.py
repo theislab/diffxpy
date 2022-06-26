@@ -671,7 +671,7 @@ def wald(
     col_indices = np.array([np.where(constraints_loc_temp[x, :] == 1)[0][0] for x in col_indices])
 
     # Fit model.
-    model = _fit(
+    estim = _fit(
         noise_model=noise_model,
         data=data,
         design_loc=design_loc,
@@ -695,7 +695,7 @@ def wald(
 
     # Prepare differential expression test.
     de_test = DifferentialExpressionTestWald(
-        model_estim=model,
+        model_estim=estim,
         col_indices=col_indices,
         noise_model=noise_model,
         sample_description=sample_description

@@ -806,7 +806,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         if len(self.coef_loc_totest) == 1:
             self.theta_mle = self.theta_mle[0]
             self.theta_sd = self.model_estim.model_container.fisher_inv[:, self.coef_loc_totest[0], self.coef_loc_totest[0]]
-            self.theta_sd = np.nextafter(0, np.inf, out=self.theta_sd, where=self.theta_sd < np.nextafter(0, np.inf))
+            self.theta_sd = np.nextafter(0, np.inf, self.theta_sd, where=self.theta_sd < np.nextafter(0, np.inf))
             self.theta_sd = np.sqrt(self.theta_sd)
             return stats.wald_test(
                 theta_mle=self.theta_mle,
