@@ -138,7 +138,7 @@ class TestContinuousDeNorm(_TestContinuousDe, unittest.TestCase):
 
         self.noise_model = "norm"
         np.random.seed(1)
-        # self._test_wald_de_all_splines(ngenes=100, constrained=False)
+        self._test_wald_de_all_splines(ngenes=100, constrained=False)
         self._test_wald_de_all_splines(ngenes=100, constrained=True)
         return True
 
