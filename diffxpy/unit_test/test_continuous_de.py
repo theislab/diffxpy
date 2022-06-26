@@ -31,10 +31,10 @@ class _TestContinuousDe:
 
         num_non_de = round(ngenes / 2)
         def theta_location_setter(x):
-            x[1, :num_non_de] = 0
+            x[1:, :num_non_de] = 0
             return x
         def theta_scale_setter(x):
-            x[1, :num_non_de] = 0
+            x[1:, :] = 0
             return x
         model.generate_artificial_data(
             n_obs=n_timepoints*200,
@@ -138,7 +138,7 @@ class TestContinuousDeNorm(_TestContinuousDe, unittest.TestCase):
 
         self.noise_model = "norm"
         np.random.seed(1)
-        self._test_wald_de_all_splines(ngenes=100, constrained=False)
+        # self._test_wald_de_all_splines(ngenes=100, constrained=False)
         self._test_wald_de_all_splines(ngenes=100, constrained=True)
         return True
 
