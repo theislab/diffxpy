@@ -28,7 +28,7 @@ class TestSingleExternalLibs(unittest.TestCase):
     def _eval(self, test, ref_pvals):
         test_pval = test.pval
         pval_dev = np.abs(test_pval - ref_pvals)
-        log_pval_dev = np.abs(np.log(test_pval+1e-200) - np.log(ref_pvals+1e-200))
+        log_pval_dev = np.abs(np.log(test_pval+1e-8) - np.log(ref_pvals+1e-8))
         max_dev = np.max(pval_dev)
         max_log_dev = np.max(log_pval_dev)
         mean_dev = np.mean(log_pval_dev)
