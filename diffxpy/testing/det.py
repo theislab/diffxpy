@@ -791,6 +791,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         :return: np.ndarray
         """
+        # https://github.com/dask/dask/issues/7169
         x = self.x
         if isinstance(x, dask.array.core.Array):
             x = x.compute()
