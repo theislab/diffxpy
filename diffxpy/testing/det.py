@@ -791,7 +791,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
         :return: np.ndarray
         """
-        return np.asarray(self.x.mean(axis=0)).flatten()
+        x = self.x
+        if isinstance(x, dask.array.core.Array):
+            x = x.compute()
+        return np.asarray(x.mean(axis=0)).flatten()
 
     def _test(self):
         """
