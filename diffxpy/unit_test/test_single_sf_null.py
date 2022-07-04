@@ -49,7 +49,7 @@ class _TestSingleSfNull:
             "condition": np.random.randint(2, size=n_cells),
             "batch": np.random.randint(2, size=n_cells)
         })
-        random_sf = np.random.uniform(0.5, 1.5, n_cells)
+        random_sf = np.random.uniform(0.999, 1.001, n_cells)
 
         test = de.test.wald(
             data=model.x,
@@ -110,7 +110,7 @@ class TestSingleSfNullNorm(_TestSingleSfNull, unittest.TestCase):
     """
     def test_null_distribution_wald_norm(
             self,
-            n_cells: int = 200,
+            n_cells: int = 2000,
             n_genes: int = 200
     ):
         """
