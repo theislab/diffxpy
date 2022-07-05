@@ -1,9 +1,7 @@
 import logging
-import anndata
 import numpy as np
-import scipy.sparse
 import unittest
-
+import scanpy as sc
 import batchglm.api as glm
 import diffxpy.api as de
 
@@ -23,20 +21,23 @@ class TestAccuracyGlmNb(
         logger.error("TestAccuracyGlmNb.test_full_nb()")
 
         np.random.seed(1)
-        adata = anndata.read_h5ad("/Users/david.fischer/Desktop/test.h5ad")
-        TF = "Ascl1"
+        adata = sc.datasets.pbmc3k()
+        tf = "MALAT1"
+        ind = adata.var.index.get_loc(tf)
+        log_cd4 = sc.pp.log1p(adata[:, tf].X.todense())
+        adata.obs[tf + "_log"] = log_cd4
         temp = de.test.continuous_1d(
-            data=adata[:, :10],
-            formula_loc="~ 1 +" + TF + "_log",  # + " + log_sf",
-            formula_scale="~ 1 +" + TF + "_log",  # + " + log_sf",
-            factor_loc_totest=TF + "_log",
-            continuous=TF + "_log",
-            as_numeric=[TF + "_log"],  # "log_sf"],
+            data=adata[:, (ind - 5):(ind + 5)],
+            formula_loc="~ 1 +" + tf + "_log",  # + " + log_sf",
+            formula_scale="~ 1",
+            factor_loc_totest=tf + "_log",
+            continuous=tf + "_log",
+            as_numeric=[tf + "_log"],  # "log_sf"],
             df=4,
             quick_scale=False,
             init_a="all_zero",
             size_factors=None,
-            noise_model="poisson",
+            noise_model="nb",
             backend="numpy"
         )
         _ = temp.summary()

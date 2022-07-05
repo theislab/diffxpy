@@ -2132,7 +2132,7 @@ def continuous_1d(
         as_numeric = list(as_numeric)
 
     gene_names = parse_gene_names(data, gene_names)
-    sample_description = parse_sample_description(data, sample_description)
+    sample_description = parse_sample_description(data, sample_description).copy() # need copy to reset values.
 
     # Check that continuous factor is contained in sample description and is numeric.
     if continuous not in sample_description.columns:
