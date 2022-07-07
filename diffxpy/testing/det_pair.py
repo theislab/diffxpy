@@ -358,10 +358,10 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
         self.groups = list(np.asarray(groups))
 
         # Values of parameter estimates: coefficients x genes array with one coefficient per group
-        self._theta_mle = model_estim.a_var
+        self._theta_mle = model_estim.model_container.theta_location
         # Standard deviation of estimates: coefficients x genes array with one coefficient per group
         # Need .copy() here as nextafter needs mutabls copy.
-        theta_sd = np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1).T.copy()
+        theta_sd = np.diagonal(model_estim.model_container.fisher_inv, axis1=-2, axis2=-1).T.copy()
         theta_sd = np.nextafter(0, np.inf, out=theta_sd, where=theta_sd < np.nextafter(0, np.inf))
         self._theta_sd = np.sqrt(theta_sd)
         self._logfc = None
@@ -550,10 +550,10 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
             self.groups = groups.tolist()
 
         # Values of parameter estimates: coefficients x genes array with one coefficient per group
-        self._theta_mle = model_estim.a_var
+        self._theta_mle = model_estim.model_container.theta_location
         # Standard deviation of estimates: coefficients x genes array with one coefficient per group
         # Need .copy() here as nextafter needs mutabls copy.
-        theta_sd = np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1).T.copy()
+        theta_sd = np.diagonal(model_estim.model_container.fisher_inv, axis1=-2, axis2=-1).T.copy()
         theta_sd = np.nextafter(0, np.inf, out=theta_sd, where=theta_sd < np.nextafter(0, np.inf))
         self._theta_sd = np.sqrt(theta_sd)
 
