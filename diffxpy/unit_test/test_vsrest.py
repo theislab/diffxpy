@@ -148,7 +148,8 @@ class TestVsRest(unittest.TestCase):
 
         return True
 
-    def test_null_distribution_ttest(self, n_cells: int = 2000, n_genes: int = 100, n_groups: int = 2):
+    # NOTE: This test fails sometimes, and passes other times when the groups or loc are less extreme.
+    def test_null_distribution_ttest(self, n_cells: int = 2000, n_genes: int = 100, n_groups: int = 4):
         """
         Test if de.test_wald_loc() generates a uniform p-value distribution
         if it is given data simulated based on the null model. Returns the p-value
@@ -161,6 +162,8 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
+        rand_fn_loc = lambda shape: np.random.uniform(9, 10, shape)
+        rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         model = NBModel()
         model.generate_artificial_data(
             n_obs=n_cells,
