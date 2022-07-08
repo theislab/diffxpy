@@ -24,11 +24,15 @@ class TestVsRest(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
         model = NBModel()
+        rand_fn_loc = lambda shape: np.random.uniform(2, 5, shape)
+        rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         model.generate_artificial_data(
             n_obs=n_cells,
             n_vars=n_genes,
             num_batches=0,
-            num_conditions=0
+            num_conditions=0,
+            rand_fn_loc=rand_fn_loc,
+            rand_fn_scale=rand_fn_scale
         )
 
         random_sample_description = pd.DataFrame({
