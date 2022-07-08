@@ -13,6 +13,9 @@ from random import sample
 import scipy.sparse
 import sparse
 from typing import Union, Dict, Tuple, List, Set
+from batchglm.models.glm_norm import Model
+from batchglm.utils.input import InputDataGLM
+from batchglm.train.numpy.glm_norm import Estimator
 
 from .utils import split_x, dmat_unique
 from ..stats import stats
@@ -968,7 +971,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         import matplotlib.pyplot as plt
         from matplotlib import gridspec
         from matplotlib import rcParams
-        from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
+
 
         plt.ioff()
 
@@ -983,12 +986,12 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 size_factors=self.model_estim.model_container.size_factors,
                 feature_names=self.model_estim.model_container.features,
             )
+            model = Model(input_data=input_data_ols)
             estim_ols = Estimator(
-                input_data=input_data_ols,
+                model=model,
                 init_model=None,
                 init_a="standard",
                 init_b="standard",
-                dtype=self.model_estim.model_container.theta_location.dtype
             )
             estim_ols.initialize()
             store_ols = estim_ols.finalize()
@@ -999,7 +1002,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         # Prepare parameter summary of both model fits.
         par_loc = self.model_estim.model_container.data.coords["design_loc_params"].values
 
-        theta_location_ols = store_ols.theta_location
+        theta_location_ols = store_ols.model_container.theta_location
         theta_location_ols[1:, :] = (theta_location_ols[1:, :] + theta_location_ols[[0], :]) / theta_location_ols[[0], :]
 
         theta_location_user = self.model_estim.model_container.theta_location
@@ -1107,7 +1110,6 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         import matplotlib.pyplot as plt
         from matplotlib import gridspec
         from matplotlib import rcParams
-        from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
 
         plt.ioff()
 
@@ -1122,12 +1124,12 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 size_factors=self.model_estim.model_container.size_factors,
                 feature_names=self.model_estim.model_container.features,
             )
+            model = Model(input_data=input_data_ols)
             estim_ols = Estimator(
-                input_data=input_data_ols,
+                model=model,
                 init_model=None,
                 init_a="standard",
                 init_b="standard",
-                dtype=self.model_estim.model_container.theta_location.dtype
             )
             estim_ols.initialize()
             store_ols = estim_ols.finalize()
@@ -1164,8 +1166,8 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         y_user = self.model_estim.model_container.inverse_link_loc(
             np.matmul(self.model_estim.model_container.design_loc[pred_n_cells, :], self.model_estim.model_container.theta_location).flatten()
         )
-        y_ols = store_ols.inverse_link_loc(
-            np.matmul(store_ols.design_loc[pred_n_cells, :], store_ols.theta_location).flatten()
+        y_ols = store_ols.model_container.inverse_link_loc(
+            np.matmul(store_ols.model_container.design_loc[pred_n_cells, :], store_ols.model_container.theta_location).flatten()
         )
         if log1p_transform:
             x = np.log(x+1)
