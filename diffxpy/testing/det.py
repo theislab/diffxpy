@@ -652,7 +652,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
         dmat, sample_description = dmat_unique(dmat, sample_description)
 
-        retval = self.full_estim.inverse_link_scale(dmat.doc(self.full_estim.par_link_scale))
+        retval = self.full_estim.model_container.inverse_link_scale(dmat.doc(self.full_estim.par_link_scale))
         retval = pd.DataFrame(retval, columns=self.full_estim.model_container.features)
         for col in sample_description:
             retval[col] = sample_description[col]
@@ -698,7 +698,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     Single wald test per gene.
     """
 
-    model_estim: glm.train.base.BaseModelContainer
+    model_estim: glm.train.base.BaseEstimatorGlm
     sample_description: pd.DataFrame
     coef_loc_totest: np.ndarray
     theta_mle: np.ndarray
@@ -708,7 +708,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
     def __init__(
             self,
-            model_estim: glm.train.base.BaseModelContainer,
+            model_estim: glm.train.base.BaseEstimatorGlm,
             col_indices: np.ndarray,
             noise_model: str,
             sample_description: pd.DataFrame
@@ -726,16 +726,16 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
         self._store_ols = None
 
         try:
-            if self.model_estim.error_codes is not None:
-                self._error_codes = self.model_estim.error_codes
+            if self.model_estim.model_container.error_codes is not None:
+                self._error_codes = self.model_estim.model_container.error_codes
             else:
                 self._error_codes = None
         except Exception as e:
             self._error_codes = None
 
         try:
-            if self.model_estim.niter is not None:
-                self._niter = self.model_estim.niter
+            if self.model_estim.model_container.niter is not None:
+                self._niter = self.model_estim.model_container.niter
             else:
                 self._niter = None
         except Exception as e:

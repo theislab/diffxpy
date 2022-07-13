@@ -341,13 +341,13 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
     lazy test evaluation.
     """
 
-    model_estim: glm.train.base.BaseModelContainer
+    model_estim: glm.train.base.BaseEstimatorGlm
     theta_mle: np.ndarray
     theta_sd: np.ndarray
 
     def __init__(
             self,
-            model_estim: glm.train.base.BaseModelContainer,
+            model_estim: glm.train.base.BaseEstimatorGlm,
             grouping,
             groups,
             correction_type: str
@@ -528,13 +528,13 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
     memory.
     """
 
-    model_estim: glm.train.base.BaseModelContainer
+    model_estim: glm.train.base.BaseEstimatorGlm
     _theta_mle: np.ndarray
     _theta_sd: np.ndarray
 
     def __init__(
             self,
-            model_estim: glm.train.base.BaseModelContainer,
+            model_estim: glm.train.base.BaseEstimatorGlm,
             grouping, groups,
             correction_type="global"
     ):
