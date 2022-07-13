@@ -45,7 +45,6 @@ class TestVsRest(unittest.TestCase):
             test="wald",
             noise_model="nb",
             sample_description=random_sample_description,
-            # batch_size=(500, 500), # why was this here?
             training_strategy="DEFAULT",
             dtype="float64"
         )
@@ -91,7 +90,6 @@ class TestVsRest(unittest.TestCase):
             test="lrt",
             noise_model="nb",
             sample_description=random_sample_description,
-            # batch_size=(500, 500), # why was this here?
             training_strategy="DEFAULT",
             dtype="float64"
         )
