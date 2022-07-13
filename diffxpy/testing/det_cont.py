@@ -20,7 +20,7 @@ logger = logging.getLogger("diffxpy")
 
 class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
     _de_test: _DifferentialExpressionTestSingle
-    _model_estim: glm.train.numpy.nb.model_container
+    _model_estim: glm.train.base.BaseModelContainer
     _size_factors: np.ndarray
     _continuous_coords: np.ndarray
     _spline_coefs: list
@@ -28,7 +28,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
     def __init__(
             self,
             de_test: _DifferentialExpressionTestSingle,
-            model_estim: glm.train.numpy.nb.model_container,
+            model_estim: glm.train.base.BaseModelContainer,
             size_factors: np.ndarray,
             continuous_coords: np.ndarray,
             spline_coefs: list,

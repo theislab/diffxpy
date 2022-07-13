@@ -698,7 +698,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
     Single wald test per gene.
     """
 
-    model_estim: glm.train.numpy.nb.model_container
+    model_estim: glm.train.base.BaseModelContainer
     sample_description: pd.DataFrame
     coef_loc_totest: np.ndarray
     theta_mle: np.ndarray
@@ -708,7 +708,7 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
 
     def __init__(
             self,
-            model_estim: glm.train.numpy.nb.model_container,
+            model_estim: glm.train.base.BaseModelContainer,
             col_indices: np.ndarray,
             noise_model: str,
             sample_description: pd.DataFrame
