@@ -75,52 +75,6 @@ class TestSingleNullBackendsNb(_TestSingleNullBackends, unittest.TestCase):
     distributed p-values if data are sampled from the null model.
     """
 
-    # def test_null_distribution_wald_nb_tf1(
-    #         self,
-    #         n_cells: int = 2000,
-    #         n_genes: int = 200
-    # ):
-    #     """
-    #     Test if wald() generates a uniform p-value distribution for "nb" noise model under tf1 backend
-    #
-    #     :param n_cells: Number of cells to simulate (number of observations per test).
-    #     :param n_genes: Number of genes to simulate (number of tests).
-    #     """
-    #     logging.getLogger("tensorflow").setLevel(logging.ERROR)
-    #     logging.getLogger("batchglm").setLevel(logging.WARNING)
-    #     logging.getLogger("diffxpy").setLevel(logging.WARNING)
-    #
-    #     np.random.seed(1)
-    #     _ = self._test_null_distribution_wald(
-    #         n_cells=n_cells,
-    #         n_genes=n_genes,
-    #         noise_model="nb",
-    #         backend="tf1"
-    #     )
-    #
-    # def test_null_distribution_wald_nb_tf2(
-    #         self,
-    #         n_cells: int = 2000,
-    #         n_genes: int = 200
-    # ):
-    #     """
-    #     Test if wald() generates a uniform p-value distribution for "nb" noise model under tf2 backend
-    #
-    #     :param n_cells: Number of cells to simulate (number of observations per test).
-    #     :param n_genes: Number of genes to simulate (number of tests).
-    #     """
-    #     logging.getLogger("tensorflow").setLevel(logging.ERROR)
-    #     logging.getLogger("batchglm").setLevel(logging.WARNING)
-    #     logging.getLogger("diffxpy").setLevel(logging.WARNING)
-    #
-    #     np.random.seed(1)
-    #     _ = self._test_null_distribution_wald(
-    #         n_cells=n_cells,
-    #         n_genes=n_genes,
-    #         noise_model="nb",
-    #         backend="tf2"
-    #     )
-
     def test_null_distribution_wald_nb_numpy(
             self,
             n_cells: int = 2000,
