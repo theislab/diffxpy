@@ -45,7 +45,7 @@ class TestConstrained(unittest.TestCase):
         dmat_est = pd.DataFrame(data=dmat, columns=coefficient_names)
 
         dmat_est_loc, _ = de.utils.design_matrix(dmat=dmat_est, return_type="dataframe")
-        dmat_est_scale, _ = de.utils.design_matrix(dmat=dmat_est, return_type="dataframe")
+        dmat_est_scale, _ = de.utils.design_matrix(dmat=pd.DataFrame(dmat_est['intercept']), return_type="dataframe")
 
         # Build constraints:
         constraints_loc = de.utils.constraint_matrix_from_string(
@@ -53,11 +53,7 @@ class TestConstrained(unittest.TestCase):
             coef_names=dmat_est_loc.columns,
             constraints=["bio1+bio2=0", "bio3+bio4=0"]
         )
-        constraints_scale = de.utils.constraint_matrix_from_string(
-            dmat=dmat_est_scale.values,
-            coef_names=dmat_est_scale.columns,
-            constraints=["bio1+bio2=0", "bio3+bio4=0"]
-        )
+        constraints_scale = None
 
         test = de.test.wald(
             data=model.x,
@@ -101,9 +97,9 @@ class TestConstrained(unittest.TestCase):
             gene_names=model.features,
             sample_description=sample_description,
             formula_loc="~1+cond+batch",
-            formula_scale="~1+cond+batch",
+            formula_scale="~1",
             constraints_loc={"batch": "cond"},
-            constraints_scale={"batch": "cond"},
+            constraints_scale=None,
             coef_to_test=["cond[T.cond1]"]
         )
         _ = test.summary()
@@ -144,9 +140,9 @@ class TestConstrained(unittest.TestCase):
             gene_names=model.features,
             sample_description=sample_description,
             formula_loc="~1+cond+batch",
-            formula_scale="~1+cond+batch",
+            formula_scale="~1",
             constraints_loc={"batch": "cond"},
-            constraints_scale={"batch": "cond"},
+            constraints_scale=None,
             coef_to_test=["cond[T.cond1]"]
         )
         _ = test.summary()
