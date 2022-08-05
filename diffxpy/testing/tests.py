@@ -1188,15 +1188,20 @@ def pairwise(
 
     if test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest':
         # -1 in formula removes intercept
-        dmat, _ = glm.utils.data.design_matrix(
+        dmat_loc, _ = glm.utils.data.design_matrix(
             sample_description,
             formula="~ 1 - 1 + grouping"
+        )
+        # Only intercept scale model
+        dmat_scale, _ = glm.utils.data.design_matrix(
+            sample_description,
+            formula="~ 1"
         )
         model = _fit(
             noise_model=noise_model,
             data=data,
-            design_loc=dmat,
-            design_scale=dmat,
+            design_loc=dmat_loc,
+            design_scale=dmat_scale,
             gene_names=gene_names,
             size_factors=size_factors,
             init_a="closed_form",
