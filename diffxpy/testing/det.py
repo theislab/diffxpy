@@ -468,17 +468,17 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
     sample_description: pd.DataFrame
     full_design_loc_info: patsy.design_info
-    full_estim: glm.train.numpy.glm_nb.Estimator
+    full_estim: glm.train.numpy.glm_base.Estimator
     reduced_design_loc_info: patsy.design_info
-    reduced_estim: glm.train.numpy.glm_nb.Estimator
+    reduced_estim: glm.train.numpy.glm_base.Estimator
 
     def __init__(
             self,
             sample_description: pd.DataFrame,
             full_design_loc_info: patsy.design_info,
-            full_estim: glm.train.numpy.glm_nb.Estimator,
+            full_estim: glm.train.numpy.glm_base.Estimator,
             reduced_design_loc_info: patsy.design_info,
-            reduced_estim: glm.train.numpy.glm_nb.Estimator
+            reduced_estim: glm.train.numpy.glm_base.Estimator
     ):
         super().__init__()
         self.sample_description = sample_description

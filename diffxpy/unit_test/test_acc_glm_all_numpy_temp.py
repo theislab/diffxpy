@@ -9,17 +9,14 @@ glm.setup_logging(verbosity="WARNING", stream="STDOUT")
 logger = logging.getLogger(__name__)
 
 
-class TestAccuracyGlmNb(
+class TestConvergence(
     unittest.TestCase
 ):
     """
     Test whether optimizers yield exact results for negative binomial distributed data.
     """
 
-    def test_full_nb(self):
-        logging.getLogger("batchglm").setLevel(logging.INFO)
-        logger.error("TestAccuracyGlmNb.test_full_nb()")
-
+    def _test_full_model(self, noise_model):
         np.random.seed(1)
         adata = sc.datasets.pbmc3k()
         tf = "MALAT1"
@@ -37,10 +34,14 @@ class TestAccuracyGlmNb(
             quick_scale=False,
             init_a="all_zero",
             size_factors=None,
-            noise_model="nb",
+            noise_model=noise_model,
             backend="numpy"
         )
         _ = temp.summary()
+
+    def test(self):
+        for noise_model in ['norm', 'poisson', 'nb']:
+            self._test_full_model(noise_model)
 
 
 if __name__ == '__main__':
