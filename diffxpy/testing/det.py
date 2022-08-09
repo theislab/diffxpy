@@ -542,7 +542,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
         :param factors: the factors to select.
             E.g. `condition` or `batch` if formula would be `~ 1 + batch + condition`
-        :param base: the log base to use; default is the natural logarithm
+        :param base: the log base_glmm to use; default is the natural logarithm
         :return: np.ndarray
         """
 
@@ -590,7 +590,7 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
         Returns some distance matrix representation of size (groups x groups x genes) where groups corresponds
         to the unique groups compared in this differential expression test.
 
-        :param base: the log base to use; default is the natural logarithm
+        :param base: the log base_glmm to use; default is the natural logarithm
         :param return_type: Choose the return type.
             Possible values are:
 

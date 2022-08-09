@@ -53,18 +53,20 @@ def _fit(
     :param design_loc: Design matrix of location model.
     :param design_loc: Design matrix of scale model.
     :param constraints_loc: : Constraints for location model.
-        Array with constraints in rows and model parameters in columns.
-        Each constraint contains non-zero entries for the a of parameters that
-        has to sum to zero. This constraint is enforced by binding one parameter
+        Array with constraints in columns and model parameters in rows.
+        Each constraint contains non-zero entries for the constrained parameters that
+        have to sum to zero. For a non-constrained parameter the revelant constraint column 
+        contains 1 in the parameter row. This constraint is enforced by binding one parameter
         to the negative sum of the other parameters, effectively representing that
         parameter as a function of the other parameters. This dependent
         parameter is indicated by a -1 in this array, the independent parameters
         of that constraint (which may be dependent at an earlier constraint)
         are indicated by a 1.
     :param constraints_scale: : Constraints for scale model.
-        Array with constraints in rows and model parameters in columns.
-        Each constraint contains non-zero entries for the a of parameters that
-        has to sum to zero. This constraint is enforced by binding one parameter
+        Array with constraints in columns and model parameters in rows.
+        Each constraint contains non-zero entries for the constrained parameters that
+        have to sum to zero. For a non-constrained parameter the revelant constraint column 
+        contains 1 in the parameter row. This constraint is enforced by binding one parameter
         to the negative sum of the other parameters, effectively representing that
         parameter as a function of the other parameters. This dependent
         parameter is indicated by a -1 in this array, the independent parameters
@@ -479,9 +481,10 @@ def wald(
     :param constraints_loc: Constraints for location model. Can be one of the following:
 
             - np.ndarray:
-                Array with constraints in rows and model parameters in columns.
-                Each constraint contains non-zero entries for the a of parameters that
-                has to sum to zero. This constraint is enforced by binding one parameter
+                Array with constraints in columns and model parameters in rows.
+                Each constraint contains non-zero entries for the constrained parameters that
+                have to sum to zero. For a non-constrained parameter the revelant constraint column 
+                contains 1 in the parameter row. This constraint is enforced by binding one parameter
                 to the negative sum of the other parameters, effectively representing that
                 parameter as a function of the other parameters. This dependent
                 parameter is indicated by a -1 in this array, the independent parameters
@@ -512,9 +515,10 @@ def wald(
     :param constraints_scale: Constraints for scale model. Can be one of the following:
 
             - np.ndarray:
-                Array with constraints in rows and model parameters in columns.
-                Each constraint contains non-zero entries for the a of parameters that
-                has to sum to zero. This constraint is enforced by binding one parameter
+                Array with constraints in columns and model parameters in rows.
+                Each constraint contains non-zero entries for the constrained parameters that
+                have to sum to zero. For a non-constrained parameter the revelant constraint column 
+                contains 1 in the parameter row. This constraint is enforced by binding one parameter
                 to the negative sum of the other parameters, effectively representing that
                 parameter as a function of the other parameters. This dependent
                 parameter is indicated by a -1 in this array, the independent parameters
@@ -654,7 +658,10 @@ def wald(
                 as_numeric=as_numeric
             )
         else:
-            coef_loc_names = dmat_loc.columns.tolist()
+            if isinstance(dmat_loc, patsy.design_info.DesignMatrix):
+                coef_loc_names = dmat_loc.design_info.column_names
+            else:
+                coef_loc_names = dmat_loc.columns.tolist()
         if not np.all([x in coef_loc_names for x in coef_to_test]):
             raise ValueError(
                 "the requested test coefficients %s were found in model coefficients %s" %
@@ -745,15 +752,15 @@ def wald_repeated(
     elif factor_loc_totest is None and coef_to_test is not None:
         if not np.all([x in par_loc_names for x in coef_to_test]):
             raise ValueError(
-                "the requested test coefficients %s were found in model coefficients %s" %
+                "the requested test coefficients %s were not found in model coefficients %s" %
                 (", ".join([x for x in coef_to_test if x not in par_loc_names]),
                  ", ".join(par_loc_names))
             )
         col_indices = np.asarray([
             par_loc_names.index(x) for x in coef_to_test
         ])
-    elif factor_loc_totest is None and coef_to_test is None:
-        raise ValueError("Do not supply factor_loc_totest and coef_to_test in wald_repeated, run a new wald test.")
+    elif factor_loc_totest is not None and coef_to_test is not None:
+        raise ValueError("Do not supply both factor_loc_totest and coef_to_test in wald_repeated.")
     else:
         raise ValueError("Either set factor_loc_totest or coef_to_test.")
     assert len(col_indices) > 0, "Could not find any matching columns!"
@@ -1861,9 +1868,10 @@ class _Partition:
             This makes sense for number of genes, time, pseudotime or space
             for example.
         :param constraints_loc: : Constraints for location model.
-            Array with constraints in rows and model parameters in columns.
-            Each constraint contains non-zero entries for the a of parameters that
-            has to sum to zero. This constraint is enforced by binding one parameter
+            Array with constraints in columns and model parameters in rows.
+            Each constraint contains non-zero entries for the constrained parameters that
+            have to sum to zero. For a non-constrained parameter the revelant constraint column 
+            contains 1 in the parameter row. This constraint is enforced by binding one parameter
             to the negative sum of the other parameters, effectively representing that
             parameter as a function of the other parameters. This dependent
             parameter is indicated by a -1 in this array, the independent parameters
@@ -1871,9 +1879,10 @@ class _Partition:
             are indicated by a 1. It is highly recommended to only use this option
             together with prebuilt design matrix for the location model, dmat_loc.
         :param constraints_scale: : Constraints for scale model.
-            Array with constraints in rows and model parameters in columns.
-            Each constraint contains non-zero entries for the a of parameters that
-            has to sum to zero. This constraint is enforced by binding one parameter
+            Array with constraints in columns and model parameters in rows.
+            Each constraint contains non-zero entries for the constrained parameters that
+            have to sum to zero. For a non-constrained parameter the revelant constraint column 
+            contains 1 in the parameter row. This constraint is enforced by binding one parameter
             to the negative sum of the other parameters, effectively representing that
             parameter as a function of the other parameters. This dependent
             parameter is indicated by a -1 in this array, the independent parameters
