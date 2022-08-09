@@ -40,7 +40,7 @@ class TestConvergence(
         _ = temp.summary()
 
     def test(self):
-        for noise_model in ['norm', 'poisson', 'nb']:
+        for noise_model in ['poisson', 'norm', 'nb']:
             self._test_full_model(noise_model)
 
 

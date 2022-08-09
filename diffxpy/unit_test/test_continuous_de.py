@@ -6,6 +6,7 @@ import diffxpy.api as de
 
 from batchglm.models.glm_nb import Model as NBModel
 from batchglm.models.glm_norm import Model as NormModel
+from batchglm.models.glm_poisson import Model as PoissonModel
 
 class _TestContinuousDe:
     noise_model: str
@@ -24,6 +25,10 @@ class _TestContinuousDe:
             model = NormModel()
             rand_fn_loc = lambda shape: np.random.uniform(500, 1000, shape)
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+        elif self.noise_model == "poisson":
+            model = PoissonModel()
+            rand_fn_loc = lambda shape: np.random.uniform(2, 10, shape)
+            rand_fn_scale = None
         else:
             raise ValueError("noise model %s not recognized" % self.noise_model)
 
@@ -137,6 +142,26 @@ class TestContinuousDeNorm(_TestContinuousDe, unittest.TestCase):
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         self.noise_model = "norm"
+        np.random.seed(1)
+        self._test_wald_de_all_splines(ngenes=100, constrained=False)
+        self._test_wald_de_all_splines(ngenes=100, constrained=True)
+        return True
+
+class TestContinuousDePoisson(_TestContinuousDe, unittest.TestCase):
+    """
+    Normal noise model unit tests that tests false positive and false negative rates.
+    """
+
+    def test_wald_de_poisson(self):
+        """
+
+        :return:
+        """
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        self.noise_model = "poisson"
         np.random.seed(1)
         self._test_wald_de_all_splines(ngenes=100, constrained=False)
         self._test_wald_de_all_splines(ngenes=100, constrained=True)

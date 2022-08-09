@@ -468,17 +468,17 @@ class DifferentialExpressionTestLRT(_DifferentialExpressionTestSingle):
 
     sample_description: pd.DataFrame
     full_design_loc_info: patsy.design_info
-    full_estim: glm.train.numpy.glm_base.Estimator
+    full_estim: glm.train.base.BaseEstimatorGlm
     reduced_design_loc_info: patsy.design_info
-    reduced_estim: glm.train.numpy.glm_base.Estimator
+    reduced_estim: glm.train.base.BaseEstimatorGlm
 
     def __init__(
             self,
             sample_description: pd.DataFrame,
             full_design_loc_info: patsy.design_info,
-            full_estim: glm.train.numpy.glm_base.Estimator,
+            full_estim: glm.train.base.BaseEstimatorGlm,
             reduced_design_loc_info: patsy.design_info,
-            reduced_estim: glm.train.numpy.glm_base.Estimator
+            reduced_estim: glm.train.base.BaseEstimatorGlm
     ):
         super().__init__()
         self.sample_description = sample_description
@@ -1286,6 +1286,10 @@ class DifferentialExpressionTestWald(_DifferentialExpressionTestSingle):
                 yhat = np.random.normal(
                     loc=loc,
                     scale=scale
+                )
+            elif self.noise_model == "poisson":
+                yhat = np.random.poisson(
+                    lam=loc
                 )
             else:
                 raise ValueError("noise model %s not yet supported for plot_gene_fits" % self.noise_model)

@@ -5,6 +5,7 @@ import pandas as pd
 import scipy.stats as stats
 from batchglm.models.glm_nb import Model as NBModel
 from batchglm.models.glm_norm import Model as NormModel
+from batchglm.models.glm_poisson import Model as PoissonModel
 
 import diffxpy.api as de
 
@@ -33,6 +34,9 @@ class _TestSingleNullBackends:
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         elif noise_model == "norm":
             model = NormModel()
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+        elif noise_model == "poisson":
+            model = PoissonModel()
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
 
 
@@ -69,13 +73,13 @@ class _TestSingleNullBackends:
         return True
 
 
-class TestSingleNullBackendsNb(_TestSingleNullBackends, unittest.TestCase):
+class TestSingleNullBackends(_TestSingleNullBackends, unittest.TestCase):
     """
     Negative binomial noise model unit tests that test whether a test generates uniformly
     distributed p-values if data are sampled from the null model.
     """
 
-    def test_null_distribution_wald_nb_numpy(
+    def test_null_distribution_wald_numpy(
             self,
             n_cells: int = 2000,
             n_genes: int = 200
@@ -91,12 +95,13 @@ class TestSingleNullBackendsNb(_TestSingleNullBackends, unittest.TestCase):
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         np.random.seed(1)
-        _ = self._test_null_distribution_wald(
-            n_cells=n_cells,
-            n_genes=n_genes,
-            noise_model="nb",
-            backend="numpy"
-        )
+        for noise_model in ['poisson', 'nb', 'norm']:
+            _ = self._test_null_distribution_wald(
+                n_cells=n_cells,
+                n_genes=n_genes,
+                noise_model="nb",
+                backend="numpy"
+            )
 
 
 if __name__ == '__main__':

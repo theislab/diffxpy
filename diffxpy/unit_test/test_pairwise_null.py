@@ -5,6 +5,7 @@ import pandas as pd
 import scipy.stats as stats
 from batchglm.models.glm_nb import Model as NBModel
 from batchglm.models.glm_norm import Model as NormModel
+from batchglm.models.glm_poisson import Model as PoissonModel
 
 import diffxpy.api as de
 
@@ -29,6 +30,10 @@ class _TestPairwiseNull:
             rand_fn_loc = lambda shape: np.random.uniform(500, 1000, shape)
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
             model = NormModel()
+        elif self.noise_model == "poisson":
+            rand_fn_loc = lambda shape: np.random.uniform(2, 10, shape)
+            rand_fn_scale = None
+            model = PoissonModel()
         else:
             raise ValueError("noise model %s not recognized" % self.noise_model)
 
@@ -109,7 +114,7 @@ class TestPairwiseNullStandard(unittest.TestCase, _TestPairwiseNull):
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         np.random.seed(1)
-        self.noise_model = None
+        self.noise_model = "norm"
         self._test_null_distribution_basic(test="t-test", lazy=False)
 
     def test_null_distribution_rank(self):
@@ -118,8 +123,47 @@ class TestPairwiseNullStandard(unittest.TestCase, _TestPairwiseNull):
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         np.random.seed(1)
-        self.noise_model = None
+        self.noise_model = "norm"
         self._test_null_distribution_basic(test="rank", lazy=False)
+
+class TestPairwiseNullPoisson(unittest.TestCase, _TestPairwiseNull):
+
+    def test_null_distribution_ztest(self):
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
+        self.noise_model = "poisson"
+        self._test_null_distribution_basic(test="z-test", lazy=False, quick_scale=False)
+
+    def test_null_distribution_ztest_lazy(self):
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
+        self.noise_model = "poisson"
+        self._test_null_distribution_basic(test="z-test", lazy=True, quick_scale=False)
+
+    def test_null_distribution_wald(self):
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
+        self.noise_model = "poisson"
+        self._test_null_distribution_basic(test="wald", lazy=False, quick_scale=False)
+
+    def test_null_distribution_lrt(self):
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("batchglm").setLevel(logging.WARNING)
+        logging.getLogger("diffxpy").setLevel(logging.WARNING)
+
+        np.random.seed(1)
+        self.noise_model = "poisson"
+        self._test_null_distribution_basic(test="lrt", lazy=False, quick_scale=False)
+
 
 
 class TestPairwiseNullNb(unittest.TestCase, _TestPairwiseNull):

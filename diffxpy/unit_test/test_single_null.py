@@ -5,6 +5,7 @@ import pandas as pd
 import scipy.stats as stats
 from batchglm.models.glm_nb import Model as NBModel
 from batchglm.models.glm_norm import Model as NormModel
+from batchglm.models.glm_poisson import Model as PoissonModel
 
 import diffxpy.api as de
 
@@ -33,6 +34,9 @@ class _TestSingleNull:
         elif noise_model == "norm":
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
             model = NormModel()
+        elif noise_model == "poisson":
+            rand_fn_scale = None
+            model = PoissonModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
         model.generate_artificial_data(
@@ -88,6 +92,9 @@ class _TestSingleNull:
         elif noise_model == "norm":
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
             model = NormModel()
+        elif noise_model == "poisson":
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape) # not used
+            model = PoissonModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
         model.generate_artificial_data(
@@ -146,6 +153,8 @@ class _TestSingleNull:
             model = NBModel()
         elif noise_model == "norm":
             model = NormModel()
+        elif noise_model == "poisson":
+            model = PoissonModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
         model.generate_artificial_data(
@@ -196,6 +205,8 @@ class _TestSingleNull:
             model = NBModel()
         elif noise_model == "norm":
             model = NormModel()
+        elif noise_model == "poisson":
+            model = PoissonModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
         model.generate_artificial_data(
@@ -364,19 +375,20 @@ class TestSingleNullStandard(_TestSingleNull, unittest.TestCase):
         )
 
 
-class TestSingleNullNb(_TestSingleNull, unittest.TestCase):
+class TestSingleNullModelNb(_TestSingleNull, unittest.TestCase):
+    noise_model = "nb"
     """
-    Negative binomial noise model unit tests that test whether a test generates uniformly
+    Negative binomial (default) noise model unit tests that test whether a test generates uniformly
     distributed p-values if data are sampled from the null model.
     """
 
-    def test_null_distribution_wald_nb(
+    def test_null_distribution_wald(
             self,
             n_cells: int = 2000,
             n_genes: int = 200
     ):
         """
-        Test if wald() generates a uniform p-value distribution for "nb" noise model.
+        Test if wald() generates a uniform p-value distribution for given noise model.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
@@ -389,16 +401,16 @@ class TestSingleNullNb(_TestSingleNull, unittest.TestCase):
         return self._test_null_distribution_wald(
             n_cells=n_cells,
             n_genes=n_genes,
-            noise_model="nb"
+            noise_model=self.noise_model
         )
 
-    def test_null_distribution_wald_repeated_nb(
+    def test_null_distribution_wald_repeated(
             self,
             n_cells: int = 2000,
             n_genes: int = 200
     ):
         """
-        Test if wald() generates a uniform p-value distribution for "nb" noise model.
+        Test if wald() generates a uniform p-value distribution for given noise model.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
@@ -411,16 +423,16 @@ class TestSingleNullNb(_TestSingleNull, unittest.TestCase):
         return self._test_null_distribution_wald_repeated(
             n_cells=n_cells,
             n_genes=n_genes,
-            noise_model="nb"
+            noise_model=self.noise_model
         )
 
-    def test_null_distribution_wald_multi_nb(
+    def test_null_distribution_wald_multi(
             self,
             n_cells: int = 2000,
             n_genes: int = 200
     ):
         """
-        Test if wald() generates a uniform p-value distribution for "nb" noise model
+        Test if wald() generates a uniform p-value distribution for given noise model
         for multiple coefficients to test.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
@@ -434,16 +446,16 @@ class TestSingleNullNb(_TestSingleNull, unittest.TestCase):
         return self._test_null_distribution_wald_multi(
             n_cells=n_cells,
             n_genes=n_genes,
-            noise_model="nb"
+            noise_model=self.noise_model
         )
 
-    def test_null_distribution_lrt_nb(
+    def test_null_distribution_lrt(
             self,
             n_cells: int = 2000,
             n_genes: int = 200
     ):
         """
-        Test if lrt() generates a uniform p-value distribution for "nb" noise model.
+        Test if lrt() generates a uniform p-value distribution for given noise model.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
@@ -456,8 +468,12 @@ class TestSingleNullNb(_TestSingleNull, unittest.TestCase):
         return self._test_null_distribution_lrt(
             n_cells=n_cells,
             n_genes=n_genes,
-            noise_model="nb"
+            noise_model=self.noise_model
         )
+
+
+class TestSingleNullPoisson(TestSingleNullModelNb, unittest.TestCase):
+   noise_model = "poisson"
 
 
 class TestSingleNullNorm(_TestSingleNull, unittest.TestCase):

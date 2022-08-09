@@ -5,6 +5,7 @@ import numpy as np
 import diffxpy.api as de
 from batchglm.models.glm_nb import Model as NBModel
 from batchglm.models.glm_norm import Model as NormModel
+from batchglm.models.glm_poisson import Model as PoissonModel
 
 
 class _TestSingleDe:
@@ -29,6 +30,10 @@ class _TestSingleDe:
             rand_fn_loc = lambda shape: np.random.uniform(500, 1000, shape)
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
             model = NormModel()
+        elif noise_model == "poisson":
+            rand_fn_loc = lambda shape: np.random.uniform(2, 10, shape)
+            rand_fn_scale = None # not used
+            model = PoissonModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
@@ -253,10 +258,10 @@ class TestSingleDeStandard(_TestSingleDe, unittest.TestCase):
 
 class TestSingleDeNb(_TestSingleDe, unittest.TestCase):
     """
-    Negative binomial noise model unit tests that tests false positive and false negative rates.
+    Negative binomial (default) noise model unit tests that tests false positive and false negative rates.
     """
 
-    def test_wald_de_nb(
+    def test_wald_de(
             self,
             n_cells: int = 2000,
             n_genes: int = 200
@@ -273,10 +278,10 @@ class TestSingleDeNb(_TestSingleDe, unittest.TestCase):
         return self._test_wald_de(
             n_cells=n_cells,
             n_genes=n_genes,
-            noise_model="nb"
+            noise_model=self.noise_model
         )
 
-    def test_lrt_de_nb(
+    def test_lrt_de(
             self,
             n_cells: int = 2000,
             n_genes: int = 200
@@ -293,54 +298,14 @@ class TestSingleDeNb(_TestSingleDe, unittest.TestCase):
         return self._test_lrt_de(
             n_cells=n_cells,
             n_genes=n_genes,
-            noise_model="nb"
+            noise_model=self.noise_model
         )
 
+class TestSingleDePoisson(TestSingleDeNb, unittest.TestCase):
+    noise_model = "poisson"
 
-class TestSingleDeNorm(_TestSingleDe, unittest.TestCase):
-    """
-    Normal noise model unit tests that tests false positive and false negative rates.
-    """
-
-    def test_wald_de_norm(
-            self,
-            n_cells: int = 2000,
-            n_genes: int = 200
-    ):
-        """
-        :param n_cells: Number of cells to simulate (number of observations per test).
-        :param n_genes: Number of genes to simulate (number of tests).
-        """
-        logging.getLogger("tensorflow").setLevel(logging.ERROR)
-        logging.getLogger("batchglm").setLevel(logging.WARNING)
-        logging.getLogger("diffxpy").setLevel(logging.WARNING)
-
-        np.random.seed(1)
-        return self._test_wald_de(
-            n_cells=n_cells,
-            n_genes=n_genes,
-            noise_model="norm"
-        )
-
-    def test_lrt_de_norm(
-            self,
-            n_cells: int = 2000,
-            n_genes: int = 200
-    ):
-        """
-        :param n_cells: Number of cells to simulate (number of observations per test).
-        :param n_genes: Number of genes to simulate (number of tests).
-        """
-        logging.getLogger("tensorflow").setLevel(logging.ERROR)
-        logging.getLogger("batchglm").setLevel(logging.WARNING)
-        logging.getLogger("diffxpy").setLevel(logging.WARNING)
-
-        np.random.seed(1)
-        return self._test_lrt_de(
-            n_cells=n_cells,
-            n_genes=n_genes,
-            noise_model="norm"
-        )
+class TestSingleDeNorm(TestSingleDeNb, unittest.TestCase):
+    noise_model = "norm"
 
 
 if __name__ == '__main__':

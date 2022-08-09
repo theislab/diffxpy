@@ -138,6 +138,9 @@ def _fit(
         elif noise_model == "norm" or noise_model == "normal":
             from batchglm.train.numpy.glm_norm import Estimator
             from batchglm.models.glm_norm import Model
+        elif noise_model == "poisson":
+            from batchglm.train.numpy.glm_poisson import Estimator
+            from batchglm.models.glm_poisson import Model
         else:
             raise ValueError('noise_model="%s" not recognized.' % noise_model)
         # Set default chunk size:
