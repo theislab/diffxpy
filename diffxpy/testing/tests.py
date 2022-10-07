@@ -1254,6 +1254,10 @@ def pairwise(
             tests = np.tile([None], [len(groups), len(groups)])
         else:
             tests = None
+        
+        if test not in ["rank", "t-test"]:
+            kwargs["noise_model"] = noise_model,
+
 
         for i, g1 in enumerate(groups):
             for j, g2 in enumerate(groups[(i + 1):]):
@@ -1270,7 +1274,6 @@ def pairwise(
                     test=test,
                     gene_names=gene_names,
                     sample_description=sample_description.iloc[idx, :],
-                    noise_model=noise_model,
                     size_factors=size_factors[idx] if size_factors is not None else None,
                     batch_size=batch_size,
                     backend=backend,
