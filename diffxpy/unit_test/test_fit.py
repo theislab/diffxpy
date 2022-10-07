@@ -82,6 +82,9 @@ class _TestFit:
         elif noise_model == "norm":
             model = NormModel()
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+        elif noise_model == "poisson":
+            model = PoissonModel()
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape) # since it is called later but not used
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
 
