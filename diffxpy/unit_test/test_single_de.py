@@ -188,15 +188,16 @@ class _TestSingleDe:
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = self._prepare_data(
+        model = self._prepare_data(
             n_cells=n_cells,
             n_genes=n_genes,
             noise_model=noise_model
         )
 
         test1 = de.test.wald(
-            data=sim.input_data,
-            sample_description=sim.sample_description,
+            data=model.x,
+            gene_names=model.features,
+            sample_description=model.sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition",
             noise_model=noise_model,
@@ -209,7 +210,7 @@ class _TestSingleDe:
         )
         assert np.max(test.log10_pval_clean() - test1.log10_pval_clean()) < 1e-10
 
-        self._eval(sim=sim, test=test)
+        self._eval(model=model, test=test)
         return True
 
     def _test_lrt_de(
@@ -296,6 +297,9 @@ class TestSingleDeStandard(_TestSingleDe, unittest.TestCase):
 
 
 class TestSingleDeNb(_TestSingleDe, unittest.TestCase):
+
+    noise_model = 'nb'
+
     """
     Negative binomial (default) noise model unit tests that tests false positive and false negative rates.
     """
