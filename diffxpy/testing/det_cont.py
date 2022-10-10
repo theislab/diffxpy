@@ -151,7 +151,7 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :return: Filtered list of genes
         """
         genes_found = np.array([idx for idx, x in enumerate(genes) if x in self.gene_ids])
-        if any(np.logical_not(genes_found)):
+        if len(genes_found) < len(genes):
             logger.info("did not find some genes, omitting")
             genes = genes[genes_found]
         return genes
@@ -163,8 +163,8 @@ class _DifferentialExpressionTestCont(_DifferentialExpressionTestSingle):
         :param genes: List of genes to filter.
         :return: Filtered list of genes
         """
-        genes_found = np.array([x < self.x.shape[1] for x in genes])
-        if any(np.logical_not(genes_found)):
+        genes_found = np.array([idx for idx, x in enumerate(genes) if x < self.x.shape[1]])
+        if len(genes_found) < len(genes):
             logger.info("did not find some genes, omitting")
             genes = genes[genes_found]
         return genes

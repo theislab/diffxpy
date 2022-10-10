@@ -145,7 +145,7 @@ def _fit(
             from batchglm.models.glm_poisson import Model
         else:
             raise ValueError('noise_model="%s" not recognized.' % noise_model)
-        # Set default chunk size:
+            # Set default chunk size:
         if batch_size is None:
             chunk_size_cells = int(1e9)
             chunk_size_genes = 128
@@ -1215,7 +1215,7 @@ def pairwise(
             gene_names=gene_names,
             size_factors=size_factors,
             init_a="closed_form",
-            init_b="closed_form",
+            init_b="auto",
             batch_size=batch_size,
             backend=backend,
             train_args=train_args,
@@ -1256,7 +1256,7 @@ def pairwise(
             tests = None
         
         if test not in ["rank", "t-test"]:
-            kwargs["noise_model"] = noise_model,
+            kwargs["noise_model"] = noise_model
 
 
         for i, g1 in enumerate(groups):
