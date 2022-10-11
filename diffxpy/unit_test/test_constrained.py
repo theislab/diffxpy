@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 
-from batchglm.api.models.numpy.glm_nb import Simulator
+from batchglm.models.glm_nb import Model as NBModel
 import diffxpy.api as de
 
 
@@ -25,9 +25,13 @@ class TestConstrained(unittest.TestCase):
         n_cells = 2000
         n_genes = 2
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+        )
 
         # Build design matrix:
         dmat = np.zeros([n_cells, 6])
@@ -41,7 +45,7 @@ class TestConstrained(unittest.TestCase):
         dmat_est = pd.DataFrame(data=dmat, columns=coefficient_names)
 
         dmat_est_loc, _ = de.utils.design_matrix(dmat=dmat_est, return_type="dataframe")
-        dmat_est_scale, _ = de.utils.design_matrix(dmat=dmat_est, return_type="dataframe")
+        dmat_est_scale, _ = de.utils.design_matrix(dmat=pd.DataFrame(dmat_est['intercept']), return_type="dataframe")
 
         # Build constraints:
         constraints_loc = de.utils.constraint_matrix_from_string(
@@ -49,14 +53,11 @@ class TestConstrained(unittest.TestCase):
             coef_names=dmat_est_loc.columns,
             constraints=["bio1+bio2=0", "bio3+bio4=0"]
         )
-        constraints_scale = de.utils.constraint_matrix_from_string(
-            dmat=dmat_est_scale.values,
-            coef_names=dmat_est_scale.columns,
-            constraints=["bio1+bio2=0", "bio3+bio4=0"]
-        )
+        constraints_scale = None
 
         test = de.test.wald(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             dmat_loc=dmat_est_loc,
             dmat_scale=dmat_est_scale,
             constraints_loc=constraints_loc,
@@ -77,9 +78,13 @@ class TestConstrained(unittest.TestCase):
         n_cells = 2000
         n_genes = 2
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+        )
 
         # Build design matrix:
         sample_description = pd.DataFrame({
@@ -88,12 +93,13 @@ class TestConstrained(unittest.TestCase):
         })
 
         test = de.test.wald(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=sample_description,
             formula_loc="~1+cond+batch",
-            formula_scale="~1+cond+batch",
+            formula_scale="~1",
             constraints_loc={"batch": "cond"},
-            constraints_scale={"batch": "cond"},
+            constraints_scale=None,
             coef_to_test=["cond[T.cond1]"]
         )
         _ = test.summary()
@@ -115,9 +121,13 @@ class TestConstrained(unittest.TestCase):
 
         np.random.seed(1)
         n_cells = 2000
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+        )
 
         # Build design matrix:
         sample_description = pd.DataFrame({
@@ -126,12 +136,13 @@ class TestConstrained(unittest.TestCase):
         })
 
         test = de.test.wald(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=sample_description,
             formula_loc="~1+cond+batch",
-            formula_scale="~1+cond+batch",
+            formula_scale="~1",
             constraints_loc={"batch": "cond"},
-            constraints_scale={"batch": "cond"},
+            constraints_scale=None,
             coef_to_test=["cond[T.cond1]"]
         )
         _ = test.summary()
@@ -161,9 +172,13 @@ class TestConstrained(unittest.TestCase):
 
         np.random.seed(1)
         n_cells = 12000
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+        )
 
         # Build design matrix:
         dmat = np.zeros([n_cells, 14])
@@ -191,8 +206,8 @@ class TestConstrained(unittest.TestCase):
                              'tech1', 'tech2', 'tech3', 'tech4']
         dmat_est = pd.DataFrame(data=dmat, columns=coefficient_names)
 
-        dmat_est_loc = de.utils.design_matrix(dmat=dmat_est, return_type="dataframe")
-        dmat_est_scale = de.utils.design_matrix(dmat=dmat_est.iloc[:, [0]], return_type="dataframe")
+        dmat_est_loc, _ = de.utils.design_matrix(dmat=dmat_est, return_type="dataframe")
+        dmat_est_scale, _ = de.utils.design_matrix(dmat=dmat_est.iloc[:, [0]], return_type="dataframe")
 
         # Build constraints:
         constraints_loc = de.utils.constraint_matrix_from_string(
@@ -208,7 +223,8 @@ class TestConstrained(unittest.TestCase):
         constraints_scale = None
 
         test = de.test.wald(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             dmat_loc=dmat_est_loc,
             dmat_scale=dmat_est_scale,
             constraints_loc=constraints_loc,

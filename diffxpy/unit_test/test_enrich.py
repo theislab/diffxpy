@@ -1,7 +1,7 @@
 import unittest
 import logging
 
-from batchglm.api.models.numpy.glm_nb import Simulator
+from batchglm.models.glm_nb import Model as NBModel
 import diffxpy.api as de
 
 
@@ -14,16 +14,20 @@ class TestEnrich(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = Simulator(num_observations=50, num_features=10)
-        sim.generate_sample_description(num_batches=0, num_conditions=2)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=50,
+            n_vars=10,
+            num_batches=0,
+            num_conditions=2
+        )
 
         test = de.test.wald(
-            data=sim.X,
+            data=model.x,
+            gene_names=[str(x) for x in range(model.x.shape[1])],
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition",
-            sample_description=sim.sample_description,
-            gene_names=[str(x) for x in range(sim.X.shape[1])],
+            sample_description=model.sample_description,
             training_strategy="DEFAULT",
             dtype="float64"
         )

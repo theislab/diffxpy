@@ -4,7 +4,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from batchglm.api.models.numpy.glm_nb import Simulator
+from batchglm.models.glm_nb import Model as NBModel
 import diffxpy.api as de
 
 
@@ -19,18 +19,23 @@ class TestExtremeValues(unittest.TestCase):
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         np.random.seed(1)
-        sim = Simulator(num_observations=1000, num_features=10)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
-        sim.input_data.x[:, 0] = 0
-        sim.input_data.x[:, 1] = 5
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=1000,
+            n_vars=10,
+            num_batches=0,
+            num_conditions=0,
+        )
+        model.x[:, 0] = 0
+        model.x[:, 1] = 5
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(2, size=1000)
         })
 
         test = de.test.t_test(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             grouping="condition",
             is_sig_zerovar=True
@@ -50,18 +55,23 @@ class TestExtremeValues(unittest.TestCase):
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
         np.random.seed(1)
-        sim = Simulator(num_observations=1000, num_features=10)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
-        sim.input_data.x[:, 0] = 0
-        sim.input_data.x[:, 1] = 5
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=1000,
+            n_vars=10,
+            num_batches=0,
+            num_conditions=0,
+        )
+        model.x[:, 0] = 0
+        model.x[:, 1] = 5
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(2, size=1000)
         })
 
         test = de.test.rank_test(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             grouping="condition",
             is_sig_zerovar=True

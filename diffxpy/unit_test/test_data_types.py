@@ -6,7 +6,7 @@ import pandas as pd
 import scipy.sparse
 import anndata
 
-from batchglm.api.models.numpy.glm_nb import Simulator
+from batchglm.models.glm_nb import Model as NBModel
 import diffxpy.api as de
 
 
@@ -20,7 +20,7 @@ class TestDataTypesSingle(unittest.TestCase):
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition",
             noise_model="nb",
-            batch_size=5
+            batch_size=(5, 5)
         )
         _ = test.summary()
 
@@ -54,14 +54,18 @@ class TestDataTypesSingle(unittest.TestCase):
         _ = test.summary()
 
     def simulate(self, n_cells: int = 200, n_genes: int = 2):
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.input_data.num_observations)
+            "condition": np.random.randint(2, size=model.num_observations)
         })
-        return sim.x, random_sample_description
+        return model.x, random_sample_description
 
     def _test_numpy(self, sparse):
         data, sample_description = self.simulate()

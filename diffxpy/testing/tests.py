@@ -11,6 +11,7 @@ import pandas as pd
 import patsy
 import scipy.sparse
 from typing import Union, List, Dict, Callable, Tuple
+from batchglm.utils.input import InputDataGLM
 
 from diffxpy import pkg_constants
 from .det import DifferentialExpressionTestLRT, DifferentialExpressionTestWald, \
@@ -129,41 +130,22 @@ def _fit(
     :param close_session: If True, will finalize the estimator. Otherwise, return the estimator itself.
     """
     # Load estimator for required noise model and backend:
-    if backend.lower() in ["tf1"]:
-        if noise_model == "nb" or noise_model == "negative_binomial":
-            from batchglm.api.models.tf1.glm_nb import Estimator, InputDataGLM
-        elif noise_model == "norm" or noise_model == "normal":
-            from batchglm.api.models.tf1.glm_norm import Estimator, InputDataGLM
-        else:
-            raise ValueError('noise_model="%s" not recognized.' % noise_model)
-        if batch_size is None:
-            batch_size = 128
-        else:
-            if not isinstance(batch_size, int):
-                raise ValueError("batch_size has to be an integer if backend is tf1")
-        chunk_size_cells = int(1e9)
-        chunk_size_genes = 128
-    elif backend.lower() in ["tf2"]:
-        if noise_model == "nb" or noise_model == "negative_binomial":
-            from batchglm.api.models.tf2.glm_nb import Estimator, InputDataGLM
-        else:
-            raise ValueError('noise_model="%s" not recognized.' % noise_model)
-        if batch_size is None:
-            batch_size = 128
-        else:
-            if not isinstance(batch_size, int):
-                raise ValueError("batch_size has to be an integer if backend is tf2")
-        chunk_size_cells = int(1e9)
-        chunk_size_genes = 128
-    elif backend.lower() in ["numpy"]:
+    if backend.lower() in ["numpy"]:
         if isinstance(training_strategy, str):
             if training_strategy.lower() == "auto":
                 training_strategy = "DEFAULT"
         if noise_model == "nb" or noise_model == "negative_binomial":
-            from batchglm.api.models.numpy.glm_nb import Estimator, InputDataGLM
+            from batchglm.train.numpy.glm_nb import Estimator
+            from batchglm.models.glm_nb import Model
+        elif noise_model == "norm" or noise_model == "normal":
+            from batchglm.train.numpy.glm_norm import Estimator
+            from batchglm.models.glm_norm import Model
+        elif noise_model == "poisson":
+            from batchglm.train.numpy.glm_poisson import Estimator
+            from batchglm.models.glm_poisson import Model
         else:
             raise ValueError('noise_model="%s" not recognized.' % noise_model)
-        # Set default chunk size:
+            # Set default chunk size:
         if batch_size is None:
             chunk_size_cells = int(1e9)
             chunk_size_genes = 128
@@ -196,45 +178,23 @@ def _fit(
     constructor_args = {}
     if quick_scale is not None:
         constructor_args["quick_scale"] = quick_scale
-    # Backend-specific constructor arguments:
-    if backend.lower() in ["tf1"]:
-        constructor_args['provide_optimizers'] = {
-            "gd": pkg_constants.BATCHGLM_OPTIM_GD,
-            "adam": pkg_constants.BATCHGLM_OPTIM_ADAM,
-            "adagrad": pkg_constants.BATCHGLM_OPTIM_ADAGRAD,
-            "rmsprop": pkg_constants.BATCHGLM_OPTIM_RMSPROP,
-            "nr": pkg_constants.BATCHGLM_OPTIM_NEWTON,
-            "nr_tr": pkg_constants.BATCHGLM_OPTIM_NEWTON_TR,
-            "irls": pkg_constants.BATCHGLM_OPTIM_IRLS,
-            "irls_gd": pkg_constants.BATCHGLM_OPTIM_IRLS_GD,
-            "irls_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_TR,
-            "irls_gd_tr": pkg_constants.BATCHGLM_OPTIM_IRLS_GD_TR
-        }
-        constructor_args['provide_batched'] = pkg_constants.BATCHGLM_PROVIDE_BATCHED
-        constructor_args['provide_fim'] = pkg_constants.BATCHGLM_PROVIDE_FIM
-        constructor_args['provide_hessian'] = pkg_constants.BATCHGLM_PROVIDE_HESSIAN
-        constructor_args["batch_size"] = batch_size
     elif backend.lower() not in ["tf2"]:
         pass
     elif backend.lower() not in ["numpy"]:
         pass
     else:
         raise ValueError('backend="%s" not recognized.' % backend)
-
+    model = Model(input_data=input_data)
     estim = Estimator(
-        input_data=input_data,
-        init_a=init_a,
-        init_b=init_b,
-        dtype=dtype,
-        **constructor_args
+        model=model,
+        init_location=init_a,
+        init_scale=init_b
     )
     estim.initialize()
 
     # Assemble backend specific key word arguments to training function:
     if batch_size is not None:
         train_args["batch_size"] = batch_size
-    if backend.lower() in ["tf1"]:
-        pass
     elif backend.lower() in ["tf2"]:
         train_args["autograd"] = pkg_constants.BATCHGLM_AUTOGRAD
         train_args["featurewise"] = pkg_constants.BATCHGLM_FEATUREWISE
@@ -252,7 +212,7 @@ def _fit(
 
 
 def lrt(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         full_formula_loc: str,
         reduced_formula_loc: str,
         full_formula_scale: str = "~1",
@@ -371,28 +331,28 @@ def lrt(
         sample_description=sample_description
     )
 
-    full_design_loc = glm.data.design_matrix(
+    full_design_loc, _ = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=full_formula_loc,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        as_categorical=[x for x in sample_description.columns.values if x not in as_numeric],
         return_type="patsy"
     )
-    reduced_design_loc = glm.data.design_matrix(
+    reduced_design_loc, _ = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_loc,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        as_categorical=[x for x in sample_description.columns.values if x not in as_numeric],
         return_type="patsy"
     )
-    full_design_scale = glm.data.design_matrix(
+    full_design_scale, _ = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=full_formula_scale,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        as_categorical=[x for x in sample_description.columns.values if x not in as_numeric],
         return_type="patsy"
     )
-    reduced_design_scale = glm.data.design_matrix(
+    reduced_design_scale, _ = glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=reduced_formula_scale,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values],
+        as_categorical=[x for x in sample_description.columns.values if x not in as_numeric],
         return_type="patsy"
     )
 
@@ -423,8 +383,8 @@ def lrt(
         constraints_loc=None,
         constraints_scale=None,
         gene_names=gene_names,
-        init_a="init_model",
-        init_b="init_model",
+        init_a="auto",
+        init_b="auto",
         init_model=reduced_model,
         size_factors=size_factors,
         batch_size=batch_size,
@@ -448,7 +408,7 @@ def lrt(
 
 
 def wald(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         factor_loc_totest: Union[str, List[str]] = None,
         coef_to_test: Union[str, List[str]] = None,
         formula_loc: Union[None, str] = None,
@@ -649,19 +609,19 @@ def wald(
 
     # Build design matrices and constraints.
     design_loc, design_loc_names, constraints_loc, term_names_loc = constraint_system_from_star(
+        constraints=constraints_loc,
         dmat=dmat_loc,
         sample_description=sample_description,
         formula=formula_loc,
         as_numeric=as_numeric,
-        constraints=constraints_loc,
         return_type="patsy"
     )
     design_scale, design_scale_names, constraints_scale, term_names_scale = constraint_system_from_star(
+        constraints=constraints_scale,
         dmat=dmat_scale,
         sample_description=sample_description,
         formula=formula_scale,
         as_numeric=as_numeric,
-        constraints=constraints_scale,
         return_type="patsy"
     )
 
@@ -672,7 +632,7 @@ def wald(
         if not isinstance(design_loc, patsy.design_info.DesignMatrix):
             col_indices = np.where([
                 x in factor_loc_totest
-                for x in term_names_loc
+                for x in design_loc_names # should match the matrix it comes from?
             ])[0]
         else:
             # Select coefficients to test via formula model:
@@ -721,7 +681,7 @@ def wald(
     col_indices = np.array([np.where(constraints_loc_temp[x, :] == 1)[0][0] for x in col_indices])
 
     # Fit model.
-    model = _fit(
+    estim = _fit(
         noise_model=noise_model,
         data=data,
         design_loc=design_loc,
@@ -745,7 +705,7 @@ def wald(
 
     # Prepare differential expression test.
     de_test = DifferentialExpressionTestWald(
-        model_estim=model,
+        model_estim=estim,
         col_indices=col_indices,
         noise_model=noise_model,
         sample_description=sample_description
@@ -783,7 +743,7 @@ def wald_repeated(
         coef_to_test = [coef_to_test]
 
     # Check that design_loc is patsy, otherwise  use term_names for slicing.
-    par_loc_names = det.model_estim.model.design_loc_names
+    par_loc_names = det.model_estim.model_container.design_loc_names
     if factor_loc_totest is not None and coef_to_test is None:
         col_indices = np.concatenate([np.where([
             fac in x
@@ -806,7 +766,7 @@ def wald_repeated(
     assert len(col_indices) > 0, "Could not find any matching columns!"
 
     # Check that all tested coefficients are independent:
-    constraints_loc = det.model_estim.model.constraints_loc
+    constraints_loc = det.model_estim.model_container.constraints_loc
     if isinstance(constraints_loc, dask.array.core.Array):
         constraints_loc = constraints_loc.compute()
     for x in col_indices:
@@ -829,7 +789,7 @@ def wald_repeated(
 
 
 def t_test(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         grouping,
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
@@ -871,7 +831,7 @@ def t_test(
 
 
 def rank_test(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         grouping: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
@@ -913,7 +873,7 @@ def rank_test(
 
 
 def two_sample(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = "t-test",
@@ -1102,7 +1062,7 @@ def two_sample(
 
 
 def pairwise(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = "z-test",
@@ -1238,19 +1198,24 @@ def pairwise(
 
     if test.lower() == 'z-test' or test.lower() == 'z_test' or test.lower() == 'ztest':
         # -1 in formula removes intercept
-        dmat = glm.data.design_matrix(
+        dmat_loc, _ = glm.utils.data.design_matrix(
             sample_description,
             formula="~ 1 - 1 + grouping"
+        )
+        # Only intercept scale model
+        dmat_scale, _ = glm.utils.data.design_matrix(
+            sample_description,
+            formula="~ 1"
         )
         model = _fit(
             noise_model=noise_model,
             data=data,
-            design_loc=dmat,
-            design_scale=dmat,
+            design_loc=dmat_loc,
+            design_scale=dmat_scale,
             gene_names=gene_names,
             size_factors=size_factors,
             init_a="closed_form",
-            init_b="closed_form",
+            init_b="auto",
             batch_size=batch_size,
             backend=backend,
             train_args=train_args,
@@ -1277,7 +1242,7 @@ def pairwise(
     else:
         if isinstance(data, anndata.AnnData) or isinstance(data, anndata.Raw):
             data = data.X
-        elif isinstance(data, glm.typing.InputDataBase):
+        elif isinstance(data, glm.utils.input.InputDataGLM):
             data = data.x
         groups = np.unique(grouping)
         pvals = np.tile(np.NaN, [len(groups), len(groups), data.shape[1]])
@@ -1289,6 +1254,10 @@ def pairwise(
             tests = np.tile([None], [len(groups), len(groups)])
         else:
             tests = None
+        
+        if test not in ["rank", "t-test"]:
+            kwargs["noise_model"] = noise_model
+
 
         for i, g1 in enumerate(groups):
             for j, g2 in enumerate(groups[(i + 1):]):
@@ -1305,7 +1274,6 @@ def pairwise(
                     test=test,
                     gene_names=gene_names,
                     sample_description=sample_description.iloc[idx, :],
-                    noise_model=noise_model,
                     size_factors=size_factors[idx] if size_factors is not None else None,
                     batch_size=batch_size,
                     backend=backend,
@@ -1338,7 +1306,7 @@ def pairwise(
 
 
 def versus_rest(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         grouping: Union[str, np.ndarray, list],
         as_numeric: Union[List[str], Tuple[str], str] = (),
         test: str = 'wald',
@@ -1514,7 +1482,7 @@ def versus_rest(
 
 
 def partition(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         parts: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None
@@ -1557,7 +1525,7 @@ class _Partition:
 
     def __init__(
             self,
-            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
             parts: Union[str, np.ndarray, list],
             gene_names: Union[np.ndarray, list] = None,
             sample_description: pd.DataFrame = None
@@ -1572,12 +1540,14 @@ class _Partition:
         :param gene_names: optional list/array of gene names which will be used if `data` does not implicitly store these
         :param sample_description: optional pandas.DataFrame containing sample annotations
         """
-        if isinstance(data, glm.typing.InputDataBase):
+        if isinstance(data, glm.utils.input.InputDataGLM):
             self.x = data.x
         elif isinstance(data, anndata.AnnData) or isinstance(data, Raw):
             self.x = data.X
         elif isinstance(data, np.ndarray):
             self.x = data
+        elif isinstance(data, dask.array.core.Array):
+            self.x = data.compute()
         else:
             raise ValueError("data type %s not recognized" % type(data))
         self.gene_names = parse_gene_names(data, gene_names)
@@ -1704,7 +1674,6 @@ class _Partition:
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 is_sig_zerovar=is_sig_zerovar,
-                dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,
@@ -1740,7 +1709,6 @@ class _Partition:
                 gene_names=self.gene_names,
                 sample_description=self.sample_description.iloc[idx, :],
                 is_sig_zerovar=is_sig_zerovar,
-                dtype=dtype
             ))
         return DifferentialExpressionTestByPartition(
             partitions=self.partitions,
@@ -1978,7 +1946,7 @@ class _Partition:
 
 
 def continuous_1d(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         continuous: str,
         factor_loc_totest: Union[str, List[str]],
         formula_loc: str,
@@ -2184,7 +2152,7 @@ def continuous_1d(
         as_numeric = list(as_numeric)
 
     gene_names = parse_gene_names(data, gene_names)
-    sample_description = parse_sample_description(data, sample_description)
+    sample_description = parse_sample_description(data, sample_description).copy() # need copy to reset values.
 
     # Check that continuous factor is contained in sample description and is numeric.
     if continuous not in sample_description.columns:

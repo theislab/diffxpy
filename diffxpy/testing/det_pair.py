@@ -341,13 +341,13 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
     lazy test evaluation.
     """
 
-    model_estim: glm.typing.EstimatorBaseTyping
+    model_estim: glm.train.base.BaseEstimatorGlm
     theta_mle: np.ndarray
     theta_sd: np.ndarray
 
     def __init__(
             self,
-            model_estim: glm.typing.EstimatorBaseTyping,
+            model_estim: glm.train.base.BaseEstimatorGlm,
             grouping,
             groups,
             correction_type: str
@@ -358,10 +358,10 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
         self.groups = list(np.asarray(groups))
 
         # Values of parameter estimates: coefficients x genes array with one coefficient per group
-        self._theta_mle = model_estim.a_var
+        self._theta_mle = model_estim.model_container.theta_location
         # Standard deviation of estimates: coefficients x genes array with one coefficient per group
         # Need .copy() here as nextafter needs mutabls copy.
-        theta_sd = np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1).T.copy()
+        theta_sd = np.diagonal(model_estim.model_container.fisher_inv, axis1=-2, axis2=-1).T.copy()
         theta_sd = np.nextafter(0, np.inf, out=theta_sd, where=theta_sd < np.nextafter(0, np.inf))
         self._theta_sd = np.sqrt(theta_sd)
         self._logfc = None
@@ -371,7 +371,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
         _ = self.qval
 
     def _test(self, **kwargs):
-        pvals = np.tile(np.NaN, [len(self.groups), len(self.groups), self.model_estim.x.shape[1]])
+        pvals = np.tile(np.NaN, [len(self.groups), len(self.groups), self.model_estim.model_container.x.shape[1]])
         for i, g1 in enumerate(self.groups):
             for j, g2 in enumerate(self.groups[(i + 1):]):
                 j = j + i + 1
@@ -387,19 +387,21 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.model_estim.input_data.features)
+        return np.asarray(self.model_estim.model_container.features)
 
     @property
     def x(self):
-        return self.model_estim.x
+        return self.model_estim.model_container.x
 
     @property
     def log_likelihood(self):
-        return self.model_estim.log_likelihood
+        return self.model_estim.model_container.ll_byfeature
 
     @property
     def model_gradient(self):
-        return self.model_estim.jacobian
+        return np.sum(
+            np.abs(self.model_estim.model_container.jac.compute() / self.model_estim.model_container.x.shape[0]), axis=1
+        )
 
     def _ave(self):
         """
@@ -408,7 +410,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
         :return: np.ndarray
         """
 
-        return np.asarray(np.mean(self.model_estim.x, axis=0)).flatten()
+        return np.asarray(np.mean(self.model_estim.model_container.x, axis=0)).flatten()
 
     def _pval_pairs(self, idx0, idx1):
         """
@@ -431,7 +433,7 @@ class DifferentialExpressionTestZTest(_DifferentialExpressionTestPairwiseBase):
         :param base: Base of logarithm.
         :return: log fold change values
         """
-        logfc = np.tile(np.NaN, [len(idx0), len(idx1), self.model_estim.x.shape[1]])
+        logfc = np.tile(np.NaN, [len(idx0), len(idx1), self.model_estim.model_container.x.shape[1]])
         for i, xi in enumerate(idx0):
             for j, xj in enumerate(idx1):
                 logfc[i, j, :] = self._theta_mle[xj, :] - self._theta_mle[xi, :]
@@ -526,13 +528,13 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
     memory.
     """
 
-    model_estim: glm.typing.EstimatorBaseTyping
+    model_estim: glm.train.base.BaseEstimatorGlm
     _theta_mle: np.ndarray
     _theta_sd: np.ndarray
 
     def __init__(
             self,
-            model_estim: glm.typing.EstimatorBaseTyping,
+            model_estim: glm.train.base.BaseEstimatorGlm,
             grouping, groups,
             correction_type="global"
     ):
@@ -548,10 +550,10 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
             self.groups = groups.tolist()
 
         # Values of parameter estimates: coefficients x genes array with one coefficient per group
-        self._theta_mle = model_estim.a_var
+        self._theta_mle = model_estim.model_container.theta_location
         # Standard deviation of estimates: coefficients x genes array with one coefficient per group
         # Need .copy() here as nextafter needs mutabls copy.
-        theta_sd = np.diagonal(model_estim.fisher_inv, axis1=-2, axis2=-1).T.copy()
+        theta_sd = np.diagonal(model_estim.model_container.fisher_inv, axis1=-2, axis2=-1).T.copy()
         theta_sd = np.nextafter(0, np.inf, out=theta_sd, where=theta_sd < np.nextafter(0, np.inf))
         self._theta_sd = np.sqrt(theta_sd)
 
@@ -563,10 +565,10 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
         :param idx1: List of indices of second set of group of observations in pair-wise comparison.
         :return: p-values
         """
-        pvals = np.tile(np.NaN, [len(idx0), len(idx1), self.model_estim.x.shape[1]])
+        pvals = np.tile(np.NaN, [len(idx0), len(idx1), self.model_estim.model_container.x.shape[1]])
         for i, xi in enumerate(idx0):
             for j, xj in enumerate(idx1):
-                if i != j:
+                if xi != xj:
                     pvals[i, j, :] = stats.two_coef_z_test(
                         theta_mle0=self._theta_mle[xi, :],
                         theta_mle1=self._theta_mle[xj, :],
@@ -575,24 +577,25 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
                     )
                 else:
                     pvals[i, j, :] = np.array([1.])
-
         return pvals
 
     @property
     def gene_ids(self) -> np.ndarray:
-        return np.asarray(self.model_estim.input_data.features)
+        return np.asarray(self.model_estim.model_container.features)
 
     @property
     def x(self):
-        return self.model_estim.x
+        return self.model_estim.model_container.x
 
     @property
     def log_likelihood(self):
-        return self.model_estim.log_likelihood
+        return self.model_estim.model_container.ll_byfeature # should be by gene/feature?
 
     @property
     def model_gradient(self):
-        return self.model_estim.jacobian
+        return np.sum(
+            np.abs(self.model_estim.model_container.jac.compute() / self.model_estim.model_container.x.shape[0]), axis=1
+        )
 
     def _ave(self):
         """
@@ -600,7 +603,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
 
         :return: np.ndarray
         """
-        return np.asarray(np.mean(self.model_estim.x, axis=0)).flatten()
+        return np.asarray(np.mean(self.model_estim.model_container.x, axis=0)).flatten()
 
     def _log_fold_change_pairs(self, idx0, idx1, base):
         """

@@ -3,6 +3,9 @@ import logging
 import numpy as np
 import pandas as pd
 
+from batchglm.models.glm_nb import Model as NBModel
+from batchglm.models.glm_norm import Model as NormModel
+
 import diffxpy.api as de
 
 
@@ -20,29 +23,33 @@ class _TestSingleFullRank(unittest.TestCase):
         :param noise_model: Noise model to use for data fitting.
         """
         if self.noise_model == "nb":
-            from batchglm.api.models.numpy.glm_nb import Simulator
+            model = NBModel()
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         elif self.noise_model == "norm":
-            from batchglm.api.models.numpy.glm_norm import Simulator
+            model = NormModel()
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
         else:
             raise ValueError("noise model %s not recognized" % self.noise_model)
 
-        sim = Simulator(num_observations=200, num_features=2)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate_params(rand_fn_scale=rand_fn_scale)
-        sim.generate_data()
+        model.generate_artificial_data(
+            n_obs=200,
+            n_vars=2,
+            num_batches=0,
+            num_conditions=0,
+            rand_fn_scale=rand_fn_scale
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": [str(x) for x in np.random.randint(2, size=sim.nobs)]
+            "condition": [str(x) for x in np.random.randint(2, size=200)]
         })
 
         try:
             random_sample_description["batch"] = random_sample_description["condition"]
             _ = de.test.wald(
-                data=sim.input_data,
+                data=model.x,
+                gene_names=model.features,
                 sample_description=random_sample_description,
-                factor_loc_totest="condition",
+                factor_loc_totest="condition[T.1]",
                 formula_loc="~ 1 + condition + batch",
                 noise_model=self.noise_model
             )
@@ -56,9 +63,10 @@ class _TestSingleFullRank(unittest.TestCase):
                 x + str(np.random.randint(0, 2)) for x in random_sample_description["condition"].values
             ]
             _ = de.test.wald(
-                data=sim.input_data,
+                data=model.x,
+                gene_names=model.features,
                 sample_description=random_sample_description,
-                factor_loc_totest="condition",
+                factor_loc_totest="condition[T.1]",
                 formula_loc="~ 1 + condition + batch",
                 constraints_loc={"batch": "condition"},
                 noise_model=self.noise_model

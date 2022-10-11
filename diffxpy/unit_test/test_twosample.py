@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+from batchglm.models.glm_nb import Model as NBModel
 
 import diffxpy.api as de
 
@@ -22,18 +23,21 @@ class TestTwosample(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-        from batchglm.api.models.numpy.glm_nb import Simulator
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.nobs)
+            "condition": np.random.randint(n_groups, size=n_cells)
         })
 
         test = de.test.two_sample(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             grouping=random_sample_description["condition"].values,
             test="wald",
             noise_model="nb",
@@ -61,18 +65,21 @@ class TestTwosample(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-        from batchglm.api.models.numpy.glm_nb import Simulator
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.nobs)
+            "condition": np.random.randint(n_groups, size=n_cells)
         })
 
         test = de.test.two_sample(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             grouping=random_sample_description["condition"],
             test="wald",
             noise_model="nb",
@@ -100,18 +107,21 @@ class TestTwosample(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-        from batchglm.api.models.numpy.glm_nb import Simulator
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.nobs)
+            "condition": np.random.randint(n_groups, size=n_cells)
         })
 
         test = de.test.two_sample(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             grouping=random_sample_description["condition"],
             test="rank"
         )
@@ -138,18 +148,21 @@ class TestTwosample(unittest.TestCase):
         logging.getLogger("tensorflow").setLevel(logging.ERROR)
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
-        from batchglm.api.models.numpy.glm_nb import Simulator
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(n_groups, size=sim.nobs)
+            "condition": np.random.randint(n_groups, size=n_cells)
         })
 
         test = de.test.two_sample(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             grouping=random_sample_description["condition"],
             test="t_test"
         )

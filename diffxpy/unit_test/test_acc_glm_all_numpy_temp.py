@@ -1,9 +1,7 @@
 import logging
-import anndata
 import numpy as np
-import scipy.sparse
 import unittest
-
+import scanpy as sc
 import batchglm.api as glm
 import diffxpy.api as de
 
@@ -11,35 +9,39 @@ glm.setup_logging(verbosity="WARNING", stream="STDOUT")
 logger = logging.getLogger(__name__)
 
 
-class TestAccuracyGlmNb(
+class TestConvergence(
     unittest.TestCase
 ):
     """
     Test whether optimizers yield exact results for negative binomial distributed data.
     """
 
-    def test_full_nb(self):
-        logging.getLogger("batchglm").setLevel(logging.INFO)
-        logger.error("TestAccuracyGlmNb.test_full_nb()")
-
+    def _test_full_model(self, noise_model):
         np.random.seed(1)
-        adata = anndata.read_h5ad("/Users/david.fischer/Desktop/test.h5ad")
-        TF = "Ascl1"
+        adata = sc.datasets.pbmc3k()
+        tf = "MALAT1"
+        ind = adata.var.index.get_loc(tf)
+        log_cd4 = sc.pp.log1p(adata[:, tf].X.todense())
+        adata.obs[tf + "_log"] = log_cd4
         temp = de.test.continuous_1d(
-            data=adata[:, :10],
-            formula_loc="~ 1 +" + TF + "_log",  # + " + log_sf",
-            formula_scale="~ 1 +" + TF + "_log",  # + " + log_sf",
-            factor_loc_totest=TF + "_log",
-            continuous=TF + "_log",
-            as_numeric=[TF + "_log"],  # "log_sf"],
+            data=adata[:, (ind - 5):(ind + 5)],
+            formula_loc="~ 1 +" + tf + "_log",  # + " + log_sf",
+            formula_scale="~ 1",
+            factor_loc_totest=tf + "_log",
+            continuous=tf + "_log",
+            as_numeric=[tf + "_log"],  # "log_sf"],
             df=4,
             quick_scale=False,
             init_a="all_zero",
             size_factors=None,
-            noise_model="poisson",
+            noise_model=noise_model,
             backend="numpy"
         )
         _ = temp.summary()
+
+    def test(self):
+        for noise_model in ['poisson', 'norm', 'nb']:
+            self._test_full_model(noise_model)
 
 
 if __name__ == '__main__':

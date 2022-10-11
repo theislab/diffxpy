@@ -3,6 +3,9 @@ import logging
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+from batchglm.models.glm_nb import Model as NBModel
+from batchglm.models.glm_norm import Model as NormModel
+from batchglm.models.glm_poisson import Model as PoissonModel
 
 import diffxpy.api as de
 
@@ -26,26 +29,32 @@ class _TestSingleNull:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.numpy.glm_nb import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+            model = NBModel()
         elif noise_model == "norm":
-            from batchglm.api.models.numpy.glm_norm import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+            model = NormModel()
+        elif noise_model == "poisson":
+            rand_fn_scale = None
+            model = PoissonModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate_params(rand_fn_scale=rand_fn_scale)
-        sim.generate_data()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+            rand_fn_scale=rand_fn_scale
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs),
-            "batch": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(2, size=n_cells),
+            "batch": np.random.randint(2, size=n_cells)
         })
 
         test = de.test.wald(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition + batch",
@@ -78,26 +87,32 @@ class _TestSingleNull:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.numpy.glm_nb import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+            model = NBModel()
         elif noise_model == "norm":
-            from batchglm.api.models.numpy.glm_norm import Simulator
             rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape)
+            model = NormModel()
+        elif noise_model == "poisson":
+            rand_fn_scale = lambda shape: np.random.uniform(1, 2, shape) # not used
+            model = PoissonModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate_params(rand_fn_scale=rand_fn_scale)
-        sim.generate_data()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+            rand_fn_scale=rand_fn_scale
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs),
-            "batch": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(2, size=n_cells),
+            "batch": np.random.randint(2, size=n_cells)
         })
 
         test1 = de.test.wald(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition + batch",
@@ -134,22 +149,26 @@ class _TestSingleNull:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.numpy.glm_nb import Simulator
+            model = NBModel()
         elif noise_model == "norm":
-            from batchglm.api.models.numpy.glm_norm import Simulator
+            model = NormModel()
+        elif noise_model == "poisson":
+            model = PoissonModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
-
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+        )
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(4, size=sim.nobs)
+            "condition": np.random.randint(4, size=n_cells)
         })
 
         test = de.test.wald(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             factor_loc_totest="condition",
             formula_loc="~ 1 + condition",
@@ -182,22 +201,26 @@ class _TestSingleNull:
         :param noise_model: Noise model to use for data fitting.
         """
         if noise_model == "nb":
-            from batchglm.api.models.numpy.glm_nb import Simulator
+            model = NBModel()
         elif noise_model == "norm":
-            from batchglm.api.models.numpy.glm_norm import Simulator
+            model = NormModel()
+        elif noise_model == "poisson":
+            model = PoissonModel()
         else:
             raise ValueError("noise model %s not recognized" % noise_model)
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
-
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+        )
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(2, size=n_cells)
         })
 
         test = de.test.lrt(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             full_formula_loc="~ 1 + condition",
             full_formula_scale="~ 1",
@@ -229,18 +252,22 @@ class _TestSingleNull:
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
-        from batchglm.api.models.numpy.glm_norm import Simulator
+        model = NormModel()
 
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(2, size=n_cells)
         })
 
         test = de.test.t_test(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             grouping="condition",
             is_logged=False
@@ -269,18 +296,21 @@ class _TestSingleNull:
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
         """
-        from batchglm.api.models.numpy.glm_norm import Simulator
-
-        sim = Simulator(num_observations=n_cells, num_features=n_genes)
-        sim.generate_sample_description(num_batches=0, num_conditions=0)
-        sim.generate()
+        model = NormModel()
+        model.generate_artificial_data(
+            n_obs=n_cells,
+            n_vars=n_genes,
+            num_batches=0,
+            num_conditions=0,
+        )
 
         random_sample_description = pd.DataFrame({
-            "condition": np.random.randint(2, size=sim.nobs)
+            "condition": np.random.randint(2, size=n_cells)
         })
 
         test = de.test.rank_test(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=random_sample_description,
             grouping="condition"
         )
@@ -344,19 +374,20 @@ class TestSingleNullStandard(_TestSingleNull, unittest.TestCase):
         )
 
 
-class TestSingleNullNb(_TestSingleNull, unittest.TestCase):
+class TestSingleNullModelNb(_TestSingleNull, unittest.TestCase):
+    noise_model = "nb"
     """
-    Negative binomial noise model unit tests that test whether a test generates uniformly
+    Negative binomial (default) noise model unit tests that test whether a test generates uniformly
     distributed p-values if data are sampled from the null model.
     """
 
-    def test_null_distribution_wald_nb(
+    def test_null_distribution_wald(
             self,
             n_cells: int = 2000,
             n_genes: int = 200
     ):
         """
-        Test if wald() generates a uniform p-value distribution for "nb" noise model.
+        Test if wald() generates a uniform p-value distribution for given noise model.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
@@ -369,16 +400,16 @@ class TestSingleNullNb(_TestSingleNull, unittest.TestCase):
         return self._test_null_distribution_wald(
             n_cells=n_cells,
             n_genes=n_genes,
-            noise_model="nb"
+            noise_model=self.noise_model
         )
 
-    def test_null_distribution_wald_repeated_nb(
+    def test_null_distribution_wald_repeated(
             self,
             n_cells: int = 2000,
             n_genes: int = 200
     ):
         """
-        Test if wald() generates a uniform p-value distribution for "nb" noise model.
+        Test if wald() generates a uniform p-value distribution for given noise model.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
@@ -391,16 +422,16 @@ class TestSingleNullNb(_TestSingleNull, unittest.TestCase):
         return self._test_null_distribution_wald_repeated(
             n_cells=n_cells,
             n_genes=n_genes,
-            noise_model="nb"
+            noise_model=self.noise_model
         )
 
-    def test_null_distribution_wald_multi_nb(
+    def test_null_distribution_wald_multi(
             self,
             n_cells: int = 2000,
             n_genes: int = 200
     ):
         """
-        Test if wald() generates a uniform p-value distribution for "nb" noise model
+        Test if wald() generates a uniform p-value distribution for given noise model
         for multiple coefficients to test.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
@@ -414,16 +445,16 @@ class TestSingleNullNb(_TestSingleNull, unittest.TestCase):
         return self._test_null_distribution_wald_multi(
             n_cells=n_cells,
             n_genes=n_genes,
-            noise_model="nb"
+            noise_model=self.noise_model
         )
 
-    def test_null_distribution_lrt_nb(
+    def test_null_distribution_lrt(
             self,
             n_cells: int = 2000,
             n_genes: int = 200
     ):
         """
-        Test if lrt() generates a uniform p-value distribution for "nb" noise model.
+        Test if lrt() generates a uniform p-value distribution for given noise model.
 
         :param n_cells: Number of cells to simulate (number of observations per test).
         :param n_genes: Number of genes to simulate (number of tests).
@@ -436,8 +467,12 @@ class TestSingleNullNb(_TestSingleNull, unittest.TestCase):
         return self._test_null_distribution_lrt(
             n_cells=n_cells,
             n_genes=n_genes,
-            noise_model="nb"
+            noise_model=self.noise_model
         )
+
+
+class TestSingleNullPoisson(TestSingleNullModelNb, unittest.TestCase):
+   noise_model = "poisson"
 
 
 class TestSingleNullNorm(_TestSingleNull, unittest.TestCase):
@@ -447,7 +482,7 @@ class TestSingleNullNorm(_TestSingleNull, unittest.TestCase):
     """
     def test_null_distribution_wald_norm(
             self,
-            n_cells: int = 200,
+            n_cells: int = 2000,
             n_genes: int = 200
     ):
         """

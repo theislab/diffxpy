@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 import logging
 
-from batchglm.api.models.numpy.glm_nb import Simulator
+from batchglm.models.glm_nb import Model as NBModel
 import diffxpy.api as de
 
 
@@ -19,17 +19,21 @@ class TestNumericCovar(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        sim = Simulator(num_observations=2000, num_features=2)
-        sim.generate_sample_description(num_batches=0, num_conditions=2)
-        sim.generate_params()
-        sim.generate_data()
+        model = NBModel()
+        model.generate_artificial_data(
+            n_obs=2000,
+            n_vars=2,
+            num_batches=0,
+            num_conditions=2,
+        )
 
-        sample_description = sim.sample_description
-        sample_description["numeric1"] = np.random.random(size=sim.nobs)
-        sample_description["numeric2"] = np.random.random(size=sim.nobs)
+        sample_description = model.sample_description
+        sample_description["numeric1"] = np.random.random(size=2000)
+        sample_description["numeric2"] = np.random.random(size=2000)
 
         test = de.test.wald(
-            data=sim.input_data,
+            data=model.x,
+            gene_names=model.features,
             sample_description=sample_description,
             formula_loc="~ 1 + condition + numeric1 + numeric2",
             formula_scale="~ 1",
@@ -38,7 +42,7 @@ class TestNumericCovar(unittest.TestCase):
             training_strategy="DEFAULT"
         )
         # Check that number of coefficients is correct.
-        assert test.model_estim.a_var.shape[0] == 4
+        assert test.model_estim.model_container.theta_location.shape[0] == 4
 
         return True
 

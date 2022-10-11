@@ -4,6 +4,7 @@ try:
 except ImportError:
     from anndata import Raw
 import batchglm.api as glm
+import dask
 import numpy as np
 import pandas as pd
 import patsy
@@ -13,18 +14,19 @@ from typing import List, Tuple, Union
 
 # Relay util functions for diffxpy api.
 # design_matrix, preview_coef_names and constraint_system_from_star are redefined here.
-from batchglm.data import constraint_matrix_from_string, constraint_matrix_from_dict
-from batchglm.data import view_coef_names
+from batchglm.utils.data import constraint_matrix_from_string, constraint_system_from_dict
+from batchglm.utils.data import view_coef_names
 
 
 def parse_gene_names(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         gene_names: Union[list, np.ndarray, None]
 ):
     if gene_names is None:
+        print(data)
         if anndata is not None and (isinstance(data, anndata.AnnData) or isinstance(data, Raw)):
             gene_names = data.var_names
-        elif isinstance(data, glm.typing.InputDataBase):
+        elif isinstance(data, glm.utils.input.InputDataGLM):
             gene_names = data.features
         else:
             raise ValueError("Missing gene names")
@@ -33,7 +35,7 @@ def parse_gene_names(
 
 
 def parse_sample_description(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         sample_description: Union[pd.DataFrame, None]
 ) -> pd.DataFrame:
     """
@@ -58,7 +60,7 @@ def parse_sample_description(
             assert data.X.shape[0] == sample_description.shape[0], \
                 "data matrix and sample description must contain same number of cells: %i, %i" % \
                 (data.X.shape[0], sample_description.shape[0])
-        elif isinstance(data, glm.typing.InputDataBase):
+        elif isinstance(data, glm.utils.input.InputDataGLM):
             assert data.x.shape[0] == sample_description.shape[0], \
                 "data matrix and sample description must contain same number of cells: %i, %i" % \
                 (data.x.shape[0], sample_description.shape[0])
@@ -71,7 +73,7 @@ def parse_sample_description(
 
 def parse_size_factors(
         size_factors: Union[np.ndarray, pd.core.series.Series, np.ndarray],
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         sample_description: pd.DataFrame
 ) -> Union[np.ndarray, None]:
     """
@@ -93,7 +95,7 @@ def parse_size_factors(
 
         if anndata is not None and isinstance(data, Raw):
             data_shape = data.X.shape
-        elif isinstance(data, glm.typing.InputDataBase):
+        elif isinstance(data, glm.utils.input.InputDataGLM):
             data_shape = data.x.shape
         else:
             data_shape = data.shape
@@ -118,6 +120,8 @@ def split_x(data, grouping):
 
 
 def dmat_unique(dmat, sample_description):
+    if isinstance(dmat, dask.array.core.Array):
+        dmat = dmat.compute()
     dmat, idx = np.unique(dmat, axis=0, return_index=True)
     sample_description = sample_description.iloc[idx].reset_index(drop=True)
 
@@ -135,7 +139,7 @@ def design_matrix(
     """ Create a design matrix from some sample description.
 
     This function defaults to perform formatting if dmat is directly supplied as a pd.DataFrame.
-    This function relays batchglm.data.design_matrix() to behave like the other wrappers in diffxpy.
+    This function relays batchglm.utils.data.design_matrix() to behave like the other wrappers in diffxpy.
 
     :param data: Input data matrix (observations x features) or (cells x genes).
     :param sample_description: pandas.DataFrame of length "num_observations" containing explanatory variables as columns
@@ -164,11 +168,11 @@ def design_matrix(
         sample_description = parse_sample_description(data, sample_description)
 
     if sample_description is not None:
-        as_categorical = [False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical = [x for x in sample_description.columns.values if x not in as_numeric]
     else:
         as_categorical = True
 
-    return glm.data.design_matrix(
+    return glm.utils.data.design_matrix(
         sample_description=sample_description,
         formula=formula,
         as_categorical=as_categorical,
@@ -186,7 +190,7 @@ def preview_coef_names(
     Return coefficient names of model.
 
     Use this to preview what the model would look like.
-    This function relays batchglm.data.preview_coef_names() to behave like the other wrappers in diffxpy.
+    This function relays batchglm.utils.data.preview_coef_names() to behave like the other wrappers in diffxpy.
 
     :param sample_description: pandas.DataFrame of length "num_observations" containing explanatory variables as columns
     :param formula: model formula as string, describing the relations of the explanatory variables.
@@ -205,25 +209,25 @@ def preview_coef_names(
     if isinstance(as_numeric, tuple):
         as_numeric = list(as_numeric)
 
-    return glm.data.preview_coef_names(
+    return glm.utils.data.preview_coef_names(
         sample_description=sample_description,
         formula=formula,
-        as_categorical=[False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical=[x for x in sample_description.columns.values if x not in as_numeric]
     )
 
 
 def constraint_system_from_star(
+        constraints: dict = {},
         dmat: Union[None, patsy.design_info.DesignMatrix] = None,
         sample_description: Union[None, pd.DataFrame] = None,
         formula: Union[None, str] = None,
         as_numeric: Union[List[str], Tuple[str], str] = (),
-        constraints: dict = {},
         return_type: str = "patsy",
 ) -> Tuple:
     """
     Create a design matrix and a constraint matrix.
 
-    This function relays batchglm.data.constraint_matrix_from_star() to behave like the other wrappers in diffxpy.
+    This function relays batchglm.utils.data.constraint_matrix_from_star() to behave like the other wrappers in diffxpy.
 
     :param dmat: Pre-built model design matrix.
     :param sample_description: pandas.DataFrame of length "num_observations" containing explanatory variables as columns
@@ -259,16 +263,16 @@ def constraint_system_from_star(
         as_numeric = list(as_numeric)
 
     if sample_description is not None:
-        as_categorical = [False if x in as_numeric else True for x in sample_description.columns.values]
+        as_categorical = [x for x in sample_description.columns.values if x not in as_numeric]
     else:
         as_categorical = True
 
-    return glm.data.constraint_system_from_star(
+    return glm.utils.data.constraint_system_from_star(
+        constraints,
         dmat=dmat,
         sample_description=sample_description,
         formula=formula,
         as_categorical=as_categorical,
-        constraints=constraints,
         return_type=return_type
     )
 
@@ -305,7 +309,7 @@ def bin_continuous_covariate(
     else:
         bins = np.arange(0, 1, 1 / bins)
 
-    fac_binned = glm.data.bin_continuous_covariate(
+    fac_binned = glm.utils.data.bin_continuous_covariate(
         sample_description=sd,
         factor_to_bin=factor_to_bin,
         bins=bins

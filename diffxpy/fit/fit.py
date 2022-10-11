@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import patsy
 import scipy.sparse
+import dask
 from typing import Union, List, Dict, Callable, Tuple
 
 from .external import _fit
@@ -17,7 +18,7 @@ from .external import parse_gene_names, parse_sample_description, parse_size_fac
 
 
 def model(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         formula_loc: Union[None, str] = None,
         formula_scale: Union[None, str] = "~1",
         as_numeric: Union[List[str], Tuple[str], str] = (),
@@ -192,23 +193,23 @@ def model(
     )
 
     design_loc, design_loc_names, constraints_loc, term_names_loc = constraint_system_from_star(
+        constraints=constraints_loc,
         dmat=dmat_loc,
         sample_description=sample_description,
         formula=formula_loc,
         as_numeric=as_numeric,
-        constraints=constraints_loc,
         return_type="patsy"
     )
     design_scale, design_scale_names, constraints_scale, term_names_scale = constraint_system_from_star(
+        constraints=constraints_scale,
         dmat=dmat_scale,
         sample_description=sample_description,
         formula=formula_scale,
         as_numeric=as_numeric,
-        constraints=constraints_scale,
         return_type="patsy"
     )
 
-    model = _fit(
+    estim = _fit(
         noise_model=noise_model,
         data=data,
         design_loc=design_loc,
@@ -226,11 +227,11 @@ def model(
         quick_scale=quick_scale,
         dtype=dtype
     )
-    return model
+    return estim
 
 
 def residuals(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         formula_loc: Union[None, str] = None,
         formula_scale: Union[None, str] = "~1",
         as_numeric: Union[List[str], Tuple[str], str] = (),
@@ -401,12 +402,12 @@ def residuals(
         dtype=dtype,
         ** kwargs
     )
-    residuals = estim.x - estim.model.location
+    residuals = estim.model_container.x - estim.model_container.location
     return residuals
 
 
 def partition(
-        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+        data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
         parts: Union[str, np.ndarray, list],
         gene_names: Union[np.ndarray, list] = None,
         sample_description: pd.DataFrame = None,
@@ -460,7 +461,7 @@ class _Partition:
 
     def __init__(
             self,
-            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.typing.InputDataBase],
+            data: Union[anndata.AnnData, Raw, np.ndarray, scipy.sparse.csr_matrix, glm.utils.input.InputDataGLM],
             parts: Union[str, np.ndarray, list],
             gene_names: Union[np.ndarray, list] = None,
             sample_description: pd.DataFrame = None,
@@ -487,12 +488,14 @@ class _Partition:
             same order as in data or string-type column identifier of size-factor containing
             column in sample description.
         """
-        if isinstance(data, glm.typing.InputDataBase):
+        if isinstance(data, glm.utils.input.InputDataGLM):
             self.x = data.x
         elif isinstance(data, anndata.AnnData) or isinstance(data, Raw):
             self.x = data.X
         elif isinstance(data, np.ndarray):
             self.x = data
+        elif isinstance(data, dask.array.core.Array):
+            self.x = data.compute()  # ?
         else:
             raise ValueError("data type %s not recognized" % type(data))
         self.gene_names = parse_gene_names(data, gene_names)
