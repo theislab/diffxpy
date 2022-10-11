@@ -568,7 +568,7 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
         pvals = np.tile(np.NaN, [len(idx0), len(idx1), self.model_estim.model_container.x.shape[1]])
         for i, xi in enumerate(idx0):
             for j, xj in enumerate(idx1):
-                if i != j:
+                if xi != xj:
                     pvals[i, j, :] = stats.two_coef_z_test(
                         theta_mle0=self._theta_mle[xi, :],
                         theta_mle1=self._theta_mle[xj, :],
@@ -577,7 +577,6 @@ class DifferentialExpressionTestZTestLazy(_DifferentialExpressionTestPairwiseLaz
                     )
                 else:
                     pvals[i, j, :] = np.array([1.])
-
         return pvals
 
     @property
