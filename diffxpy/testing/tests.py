@@ -196,6 +196,8 @@ def _fit(
     constructor_args = {}
     if quick_scale is not None:
         constructor_args["quick_scale"] = quick_scale
+    if batch_size is not None and backend != "tf2":
+        constructor_args["batch_size"] = batch_size
     # Backend-specific constructor arguments:
     if backend.lower() in ["tf1"]:
         constructor_args['provide_optimizers'] = {
