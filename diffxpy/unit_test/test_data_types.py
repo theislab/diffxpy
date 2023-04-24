@@ -63,22 +63,20 @@ class TestDataTypesSingle(unittest.TestCase):
         })
         return sim.x, random_sample_description
 
-    def _test_numpy(self, sparse):
+    def _test_numpy(self, fmt=np.asarray):
         data, sample_description = self.simulate()
         gene_names = ["gene" + str(i) for i in range(data.shape[1])]
-        if sparse:
-            data = scipy.sparse.csr_matrix(data)
+        data = fmt(data)
 
         self._test_wald(data=data, sample_description=sample_description, gene_names=gene_names)
         self._test_lrt(data=data, sample_description=sample_description, gene_names=gene_names)
         self._test_t_test(data=data, sample_description=sample_description, gene_names=gene_names)
         self._test_rank(data=data, sample_description=sample_description, gene_names=gene_names)
 
-    def _test_anndata(self, sparse):
+    def _test_anndata(self, fmt=np.asarray):
         data, sample_description = self.simulate()
         gene_names = ["gene" + str(i) for i in range(data.shape[1])]
-        if sparse:
-            data = scipy.sparse.csr_matrix(data)
+        data = fmt(data)
 
         data = anndata.AnnData(data)
         data.var_names = gene_names
@@ -87,11 +85,10 @@ class TestDataTypesSingle(unittest.TestCase):
         self._test_t_test(data=data, sample_description=sample_description)
         self._test_rank(data=data, sample_description=sample_description)
 
-    def _test_anndata_raw(self, sparse):
+    def _test_anndata_raw(self, fmt=np.asarray):
         data, sample_description = self.simulate()
         gene_names = ["gene" + str(i) for i in range(data.shape[1])]
-        if sparse:
-            data = scipy.sparse.csr_matrix(data)
+        data = fmt(data)
 
         data = anndata.AnnData(data)
         data.var_names = gene_names
@@ -106,8 +103,9 @@ class TestDataTypesSingle(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        self._test_numpy(sparse=False)
-        self._test_numpy(sparse=True)
+        self._test_numpy(fmt=np.asarray)
+        self._test_numpy(fmt=scipy.sparse.csr_matrix)
+        self._test_numpy(fmt=scipy.sparse.csc_matrix)
 
         return True
 
@@ -116,10 +114,12 @@ class TestDataTypesSingle(unittest.TestCase):
         logging.getLogger("batchglm").setLevel(logging.WARNING)
         logging.getLogger("diffxpy").setLevel(logging.WARNING)
 
-        self._test_anndata(sparse=False)
-        self._test_anndata(sparse=True)
-        self._test_anndata_raw(sparse=False)
-        self._test_anndata_raw(sparse=True)
+        self._test_anndata(fmt=np.asarray)
+        self._test_anndata(fmt=scipy.sparse.csr_matrix)
+        self._test_anndata(fmt=scipy.sparse.csc_matrix)
+        self._test_anndata_raw(fmt=np.asarray)
+        self._test_anndata_raw(fmt=scipy.sparse.csr_matrix)
+        self._test_anndata_raw(fmt=scipy.sparse.csc_matrix)
 
         return True
 

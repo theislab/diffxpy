@@ -66,8 +66,8 @@ def mann_whitney_u_test(
 
     pvals = np.asarray([
         scipy.stats.mannwhitneyu(
-            x=np.asarray(x0[:, i].todense()).flatten() if isinstance(x0, scipy.sparse.csr_matrix) else x0[:, i],
-            y=np.asarray(x1[:, i].todense()).flatten() if isinstance(x0, scipy.sparse.csr_matrix) else x1[:, i],
+            x=x0[:, i].toarray().flatten() if isinstance(x0, scipy.sparse.spmatrix) else x0[:, i],
+            y=x1[:, i].toarray().flatten() if isinstance(x0, scipy.sparse.spmatrix) else x1[:, i],
             use_continuity=True,
             alternative="two-sided"
         ).pvalue for i in range(x0.shape[1])
