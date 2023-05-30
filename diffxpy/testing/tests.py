@@ -1273,9 +1273,9 @@ def pairwise(
         elif isinstance(data, glm.typing.InputDataBase):
             data = data.x
         groups = np.unique(grouping)
-        pvals = np.tile(np.NaN, [len(groups), len(groups), data.shape[1]])
+        pvals = np.tile(np.nan, [len(groups), len(groups), data.shape[1]])
         pvals[np.eye(pvals.shape[0]).astype(bool)] = 0
-        logfc = np.tile(np.NaN, [len(groups), len(groups), data.shape[1]])
+        logfc = np.tile(np.nan, [len(groups), len(groups), data.shape[1]])
         logfc[np.eye(logfc.shape[0]).astype(bool)] = 0
 
         if keep_full_test_objs:

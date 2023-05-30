@@ -127,7 +127,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         :param log10_threshold: minimal log10 p-value to return.
         :return: Cleaned log10 transformed p-values.
         """
-        pvals = np.reshape(self.pval, -1).astype(dtype=np.float)
+        pvals = np.reshape(self.pval, -1).astype(dtype=float)
         pvals = np.clip(
             pvals,
             np.nextafter(0, 1),
@@ -148,7 +148,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         :param log10_threshold: minimal log10 q-value to return.
         :return: Cleaned log10 transformed q-values.
         """
-        qvals = np.reshape(self.qval, -1).astype(dtype=np.float)
+        qvals = np.reshape(self.qval, -1).astype(dtype=float)
         qvals = np.clip(
             qvals,
             np.nextafter(0, 1),
@@ -357,7 +357,7 @@ class _DifferentialExpressionTest(metaclass=abc.ABCMeta):
         plt.ioff()
 
         ave = np.log(np.clip(
-            self.mean.astype(dtype=np.float),
+            self.mean.astype(dtype=float),
             np.max(np.array([np.nextafter(0, 1), min_mean])),
             np.inf
         ))
@@ -1564,8 +1564,8 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         x0, x1 = split_x(data, grouping)
 
         # Only compute p-values for genes with non-zero observations and non-zero group-wise variance.
-        mean_x0 = np.asarray(np.mean(x0, axis=0)).flatten().astype(dtype=np.float)
-        mean_x1 = np.asarray(np.mean(x1, axis=0)).flatten().astype(dtype=np.float)
+        mean_x0 = np.asarray(np.mean(x0, axis=0)).flatten().astype(dtype=float)
+        mean_x1 = np.asarray(np.mean(x1, axis=0)).flatten().astype(dtype=float)
         # Avoid unnecessary mean computation:
         self._mean = np.asarray(np.average(
             a=np.vstack([mean_x0, mean_x1]),
@@ -1577,11 +1577,11 @@ class DifferentialExpressionTestTT(_DifferentialExpressionTestSingle):
         self._ave_nonzero = self._mean != 0  # omit all-zero features
         if isinstance(x0, scipy.sparse.csr_matrix):
             # Efficient analytic expression of variance without densification.
-            var_x0 = np.asarray(np.mean(x0.power(2), axis=0)).flatten().astype(dtype=np.float) - np.square(mean_x0)
-            var_x1 = np.asarray(np.mean(x1.power(2), axis=0)).flatten().astype(dtype=np.float) - np.square(mean_x1)
+            var_x0 = np.asarray(np.mean(x0.power(2), axis=0)).flatten().astype(dtype=float) - np.square(mean_x0)
+            var_x1 = np.asarray(np.mean(x1.power(2), axis=0)).flatten().astype(dtype=float) - np.square(mean_x1)
         else:
-            var_x0 = np.asarray(np.var(x0, axis=0)).flatten().astype(dtype=np.float)
-            var_x1 = np.asarray(np.var(x1, axis=0)).flatten().astype(dtype=np.float)
+            var_x0 = np.asarray(np.var(x0, axis=0)).flatten().astype(dtype=float)
+            var_x1 = np.asarray(np.var(x1, axis=0)).flatten().astype(dtype=float)
         self._var_geq_zero = np.logical_or(
             var_x0 > 0,
             var_x1 > 0
@@ -1690,8 +1690,8 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
 
         x0, x1 = split_x(data, grouping)
 
-        mean_x0 = np.asarray(np.mean(x0, axis=0)).flatten().astype(dtype=np.float)
-        mean_x1 = np.asarray(np.mean(x1, axis=0)).flatten().astype(dtype=np.float)
+        mean_x0 = np.asarray(np.mean(x0, axis=0)).flatten().astype(dtype=float)
+        mean_x1 = np.asarray(np.mean(x1, axis=0)).flatten().astype(dtype=float)
         # Avoid unnecessary mean computation:
         self._mean = np.asarray(np.average(
             a=np.vstack([mean_x0, mean_x1]),
@@ -1702,11 +1702,11 @@ class DifferentialExpressionTestRank(_DifferentialExpressionTestSingle):
         )).flatten()
         if isinstance(x0, scipy.sparse.csr_matrix):
             # Efficient analytic expression of variance without densification.
-            var_x0 = np.asarray(np.mean(x0.power(2), axis=0)).flatten().astype(dtype=np.float) - np.square(mean_x0)
-            var_x1 = np.asarray(np.mean(x1.power(2), axis=0)).flatten().astype(dtype=np.float) - np.square(mean_x1)
+            var_x0 = np.asarray(np.mean(x0.power(2), axis=0)).flatten().astype(dtype=float) - np.square(mean_x0)
+            var_x1 = np.asarray(np.mean(x1.power(2), axis=0)).flatten().astype(dtype=float) - np.square(mean_x1)
         else:
-            var_x0 = np.asarray(np.var(x0, axis=0)).flatten().astype(dtype=np.float)
-            var_x1 = np.asarray(np.var(x1, axis=0)).flatten().astype(dtype=np.float)
+            var_x0 = np.asarray(np.var(x0, axis=0)).flatten().astype(dtype=float)
+            var_x1 = np.asarray(np.var(x1, axis=0)).flatten().astype(dtype=float)
         self._var_geq_zero = np.logical_or(
             var_x0 > 0,
             var_x1 > 0
