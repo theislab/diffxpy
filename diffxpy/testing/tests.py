@@ -939,9 +939,9 @@ def two_sample(
         function if you would like to perform a different test.
 
             * full model location parameter: ~ 1 + group
-            * full model scale parameter: ~ 1 + group
+            * full model scale parameter: ~ 1
             * reduced model location parameter: ~ 1
-            * reduced model scale parameter: ~ 1 + group
+            * reduced model scale parameter: ~ 1
     - "wald" - Wald test:
         Requires the fitting of 1 generalized linear models.
         model location parameter: ~ 1 + group
