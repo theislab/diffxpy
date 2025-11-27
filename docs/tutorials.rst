@@ -8,7 +8,7 @@ We grouped tutorials by differential expression concepts:
 
 `Introduction <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/introduction_differential_testing.ipynb>`__ to differential expression testing.
 
-Differential expression analysis with `continuous <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/introduction_differential_testing.ipynb>`__ covariates such time, concentratino, pseudotime or space.
+Differential expression analysis with `continuous <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/modelling_continuous_covariates.ipynb>`__ covariates such time, concentration, pseudotime or space.
 
 How to run `multiple <https://nbviewer.jupyter.org/github/theislab/diffxpy_tutorials/tree/master/diffxpy_tutorials/test/multiple_tests_per_gene.ipynb>`__ tests per gene.
 
